@@ -1,30 +1,68 @@
 {
   "frame": 384,
   "z_order": {
-    "leg_left": 0,
-    "leg_right": 0,
-    "torso": 2,
-    "core": 3,
-    "head": 3
+    "thigh_left": 0,
+    "thigh_right": 0,
+    "shin_left": 1,
+    "shin_right": 1,
+    "torso": 3,
+    "core": 4,
+    "head": 5
   },
-  "shoulders": {
+  "anim": {
+    "step_freq": 1.0,
+    "thigh_rot": 0.1,
+    "shin_rot": 0.22,
+    "lift_thigh": 0.02,
+    "lift_shin": 0.024,
+    "stride": 0.014,
+    "squash": 0.055,
+    "bob": 0.02,
+    "lat": 0.01,
+    "rock": 0.045,
+    "head_bob": 0.008,
+    "core_pulse_hz": 1.2,
+    "recoil": 0.06,
+    "recoil_rock": 0.05
+  },
+  "hips": {
     "left": [
-      -91.7,
-      -35.4
+      -37.9,
+      4.8
     ],
     "right": [
-      91.7,
-      -35.4
+      37.9,
+      4.8
+    ]
+  },
+  "knees": {
+    "left": [
+      -37.9,
+      48.1
+    ],
+    "right": [
+      37.9,
+      48.1
     ]
   },
   "feet": {
     "left": [
-      -44.6,
-      79.0
+      -37.9,
+      104.6
     ],
     "right": [
-      44.6,
-      79.0
+      37.9,
+      104.6
+    ]
+  },
+  "shoulders": {
+    "left": [
+      -84.2,
+      -53.2
+    ],
+    "right": [
+      86.3,
+      -54.8
     ]
   },
   "center": [
@@ -34,13 +72,13 @@
   "weapons": {
     "autocannon": {
       "muzzle": [
-        117.7,
+        109.4,
         -0.0
       ]
     },
     "missilepod": {
       "muzzle": [
-        74.3,
+        63.1,
         -0.0
       ]
     }

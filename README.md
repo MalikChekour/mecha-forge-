@@ -11,10 +11,13 @@ weapons baked together, one walk-sheet per chassis). That does not scale to a *c
 mecha with *visible* weapon hardpoints — every chassis×weapon combo would need its own bake.
 
 Here the mecha is assembled from **separately-rendered rigid parts**
-(`torso`, `leg_left`, `leg_right`, `head`, `core`) composited live, and each equipped weapon
-is a **visible hardpoint** sprite mounted at a shoulder anchor that aims and recoils. Motion
-is **fully procedural** in-engine (leg stomp + weight-bob + torso rock + core pulse + hardpoint
-aim/recoil), so any loadout animates with **zero extra baking**.
+(`torso`, `thigh_left/right`, `shin_left/right`, `head`, `core`) composited live, and each
+equipped weapon is a **visible hardpoint** sprite mounted at a shoulder anchor that aims and
+recoils. Motion is **fully procedural** in-engine — two-segment FK legs in antiphase (visible
+knee bend, foot plant + squash), torso weight (bob on footfalls, lateral shift, pelvis rock),
+core pulse, hardpoint aim/recoil with torso counter-rock — so any loadout animates with
+**zero extra baking**. Animation constants live in `rig.json` (single source of truth for
+both the Python preview and `MechaRig.gd`).
 
 This deliberately sidesteps the documented dead-ends: no mesh segmentation (SIGSEGV), no
 hard-surface auto-rig (smooth-skin tears) — the parts are separate rigid objects, animated by
@@ -48,10 +51,12 @@ Desktop sandbox (arrow keys to drive; auto-demo otherwise):
 
 ## Status
 
-Foundation: layered mecha rig + procedural walk/aim/fire, validated headless. Art is a chunky
-hard-surface base (bpy primitives) — riggable and consistent; a FLUX/higher-fidelity skin pass
-can replace the part textures without touching the rig. Gameplay (spawner, weapons firing real
-projectiles, XP/draft, meta, Android/monetization) is intentionally **not** built yet — the
-brief's gate is to prove the differentiating art/animation on one entity first.
+v2 (fidelity pass after an adversarial art+code review): two-segment legs with a walk that
+actually reads at phone scale, zoned materials (tintable armor / near-black joints / bright
+trim with procedural edge-wear) + cyan rim light, weapon archetypes (rotary autocannon,
+6-tube missile pod with hot tips), designed chest reactor, heroic proportions, real smoke-test
+assertions (exit 1 on failure). Gameplay (spawner, projectiles, XP/draft, meta,
+Android/monetization) is intentionally **not** built yet — the brief's gate is to prove the
+differentiating art/animation on one entity first.
 
 Layout: `game/` = Godot project · `tools/` = bpy + preview pipeline · `docs/` = proof artifacts.
