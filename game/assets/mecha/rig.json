@@ -1,0 +1,48 @@
+{
+  "frame": 384,
+  "z_order": {
+    "leg_left": 0,
+    "leg_right": 0,
+    "torso": 2,
+    "core": 3,
+    "head": 3
+  },
+  "shoulders": {
+    "left": [
+      -91.7,
+      -35.4
+    ],
+    "right": [
+      91.7,
+      -35.4
+    ]
+  },
+  "feet": {
+    "left": [
+      -44.6,
+      79.0
+    ],
+    "right": [
+      44.6,
+      79.0
+    ]
+  },
+  "center": [
+    0.0,
+    -0.0
+  ],
+  "weapons": {
+    "autocannon": {
+      "muzzle": [
+        117.7,
+        -0.0
+      ]
+    },
+    "missilepod": {
+      "muzzle": [
+        74.3,
+        -0.0
+      ]
+    }
+  }
+}

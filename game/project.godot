@@ -1,0 +1,27 @@
+; MECHA-FORGE — fresh mecha survivor-like (Godot 4.3). Code-first, headless-validatable.
+config_version=5
+
+[application]
+config/name="MECHA-FORGE"
+config/description="Fresh mecha survivor-like — layered animated mecha rig foundation"
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.3", "Mobile")
+config/icon="res://icon.svg"
+
+[autoload]
+Palette="*res://autoload/Palette.gd"
+Tex="*res://autoload/Tex.gd"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/handheld/orientation=6
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.06, 0.055, 0.1, 1)
+2d/snap/snap_2d_transforms_to_pixel=false
