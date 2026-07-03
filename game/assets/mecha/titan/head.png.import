@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bwmn2vu8oe36s"
-path="res://.godot/imported/shin_left.png-2411feb96930b1b280ca527fd5481d5e.ctex"
+uid="uid://de1f68c4r7cvv"
+path="res://.godot/imported/head.png-7b3f0b912ae25e6340fa004855adab2d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/mecha/shin_left.png"
-dest_files=["res://.godot/imported/shin_left.png-2411feb96930b1b280ca527fd5481d5e.ctex"]
+source_file="res://assets/mecha/titan/head.png"
+dest_files=["res://.godot/imported/head.png-7b3f0b912ae25e6340fa004855adab2d.ctex"]
 
 [params]
 

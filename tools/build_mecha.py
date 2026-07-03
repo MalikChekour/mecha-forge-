@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-mecha-forge — hard-surface mecha PART renderer v2 (headless bpy, Cycles CPU, no GPU).
+mecha-forge — hard-surface mecha PART renderer v3 (headless bpy, Cycles CPU, no GPU).
 
-v2 after the art-director review pass:
-- legs are TWO segments per side (thigh + shin/foot) rendered as separate layers,
-  so the engine can bend a visible knee — the walk must READ at phone scale.
-- brighter mid-value armor + hot cyan rim light + zoned materials (primary armor /
-  near-black joints / bright metal trim / emissives) so the silhouette carves off a
-  dark battlefield instead of vanishing dark-on-dark.
-- weapons redesigned as legible ARCHETYPES: rotary autocannon (visible barrel
-  cluster) and boxy missile pod (grid of tubes with hot orange tips).
-- the chest reactor is a designed element (trim frame + hot core + saturated halo),
-  not a blank panel.
-- longer legs / bigger feet (heroic proportions), camera at 40° elevation so the
-  lower body doesn't compress.
-- rig.json now carries hips/knees/feet anchors AND the shared animation constants,
-  making it the single source of truth for preview_gif.py and MechaRig.gd.
+v3 = CUSTOMIZATION PROOF: the builder is parameterized by a CHASSIS SPEC and
+renders each chassis into its own assets/mecha/<id>/ folder with its own
+rig.json (anchors + per-chassis animation constants). Weapons are shared,
+chassis-independent hardpoints in assets/weapons/.
 
-Parts are rendered from ONE shared ortho camera so all layers stack pixel-aligned.
-Anchors are world points projected through the camera (world_to_camera_view).
+Chassis:
+- vanguard : the blue/steel hero — balanced proportions, crest head.
+- titan    : heavy weight class — wider torso, short legs, bunker head,
+             olive/bronze armor, ORANGE core; slower/heavier gait constants.
+
+Weapons (all built around the frame center, barrel pointing +X):
+- autocannon  : rotary barrel cluster + muzzle ring
+- missilepod  : boxy pod, 6 tubes with hot orange tips
+- railgun     : twin rails + emissive accelerator coils (long reach)
+- plasmacaster: fork prongs cradling a hot plasma orb
+
+Everything renders from ONE shared ortho camera so layers stack pixel-aligned.
 
 Usage:
-  python build_mecha.py            # render all parts + weapons + rig.json
-  python build_mecha.py torso      # render one part (fast look-dev)
-  python build_mecha.py --preview  # single composite render of EVERYTHING (look-dev)
+  python build_mecha.py                    # render both chassis + all weapons
+  python build_mecha.py vanguard           # one chassis only
+  python build_mecha.py --preview titan    # single composite look-dev render
 """
 import bpy, os, sys, json, math, mathutils
 from bpy_extras.object_utils import world_to_camera_view
@@ -31,51 +31,52 @@ from bpy_extras.object_utils import world_to_camera_view
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MECHA = os.path.join(ROOT, "game", "assets", "mecha")
 WEAP = os.path.join(ROOT, "game", "assets", "weapons")
-os.makedirs(MECHA, exist_ok=True)
-os.makedirs(WEAP, exist_ok=True)
+DOCS = os.path.join(ROOT, "docs")
 
 RES = 384
 SAMPLES = 48
-CAM_EL = 40.0                                    # 3/4 top-down: legs read, shoulder tops visible
-CAM_TARGET = mathutils.Vector((0.0, 0.0, 1.20))  # frame center ~ mecha mid-height
+CAM_EL = 40.0
+CAM_TARGET = mathutils.Vector((0.0, 0.0, 1.20))
 ORTHO = 3.65
 
-# ---- zoned palette (readability pass: mid-value armor, near-black joints, hot trim) ----
-PRIMARY = (0.42, 0.50, 0.64)      # tintable armor — mid value so paint reads
-PRIMARY_DK = (0.22, 0.27, 0.38)   # secondary plates
-JOINT = (0.045, 0.050, 0.065)     # near-black mechanical/rubber joints
-TRIM = (0.72, 0.76, 0.85)         # bright metal trim — catches spec streaks
-GUNMETAL = (0.15, 0.16, 0.21)
+TRIM = (0.72, 0.76, 0.85)
 CYAN = (0.20, 0.90, 1.00)
 ORANGE = (1.00, 0.42, 0.10)
 
-# ---- SHARED animation constants (fractions of frame / radians / Hz) ----
-# Written into rig.json — preview_gif.py and MechaRig.gd both read them from there.
-ANIM = {
-    "step_freq": 1.0,        # leg cycles/sec at reference speed
-    "thigh_rot": 0.10,       # thigh swing about hip (rad)
-    "shin_rot": 0.22,        # knee bend during swing (rad) — makes the knee READ
-    "lift_thigh": 0.020,     # vertical foot lift, thigh share (frac of frame)
-    "lift_shin": 0.024,      # extra lift on the shin/foot layer
-    "stride": 0.014,         # fore/aft slide
-    "squash": 0.055,         # foot-plant squash on the shin layer (scale)
-    "bob": 0.020,            # torso weight-bob (2 beats/cycle)
-    "lat": 0.010,            # torso lateral shift toward planted foot
-    "rock": 0.045,           # torso rock (rad)
-    "head_bob": 0.008,
-    "core_pulse_hz": 1.2,
-    "recoil": 0.06,          # weapon kick along -aim (frac of frame)
-    "recoil_rock": 0.05,     # torso counter-rock impulse on fire (rad)
+# ---- shared gait model; per-chassis overrides tune the weight class ----
+ANIM_BASE = {
+    "step_freq": 1.0, "thigh_rot": 0.10, "shin_rot": 0.22,
+    "lift_thigh": 0.020, "lift_shin": 0.024, "stride": 0.014, "squash": 0.055,
+    "bob": 0.020, "lat": 0.010, "rock": 0.045, "head_bob": 0.008,
+    "core_pulse_hz": 1.2, "recoil": 0.06, "recoil_rock": 0.05,
 }
 
-part_objs = {}   # layer name -> [obj,...]
+CHASSIS_SPECS = {
+    "vanguard": {
+        "pal": {
+            "primary": (0.42, 0.50, 0.64), "primary_dk": (0.22, 0.27, 0.38),
+            "joint": (0.045, 0.050, 0.065), "gun": (0.15, 0.16, 0.21),
+            "glow": CYAN, "core_hot": (0.85, 1.0, 1.0),
+        },
+        "hip_z": 1.14, "knee_z": 0.62, "leg_x": 0.36, "tw": 1.0,
+        "head": "crest", "anim": {},
+    },
+    "titan": {
+        "pal": {
+            "primary": (0.46, 0.44, 0.30), "primary_dk": (0.27, 0.25, 0.17),
+            "joint": (0.050, 0.046, 0.040), "gun": (0.17, 0.15, 0.12),
+            "glow": ORANGE, "core_hot": (1.0, 0.85, 0.6),
+        },
+        "hip_z": 0.98, "knee_z": 0.54, "leg_x": 0.44, "tw": 1.18,
+        "head": "bunker",
+        "anim": {"step_freq": 0.82, "bob": 0.025, "rock": 0.055, "lift_shin": 0.020},
+    },
+}
+
+part_objs = {}
 
 
-# ---------- materials ----------
 def _edge_wear_metal(name, color, rough=0.42, metal=1.0, wear=0.55):
-    """PBR metal with procedural edge-wear: bright TRIM metal bleeds through on
-    edges (Bevel-node normal difference mask) + noise roughness variation.
-    Sells 'battle-worn plates' without any texture/GPU work."""
     m = bpy.data.materials.new(name); m.use_nodes = True
     nt = m.node_tree
     b = nt.nodes.get("Principled BSDF")
@@ -103,7 +104,6 @@ def _edge_wear_metal(name, color, rough=0.42, metal=1.0, wear=0.55):
     mixc.inputs["B"].default_value = (*TRIM, 1.0)
     nt.links.new(clamp.outputs["Result"], mixc.inputs["Factor"])
     nt.links.new(mixc.outputs["Result"], b.inputs["Base Color"])
-    # subtle roughness breakup
     noise = nt.nodes.new("ShaderNodeTexNoise"); noise.inputs["Scale"].default_value = 9.0
     rmap = nt.nodes.new("ShaderNodeMapRange")
     rmap.inputs["To Min"].default_value = max(0.05, rough - 0.12)
@@ -150,86 +150,140 @@ def cyl(part, r, depth, loc, rot=(0, 0, 0), mat=None, verts=24):
     return o
 
 
-# ---------- skeleton reference points (world, +Z up, -Y = front/camera) ----------
-# Heroic proportions: legs lengthened (hip at 1.14), bigger feet.
-HIP = {"left": (-0.36, 0.0, 1.14), "right": (0.36, 0.0, 1.14)}
-KNEE = {"left": (-0.36, -0.02, 0.62), "right": (0.36, -0.02, 0.62)}
-FOOT = {"left": (-0.36, -0.14, 0.02), "right": (0.36, -0.14, 0.02)}
-SHOULDER = {"left": (-0.80, 0.0, 1.86), "right": (0.82, 0.0, 1.88)}
-WM = mathutils.Vector((0.0, 0.0, 1.20))   # weapon build origin = frame center
+def sph(part, r, loc, mat=None):
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=loc, segments=20, ring_count=12)
+    o = bpy.context.active_object
+    bpy.ops.object.shade_smooth()
+    if mat:
+        o.data.materials.append(mat)
+    part_objs.setdefault(part, []).append(o)
+    return o
 
 
-def build():
-    primary = _edge_wear_metal("primary", PRIMARY, rough=0.40)
-    primary_dk = _edge_wear_metal("primary_dk", PRIMARY_DK, rough=0.46)
-    joint = _edge_wear_metal("joint", JOINT, rough=0.85, metal=0.0, wear=0.0)
+def build_chassis(spec):
+    """Build one chassis as separate rigid part layers. Returns its anchor dict."""
+    pal = spec["pal"]
+    tw = spec["tw"]
+    dz = spec["hip_z"] - 1.14           # vertical shift vs the vanguard reference
+    lx = spec["leg_x"]
+
+    primary = _edge_wear_metal("primary", pal["primary"], rough=0.40)
+    primary_dk = _edge_wear_metal("primary_dk", pal["primary_dk"], rough=0.46)
+    joint = _edge_wear_metal("joint", pal["joint"], rough=0.85, metal=0.0, wear=0.0)
     trim = _edge_wear_metal("trim", TRIM, rough=0.22, wear=0.0)
-    gun = _edge_wear_metal("gun", GUNMETAL, rough=0.48, wear=0.35)
-    core_hot = _mat_emit("core_hot", (0.85, 1.0, 1.0), 16.0)
-    core_halo = _mat_emit("core_halo", CYAN, 10.0)
-    visor_e = _mat_emit("visor_e", CYAN, 10.0)
-    sensor_e = _mat_emit("sensor_e", CYAN, 6.0)
-    tip_e = _mat_emit("tip_e", ORANGE, 6.0)
+    gun = _edge_wear_metal("gun", pal["gun"], rough=0.48, wear=0.35)
+    core_hot = _mat_emit("core_hot", pal["core_hot"], 16.0)
+    core_halo = _mat_emit("core_halo", pal["glow"], 10.0)
+    visor_e = _mat_emit("visor_e", pal["glow"], 10.0)
+    sensor_e = _mat_emit("sensor_e", pal["glow"], 6.0)
 
-    # ---- TORSO (chest + pelvis + shoulders + backpack; one rigid layer) ----
-    box("torso", (1.04, 0.60, 0.72), (0, 0, 1.50), mat=primary)                 # chest
-    box("torso", (0.52, 0.44, 0.16), (0, 0, 1.14), mat=joint, bevel=0.02)       # abdomen joint (dark break)
-    box("torso", (0.78, 0.54, 0.24), (0, -0.02, 1.00), mat=primary_dk)          # pelvis
-    box("torso", (0.72, 0.46, 0.13), (0, 0.02, 1.90), mat=primary_dk)           # collar
-    box("torso", (0.40, 0.10, 0.34), (0, -0.325, 1.50), mat=trim, bevel=0.02)   # reactor frame
-    for sx in (-0.30, 0.30):                                                    # chest panel lines
-        box("torso", (0.05, 0.045, 0.52), (sx, -0.305, 1.50), mat=gun, bevel=0.01)
-    box("torso", (0.30, 0.40, 0.38), (-0.58, 0, 1.72), mat=joint, bevel=0.02)   # shoulder joint L
-    box("torso", (0.30, 0.40, 0.38), (0.58, 0, 1.72), mat=joint, bevel=0.02)    # shoulder joint R
-    # pauldrons — asymmetric silhouette: right is bigger with a trim lip
-    box("torso", (0.44, 0.50, 0.36), (-0.80, 0, 1.86), rot=(0, -12, 0), mat=primary)
-    for k in range(3):                                                          # vents on top of L pauldron
-        box("torso", (0.30, 0.07, 0.035), (-0.80, -0.14 + 0.14 * k, 2.035), rot=(0, -12, 0), mat=gun, bevel=0.008)
-    box("torso", (0.50, 0.56, 0.44), (0.82, 0, 1.88), rot=(0, 14, 0), mat=primary)
-    box("torso", (0.52, 0.12, 0.07), (0.82, -0.24, 2.07), rot=(0, 14, 0), mat=trim, bevel=0.015)  # trim lip
-    cyl("torso", 0.045, 0.03, (0.70, -0.285, 1.80), rot=(90, 0, 0), mat=sensor_e)  # sensor light
-    box("torso", (0.56, 0.30, 0.48), (0, 0.42, 1.60), mat=gun)                  # backpack
-    cyl("torso", 0.09, 0.30, (-0.20, 0.60, 1.80), rot=(90, 0, 0), mat=trim)     # thruster L
-    cyl("torso", 0.09, 0.30, (0.20, 0.60, 1.80), rot=(90, 0, 0), mat=trim)      # thruster R
+    def Z(z):
+        return z + dz
 
-    # ---- CORE (separate layer so it can pulse): hot center + saturated halo ----
-    cyl("core", 0.16, 0.05, (0, -0.345, 1.50), rot=(90, 0, 0), mat=core_halo)
-    cyl("core", 0.085, 0.08, (0, -0.360, 1.50), rot=(90, 0, 0), mat=core_hot)
+    # ---- TORSO ----
+    box("torso", (1.04 * tw, 0.60, 0.72), (0, 0, Z(1.50)), mat=primary)
+    box("torso", (0.52 * tw, 0.44, 0.16), (0, 0, Z(1.14)), mat=joint, bevel=0.02)
+    box("torso", (0.78 * tw, 0.54, 0.24), (0, -0.02, Z(1.00)), mat=primary_dk)
+    box("torso", (0.72 * tw, 0.46, 0.13), (0, 0.02, Z(1.90)), mat=primary_dk)
+    box("torso", (0.40, 0.10, 0.34), (0, -0.325, Z(1.50)), mat=trim, bevel=0.02)
+    for sx in (-0.30 * tw, 0.30 * tw):
+        box("torso", (0.05, 0.045, 0.52), (sx, -0.305, Z(1.50)), mat=gun, bevel=0.01)
+    box("torso", (0.30, 0.40, 0.38), (-0.58 * tw, 0, Z(1.72)), mat=joint, bevel=0.02)
+    box("torso", (0.30, 0.40, 0.38), (0.58 * tw, 0, Z(1.72)), mat=joint, bevel=0.02)
+    box("torso", (0.44, 0.50, 0.36), (-0.80 * tw, 0, Z(1.86)), rot=(0, -12, 0), mat=primary)
+    for k in range(3):
+        box("torso", (0.30, 0.07, 0.035), (-0.80 * tw, -0.14 + 0.14 * k, Z(2.035)), rot=(0, -12, 0), mat=gun, bevel=0.008)
+    box("torso", (0.50, 0.56, 0.44), (0.82 * tw, 0, Z(1.88)), rot=(0, 14, 0), mat=primary)
+    box("torso", (0.52, 0.12, 0.07), (0.82 * tw, -0.24, Z(2.07)), rot=(0, 14, 0), mat=trim, bevel=0.015)
+    cyl("torso", 0.045, 0.03, (0.70 * tw, -0.285, Z(1.80)), rot=(90, 0, 0), mat=sensor_e)
+    box("torso", (0.56 * tw, 0.30, 0.48), (0, 0.42, Z(1.60)), mat=gun)
+    cyl("torso", 0.09, 0.30, (-0.20 * tw, 0.60, Z(1.80)), rot=(90, 0, 0), mat=trim)
+    cyl("torso", 0.09, 0.30, (0.20 * tw, 0.60, Z(1.80)), rot=(90, 0, 0), mat=trim)
 
-    # ---- HEAD (cockpit + visor + crest fins + antenna) ----
-    box("head", (0.34, 0.36, 0.26), (0, -0.06, 2.14), mat=primary)
-    box("head", (0.28, 0.10, 0.11), (0, -0.26, 2.14), mat=visor_e, bevel=0.01)
-    box("head", (0.05, 0.24, 0.34), (-0.10, 0.04, 2.34), rot=(-10, 0, 0), mat=primary_dk)  # crest fin L
-    box("head", (0.05, 0.24, 0.34), (0.10, 0.04, 2.34), rot=(-10, 0, 0), mat=primary_dk)   # crest fin R
-    cyl("head", 0.015, 0.30, (0.20, 0.05, 2.36), mat=trim, verts=10)                       # antenna
+    # ---- CORE ----
+    cyl("core", 0.16, 0.05, (0, -0.345, Z(1.50)), rot=(90, 0, 0), mat=core_halo)
+    cyl("core", 0.085, 0.08, (0, -0.360, Z(1.50)), rot=(90, 0, 0), mat=core_hot)
 
-    # ---- LEGS: 2 rigid segments per side (knee can bend in-engine) ----
-    for side, sx in (("left", -0.36), ("right", 0.36)):
+    # ---- HEAD (style per chassis) ----
+    if spec["head"] == "crest":
+        box("head", (0.34, 0.36, 0.26), (0, -0.06, Z(2.14)), mat=primary)
+        box("head", (0.28, 0.10, 0.11), (0, -0.26, Z(2.14)), mat=visor_e, bevel=0.01)
+        box("head", (0.05, 0.24, 0.34), (-0.10, 0.04, Z(2.34)), rot=(-10, 0, 0), mat=primary_dk)
+        box("head", (0.05, 0.24, 0.34), (0.10, 0.04, Z(2.34)), rot=(-10, 0, 0), mat=primary_dk)
+        cyl("head", 0.015, 0.30, (0.20, 0.05, Z(2.36)), mat=trim, verts=10)
+    else:  # bunker: low, wide, slit visor, side intakes
+        box("head", (0.46, 0.42, 0.20), (0, -0.04, Z(2.10)), mat=primary)
+        box("head", (0.36, 0.10, 0.055), (0, -0.26, Z(2.10)), mat=visor_e, bevel=0.008)
+        box("head", (0.10, 0.28, 0.14), (-0.30, 0.02, Z(2.10)), mat=gun, bevel=0.015)
+        box("head", (0.10, 0.28, 0.14), (0.30, 0.02, Z(2.10)), mat=gun, bevel=0.015)
+        box("head", (0.30, 0.24, 0.06), (0, 0.06, Z(2.235)), mat=primary_dk)
+
+    # ---- LEGS ----
+    knee_guard_z = spec["knee_z"] + 0.02
+    thigh_c = (spec["hip_z"] + spec["knee_z"]) / 2.0 - 0.02
+    thigh_h = spec["hip_z"] - spec["knee_z"] + 0.10
+    shin_c = (spec["knee_z"] + 0.16) / 2.0
+    shin_h = spec["knee_z"] - 0.16 + 0.14
+    for side, sx in (("left", -lx), ("right", lx)):
         t = "thigh_%s" % side
-        cyl(t, 0.105, 0.30, (sx, 0.0, 1.14), rot=(0, 90, 0), mat=joint)        # hip joint
-        box(t, (0.28, 0.34, 0.52), (sx, 0.0, 0.88), mat=primary)               # thigh
-        box(t, (0.20, 0.14, 0.18), (sx, -0.14, 0.64), mat=trim, bevel=0.02)    # knee guard
+        cyl(t, 0.105, 0.30, (sx, 0.0, spec["hip_z"]), rot=(0, 90, 0), mat=joint)
+        box(t, (0.28, 0.34, thigh_h), (sx, 0.0, thigh_c), mat=primary)
+        box(t, (0.20, 0.14, 0.18), (sx, -0.14, knee_guard_z), mat=trim, bevel=0.02)
         s = "shin_%s" % side
-        box(s, (0.24, 0.28, 0.44), (sx, -0.04, 0.38), mat=primary_dk)          # shin
-        cyl(s, 0.08, 0.22, (sx, -0.05, 0.155), rot=(0, 90, 0), mat=joint)      # ankle
-        box(s, (0.36, 0.54, 0.16), (sx, -0.14, 0.075), mat=gun)                # foot (mass!)
-        box(s, (0.34, 0.14, 0.19), (sx, -0.40, 0.10), mat=trim, bevel=0.02)    # toe guard
-        box(s, (0.30, 0.12, 0.14), (sx, 0.12, 0.075), mat=gun)                 # heel
+        box(s, (0.24, 0.28, shin_h), (sx, -0.04, shin_c), mat=primary_dk)
+        cyl(s, 0.08, 0.22, (sx, -0.05, 0.155), rot=(0, 90, 0), mat=joint)
+        box(s, (0.36, 0.54, 0.16), (sx, -0.14, 0.075), mat=gun)
+        box(s, (0.34, 0.14, 0.19), (sx, -0.40, 0.10), mat=trim, bevel=0.02)
+        box(s, (0.30, 0.12, 0.14), (sx, 0.12, 0.075), mat=gun)
 
-    # ---- WEAPONS: mount at frame center, barrel points +X (screen right) ----
-    # ROTARY AUTOCANNON — the barrel cluster IS the archetype
-    box("w_autocannon", (0.34, 0.26, 0.26), (WM.x + 0.10, WM.y, WM.z), mat=gun)
-    cyl("w_autocannon", 0.115, 0.30, (WM.x + 0.36, WM.y, WM.z), rot=(0, 90, 0), mat=primary_dk)  # shroud
+    return {
+        "hips": {"left": (-lx, 0.0, spec["hip_z"]), "right": (lx, 0.0, spec["hip_z"])},
+        "knees": {"left": (-lx, -0.02, spec["knee_z"]), "right": (lx, -0.02, spec["knee_z"])},
+        "feet": {"left": (-lx, -0.14, 0.02), "right": (lx, -0.14, 0.02)},
+        "shoulders": {"left": (-0.80 * tw, 0.0, Z(1.86)), "right": (0.82 * tw, 0.0, Z(1.88))},
+    }
+
+
+def build_weapons():
+    """Weapons are chassis-independent. Built at frame center, barrel +X.
+    Returns {id: muzzle_x_world}."""
+    joint = _edge_wear_metal("w_joint", (0.045, 0.050, 0.065), rough=0.85, metal=0.0, wear=0.0)
+    trim = _edge_wear_metal("w_trim", TRIM, rough=0.22, wear=0.0)
+    gun = _edge_wear_metal("w_gun", (0.15, 0.16, 0.21), rough=0.48, wear=0.35)
+    steel_dk = _edge_wear_metal("w_steel_dk", (0.22, 0.27, 0.38), rough=0.46)
+    coil_e = _mat_emit("coil_e", CYAN, 8.0)
+    tip_e = _mat_emit("tip_e", ORANGE, 6.0)
+    orb_e = _mat_emit("orb_e", ORANGE, 14.0)
+    x, y, z = CAM_TARGET.x, CAM_TARGET.y, CAM_TARGET.z
+
+    # rotary autocannon
+    box("w_autocannon", (0.34, 0.26, 0.26), (x + 0.10, y, z), mat=gun)
+    cyl("w_autocannon", 0.115, 0.30, (x + 0.36, y, z), rot=(0, 90, 0), mat=steel_dk)
     for (oy, oz) in ((0.055, 0), (-0.055, 0), (0, 0.055), (0, -0.055)):
-        cyl("w_autocannon", 0.034, 0.58, (WM.x + 0.72, WM.y + oy, WM.z + oz), rot=(0, 90, 0), mat=trim, verts=14)
-    cyl("w_autocannon", 0.095, 0.06, (WM.x + 1.00, WM.y, WM.z), rot=(0, 90, 0), mat=trim)        # muzzle ring
-    # MISSILE POD — boxy pod, 6 visible tubes with hot orange tips
-    box("w_missilepod", (0.44, 0.34, 0.40), (WM.x + 0.22, WM.y, WM.z), mat=gun)
-    box("w_missilepod", (0.06, 0.30, 0.36), (WM.x + 0.46, WM.y, WM.z), mat=primary_dk, bevel=0.02)
+        cyl("w_autocannon", 0.034, 0.58, (x + 0.72, y + oy, z + oz), rot=(0, 90, 0), mat=trim, verts=14)
+    cyl("w_autocannon", 0.095, 0.06, (x + 1.00, y, z), rot=(0, 90, 0), mat=trim)
+    # missile pod
+    box("w_missilepod", (0.44, 0.34, 0.40), (x + 0.22, y, z), mat=gun)
+    box("w_missilepod", (0.06, 0.30, 0.36), (x + 0.46, y, z), mat=steel_dk, bevel=0.02)
     for oy in (-0.09, 0.0, 0.09):
         for oz in (-0.09, 0.09):
-            cyl("w_missilepod", 0.052, 0.10, (WM.x + 0.52, WM.y + oy, WM.z + oz), rot=(0, 90, 0), mat=joint, verts=14)
-            cyl("w_missilepod", 0.036, 0.02, (WM.x + 0.575, WM.y + oy, WM.z + oz), rot=(0, 90, 0), mat=tip_e, verts=12)
+            cyl("w_missilepod", 0.052, 0.10, (x + 0.52, y + oy, z + oz), rot=(0, 90, 0), mat=joint, verts=14)
+            cyl("w_missilepod", 0.036, 0.02, (x + 0.575, y + oy, z + oz), rot=(0, 90, 0), mat=tip_e, verts=12)
+    # railgun — twin rails + accelerator coils, LONG reach
+    box("w_railgun", (0.30, 0.24, 0.24), (x + 0.06, y, z), mat=gun)              # receiver
+    for oz in (0.045, -0.045):
+        box("w_railgun", (1.10, 0.055, 0.045), (x + 0.72, y, z + oz), mat=steel_dk, bevel=0.012)  # rails
+    for k in range(3):
+        cyl("w_railgun", 0.085, 0.045, (x + 0.42 + 0.30 * k, y, z), rot=(0, 90, 0), mat=coil_e, verts=18)  # coils
+    box("w_railgun", (0.10, 0.10, 0.16), (x + 1.28, y, z), mat=trim, bevel=0.015)  # muzzle block
+    # plasmacaster — fork prongs cradling a hot orb
+    box("w_plasmacaster", (0.36, 0.28, 0.30), (x + 0.10, y, z), mat=gun)
+    for oz in (0.14, -0.14):
+        box("w_plasmacaster", (0.44, 0.10, 0.07), (x + 0.44, y, z + oz), rot=(0, 0, 0), mat=steel_dk, bevel=0.015)
+        box("w_plasmacaster", (0.10, 0.10, 0.05), (x + 0.64, y, z + oz * 0.75), mat=trim, bevel=0.01)
+    sph("w_plasmacaster", 0.105, (x + 0.52, y, z), mat=orb_e)
+
+    return {"autocannon": 1.04, "missilepod": 0.60, "railgun": 1.36, "plasmacaster": 0.70}
 
 
 def setup_camera_lights():
@@ -251,9 +305,7 @@ def setup_camera_lights():
     cam_d = bpy.data.cameras.new("cam"); cam_d.type = 'ORTHO'; cam_d.ortho_scale = ORTHO
     cam = bpy.data.objects.new("cam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
     el, dist = math.radians(CAM_EL), 14.0
-    cam.location = (CAM_TARGET.x,
-                    CAM_TARGET.y - dist * math.cos(el),
-                    CAM_TARGET.z + dist * math.sin(el))
+    cam.location = (CAM_TARGET.x, CAM_TARGET.y - dist * math.cos(el), CAM_TARGET.z + dist * math.sin(el))
     look = CAM_TARGET - mathutils.Vector(cam.location)
     cam.rotation_euler = look.to_track_quat('-Z', 'Y').to_euler()
 
@@ -263,9 +315,8 @@ def setup_camera_lights():
         o = bpy.data.objects.new(name, d); sc.collection.objects.link(o)
         o.rotation_euler = tuple(math.radians(a) for a in rot)
         return o
-    sun("key", 5.0, (52, 8, -34), color=(1.0, 0.97, 0.90))      # warm key, front-top-right
-    sun("fill", 1.1, (66, -6, 46), color=(0.70, 0.82, 1.0))     # cool low fill, front-left
-    # cyan rim from the back, LOW angle so it grazes edges instead of flooding top faces
+    sun("key", 5.0, (52, 8, -34), color=(1.0, 0.97, 0.90))
+    sun("fill", 1.1, (66, -6, 46), color=(0.70, 0.82, 1.0))
     sun("rim", 5.5, (-35, 0, 160), color=(0.70, 0.95, 1.0))
     return cam
 
@@ -284,62 +335,81 @@ def render_only(names, path):
 
 
 def px(cam, world_pt):
-    """world point -> (dx,dy) pixel offset from frame center (screen: +y down)."""
     sc = bpy.context.scene
     co = world_to_camera_view(sc, cam, mathutils.Vector(world_pt))
-    x = co.x * RES
-    y = (1.0 - co.y) * RES
-    return [round(x - RES / 2.0, 1), round(y - RES / 2.0, 1)]
+    return [round(co.x * RES - RES / 2.0, 1), round((1.0 - co.y) * RES - RES / 2.0, 1)]
 
 
-CHASSIS = ["thigh_left", "thigh_right", "shin_left", "shin_right", "torso", "core", "head"]
-WEAPONS = ["w_autocannon", "w_missilepod"]
+CHASSIS_PARTS = ["thigh_left", "thigh_right", "shin_left", "shin_right", "torso", "core", "head"]
+WEAPON_IDS = ["autocannon", "missilepod", "railgun", "plasmacaster"]
 
 
-def main():
+def fresh_scene():
+    global part_objs
+    part_objs = {}
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    build()
+
+
+def do_chassis(cid, render=True):
+    spec = CHASSIS_SPECS[cid]
+    fresh_scene()
+    anchors_w = build_chassis(spec)
+    muzzles = build_weapons()          # in-scene for --preview; hidden for part renders
     cam = setup_camera_lights()
-
-    arg = sys.argv[1] if len(sys.argv) > 1 else None
-    if arg == "--preview":
-        p = os.path.join(ROOT, "docs", "lookdev_all.png")
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        render_only(CHASSIS + WEAPONS, p)
-        print("PREVIEW ->", p)
-        return
-    if arg:
-        folder = WEAP if arg.startswith("w_") else MECHA
-        p = os.path.join(folder, arg.replace("w_", "") + ".png")
-        render_only(arg, p)
-        print("PREVIEW", arg, "->", p, os.path.exists(p))
-        return
-
-    for name in CHASSIS:
-        render_only(name, os.path.join(MECHA, name + ".png"))
-        print("ok mecha/%s" % name, flush=True)
-    for name in WEAPONS:
-        render_only(name, os.path.join(WEAP, name.replace("w_", "") + ".png"))
-        print("ok weapons/%s" % name.replace("w_", ""), flush=True)
-
+    outdir = os.path.join(MECHA, cid)
+    os.makedirs(outdir, exist_ok=True)
+    if render:
+        for name in CHASSIS_PARTS:
+            render_only(name, os.path.join(outdir, name + ".png"))
+            print("ok %s/%s" % (cid, name), flush=True)
+    anim = dict(ANIM_BASE); anim.update(spec["anim"])
     rig = {
         "frame": RES,
         "z_order": {"thigh_left": 0, "thigh_right": 0, "shin_left": 1, "shin_right": 1,
                     "torso": 3, "core": 4, "head": 5},
-        "anim": ANIM,
-        "hips": {k: px(cam, v) for k, v in HIP.items()},
-        "knees": {k: px(cam, v) for k, v in KNEE.items()},
-        "feet": {k: px(cam, v) for k, v in FOOT.items()},
-        "shoulders": {k: px(cam, v) for k, v in SHOULDER.items()},
-        "center": px(cam, (0, 0, 1.20)),
-        "weapons": {
-            "autocannon": {"muzzle": px(cam, (WM.x + 1.04, WM.y, WM.z))},
-            "missilepod": {"muzzle": px(cam, (WM.x + 0.60, WM.y, WM.z))},
-        },
+        "anim": anim,
+        "hips": {k: px(cam, v) for k, v in anchors_w["hips"].items()},
+        "knees": {k: px(cam, v) for k, v in anchors_w["knees"].items()},
+        "feet": {k: px(cam, v) for k, v in anchors_w["feet"].items()},
+        "shoulders": {k: px(cam, v) for k, v in anchors_w["shoulders"].items()},
+        "center": px(cam, tuple(CAM_TARGET)),
+        "weapons": {wid: {"muzzle": px(cam, (CAM_TARGET.x + mx, CAM_TARGET.y, CAM_TARGET.z))}
+                    for wid, mx in muzzles.items()},
     }
-    with open(os.path.join(MECHA, "rig.json"), "w") as f:
+    with open(os.path.join(outdir, "rig.json"), "w") as f:
         json.dump(rig, f, indent=2)
-    print("RIG", json.dumps(rig), flush=True)
+    print("rig %s written" % cid, flush=True)
+
+
+def do_weapons():
+    fresh_scene()
+    build_weapons()
+    setup_camera_lights()
+    os.makedirs(WEAP, exist_ok=True)
+    for wid in WEAPON_IDS:
+        render_only("w_" + wid, os.path.join(WEAP, wid + ".png"))
+        print("ok weapons/%s" % wid, flush=True)
+
+
+def main():
+    args = sys.argv[1:]
+    if args and args[0] == "--preview":
+        cid = args[1] if len(args) > 1 else "vanguard"
+        fresh_scene()
+        build_chassis(CHASSIS_SPECS[cid])
+        build_weapons()
+        setup_camera_lights()
+        os.makedirs(DOCS, exist_ok=True)
+        p = os.path.join(DOCS, "lookdev_%s.png" % cid)
+        render_only(CHASSIS_PARTS + ["w_" + w for w in WEAPON_IDS], p)
+        print("PREVIEW ->", p)
+        return
+    targets = args if args else list(CHASSIS_SPECS.keys())
+    for cid in targets:
+        if cid in CHASSIS_SPECS:
+            do_chassis(cid)
+    if not args:
+        do_weapons()
     print("DONE", flush=True)
 
 

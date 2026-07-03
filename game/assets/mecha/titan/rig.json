@@ -1,0 +1,98 @@
+{
+  "frame": 384,
+  "z_order": {
+    "thigh_left": 0,
+    "thigh_right": 0,
+    "shin_left": 1,
+    "shin_right": 1,
+    "torso": 3,
+    "core": 4,
+    "head": 5
+  },
+  "anim": {
+    "step_freq": 0.82,
+    "thigh_rot": 0.1,
+    "shin_rot": 0.22,
+    "lift_thigh": 0.02,
+    "lift_shin": 0.02,
+    "stride": 0.014,
+    "squash": 0.055,
+    "bob": 0.025,
+    "lat": 0.01,
+    "rock": 0.055,
+    "head_bob": 0.008,
+    "core_pulse_hz": 1.2,
+    "recoil": 0.06,
+    "recoil_rock": 0.05
+  },
+  "hips": {
+    "left": [
+      -46.3,
+      17.7
+    ],
+    "right": [
+      46.3,
+      17.7
+    ]
+  },
+  "knees": {
+    "left": [
+      -46.3,
+      54.5
+    ],
+    "right": [
+      46.3,
+      54.5
+    ]
+  },
+  "feet": {
+    "left": [
+      -46.3,
+      104.6
+    ],
+    "right": [
+      46.3,
+      104.6
+    ]
+  },
+  "shoulders": {
+    "left": [
+      -99.3,
+      -40.3
+    ],
+    "right": [
+      101.8,
+      -41.9
+    ]
+  },
+  "center": [
+    0.0,
+    -0.0
+  ],
+  "weapons": {
+    "autocannon": {
+      "muzzle": [
+        109.4,
+        -0.0
+      ]
+    },
+    "missilepod": {
+      "muzzle": [
+        63.1,
+        -0.0
+      ]
+    },
+    "railgun": {
+      "muzzle": [
+        143.1,
+        -0.0
+      ]
+    },
+    "plasmacaster": {
+      "muzzle": [
+        73.6,
+        -0.0
+      ]
+    }
+  }
+}

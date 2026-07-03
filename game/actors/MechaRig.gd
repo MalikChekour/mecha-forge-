@@ -20,6 +20,7 @@ class_name MechaRig
 signal fired(hardpoint_index: int, muzzle_world: Vector2, aim: Vector2)
 
 @export var display_height: float = 150.0   # on-screen mecha height in px
+@export var chassis: String = "vanguard"    # assets/mecha/<chassis>/ — set BEFORE add_child
 
 var frame_px: float = 384.0
 var velocity: Vector2 = Vector2.ZERO
@@ -53,7 +54,7 @@ func _a(key: String, def: float) -> float:
 	return float(v) if (v is float or v is int) else def
 
 func _load_rig() -> void:
-	var path: String = "res://assets/mecha/rig.json"
+	var path: String = "res://assets/mecha/%s/rig.json" % chassis
 	if FileAccess.file_exists(path):
 		var f: FileAccess = FileAccess.open(path, FileAccess.READ)
 		if f != null:
@@ -80,7 +81,7 @@ func _mk_layer(lname: String, z: int, tint: Color) -> void:
 	s.centered = true
 	s.z_index = z
 	s.name = lname
-	s.texture = Tex.get_tex("res://assets/mecha/%s.png" % lname, tint, int(frame_px))
+	s.texture = Tex.get_tex("res://assets/mecha/%s/%s.png" % [chassis, lname], tint, int(frame_px))
 	add_child(s)
 	_layers[lname] = s
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bqoo56f5rxuxl"
-path="res://.godot/imported/head.png-2a123f6265785ab418a777fd345e45b5.ctex"
+uid="uid://cd4tu8vxj61sh"
+path="res://.godot/imported/railgun.png-095b699baf2f42fa2589a8817d66e7c9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/mecha/head.png"
-dest_files=["res://.godot/imported/head.png-2a123f6265785ab418a777fd345e45b5.ctex"]
+source_file="res://assets/weapons/railgun.png"
+dest_files=["res://.godot/imported/railgun.png-095b699baf2f42fa2589a8817d66e7c9.ctex"]
 
 [params]
 

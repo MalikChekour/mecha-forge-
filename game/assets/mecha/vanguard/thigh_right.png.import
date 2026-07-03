@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cmevdqxq525b8"
-path="res://.godot/imported/torso.png-a2a948f151d957009b9e9bf30afea04e.ctex"
+uid="uid://btimthe4nh3rq"
+path="res://.godot/imported/thigh_right.png-c64dbd1b2e64c0ab5dd8fb622e969a75.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/mecha/torso.png"
-dest_files=["res://.godot/imported/torso.png-a2a948f151d957009b9e9bf30afea04e.ctex"]
+source_file="res://assets/mecha/vanguard/thigh_right.png"
+dest_files=["res://.godot/imported/thigh_right.png-c64dbd1b2e64c0ab5dd8fb622e969a75.ctex"]
 
 [params]
 

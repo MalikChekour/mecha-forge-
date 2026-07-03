@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cq0dqu0kbq7j6"
-path="res://.godot/imported/shin_right.png-b3dcb1c039c174465ebc382f88c36f6c.ctex"
+uid="uid://op7x5iob8pg2"
+path="res://.godot/imported/plasmacaster.png-60d600724578195a3156a760adf938c6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/mecha/shin_right.png"
-dest_files=["res://.godot/imported/shin_right.png-b3dcb1c039c174465ebc382f88c36f6c.ctex"]
+source_file="res://assets/weapons/plasmacaster.png"
+dest_files=["res://.godot/imported/plasmacaster.png-60d600724578195a3156a760adf938c6.ctex"]
 
 [params]
 
