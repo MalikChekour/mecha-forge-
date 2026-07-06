@@ -7,3 +7,8 @@ __pycache__/
 *.pyc
 # scratch renders
 *.tmp
+# Meshy source GLBs + secrets (never commit keys)
+meshy_in/
+.meshy_key
+.env
+*.key
