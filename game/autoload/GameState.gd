@@ -8,6 +8,7 @@ var xp: int = 0
 var xp_to_next: int = 5
 var kills: int = 0
 var scrap: int = 0
+var overdrive: float = 0.0    # 0..1 — fills with kills, unlocks the transformation
 var alive: bool = true
 
 func reset() -> void:
@@ -17,6 +18,7 @@ func reset() -> void:
 	xp_to_next = 5
 	kills = 0
 	scrap = 0
+	overdrive = 0.0
 	alive = true
 
 func add_xp(amount: int) -> void:
@@ -34,4 +36,9 @@ func add_scrap(amount: int) -> void:
 
 func add_kill(pos: Vector2, rank: int) -> void:
 	kills += 1
+	add_overdrive(0.055 + rank * 0.03)
 	Events.enemy_killed.emit(pos, rank)
+
+func add_overdrive(a: float) -> void:
+	overdrive = clampf(overdrive + a, 0.0, 1.0)
+	Events.overdrive_changed.emit(overdrive)

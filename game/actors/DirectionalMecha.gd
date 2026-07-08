@@ -87,6 +87,13 @@ func play(anim: String) -> void:
 func current_anim() -> String:
 	return _anim
 
+## Swap the whole chassis (e.g. base 'vanguard' <-> transformed 'vanguard2').
+## Clears the texture cache so the new chassis' sheets load on the next frame.
+func set_chassis(c: String) -> void:
+	chassis = c
+	_cache.clear()
+	_apply()
+
 func _process(delta: float) -> void:
 	_t += delta
 	var step: float = 1.0 / float(FPS.get(_anim, 10.0))

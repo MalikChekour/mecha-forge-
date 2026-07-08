@@ -9,6 +9,8 @@ signal card_picked(index: int)
 var player: Player
 var _hp_fill: ColorRect
 var _xp_fill: ColorRect
+var _od_fill: ColorRect
+var _od_lbl: Label
 var _timer_lbl: Label
 var _stat_lbl: Label
 var _draft_root: Control
@@ -24,8 +26,15 @@ func setup(p: Player) -> void:
 	Events.player_damaged.connect(func(_hp: float, _mx: float) -> void: _update_hp())
 	Events.xp_gained.connect(func(_a: int) -> void: _update_xp())
 	Events.level_up.connect(func(_l: int) -> void: _update_xp())
+	Events.overdrive_changed.connect(_on_overdrive)
 	_update_hp()
 	_update_xp()
+
+func _on_overdrive(v: float) -> void:
+	if _od_fill != null:
+		_od_fill.size.x = BAR_W * clampf(v, 0.0, 1.0)
+	if _od_lbl != null:
+		_od_lbl.visible = v >= 1.0
 
 func _rect(parent: Node, pos: Vector2, size: Vector2, col: Color) -> ColorRect:
 	var c: ColorRect = ColorRect.new()
@@ -44,8 +53,17 @@ func _build() -> void:
 	_rect(root, Vector2(0, 0), Vector2(1280, 52), Color(0, 0, 0, 0.32))
 	_rect(root, Vector2(16, 12), Vector2(BAR_W, 15), Color(0.22, 0.05, 0.05, 0.9))
 	_hp_fill = _rect(root, Vector2(16, 12), Vector2(BAR_W, 15), Color(0.92, 0.26, 0.2, 1))
-	_rect(root, Vector2(16, 31), Vector2(BAR_W, 8), Color(0.05, 0.12, 0.2, 0.9))
-	_xp_fill = _rect(root, Vector2(16, 31), Vector2(0, 8), Color(0.15, 0.85, 1, 1))
+	_rect(root, Vector2(16, 31), Vector2(BAR_W, 7), Color(0.05, 0.12, 0.2, 0.9))
+	_xp_fill = _rect(root, Vector2(16, 31), Vector2(0, 7), Color(0.15, 0.85, 1, 1))
+	_rect(root, Vector2(16, 41), Vector2(BAR_W, 6), Color(0.22, 0.14, 0.03, 0.9))
+	_od_fill = _rect(root, Vector2(16, 41), Vector2(0, 6), Color(1.0, 0.72, 0.16, 1))
+	_od_lbl = Label.new()
+	_od_lbl.position = Vector2(16, 52)
+	_od_lbl.add_theme_font_size_override("font_size", 17)
+	_od_lbl.add_theme_color_override("font_color", Color(1, 0.75, 0.2))
+	_od_lbl.text = "⚡ OVERDRIVE — ESPACE"
+	_od_lbl.visible = false
+	root.add_child(_od_lbl)
 
 	_timer_lbl = Label.new()
 	_timer_lbl.position = Vector2(596, 10)

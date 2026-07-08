@@ -74,6 +74,8 @@ func _ready() -> void:
 	Events.level_up.connect(func(_l: int) -> void: _open_draft())
 	Events.level_up.connect(func(_l: int) -> void: _level_fx())
 	Events.player_died.connect(_on_player_died)
+	if _headless:
+		Events.player_transformed.connect(func(on: bool) -> void: print("[game] TRANSFORM ", on))
 
 func _mk_layer() -> Node2D:
 	var n: Node2D = Node2D.new()
@@ -211,6 +213,14 @@ func _level_fx() -> void:
 	_flash_sprite(player.global_position, Palette.CYAN, 200.0, 0.32)
 	Events.screen_shake.emit(4.0)
 
+func transform_fx(pos: Vector2, into: bool) -> void:
+	var col: Color = Palette.CYAN if into else Color(0.6, 0.72, 0.92)
+	_flash_sprite(pos, col, 280.0, 0.38)
+	_ring(pos, col, 20.0, 430.0, 0.55)
+	_ring(pos, col, 12.0, 260.0, 0.4)
+	_debris(pos, col, 24, 0.6, 170.0, 440.0)
+	Events.screen_shake.emit(13.0 if into else 6.0)
+
 func _add_mat() -> CanvasItemMaterial:
 	var m: CanvasItemMaterial = CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -312,6 +322,9 @@ func _process(delta: float) -> void:
 			_finish_headless()
 
 func _drive_bot() -> void:
+	if _headless and _frames == 300 and GameState.overdrive < 1.0:
+		GameState.overdrive = 1.0     # CI: force-fill so the transform/beam path is exercised
+		Events.overdrive_changed.emit(1.0)
 	if _draft_open:
 		hud.pick(0)
 		return
