@@ -10,6 +10,7 @@ __pycache__/
 # Meshy source GLBs + secrets (never commit keys)
 meshy_in/
 .meshy_key
+.glm_key
 .env
 *.key
 # transient bake frame

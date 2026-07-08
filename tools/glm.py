@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""
+Minimal z.ai GLM client (OpenAI-compatible coding endpoint). Offloads heavy
+generation from Claude; Claude supervises + validates headless. Key in .glm_key.
+
+  python glm.py --prompt promptfile [--system sysfile] [--out out.gd] [--code]
+                [--model glm-4.6] [--maxtok 8000]
+--code extracts the first fenced code block from the reply (drops prose).
+"""
+import sys, os, json, re, urllib.request
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+KEY = open(os.path.join(ROOT, ".glm_key")).read().strip()
+URL = "https://api.z.ai/api/coding/paas/v4/chat/completions"
+
+
+def glm(prompt, system=None, model="glm-4.6", max_tokens=8000, temperature=0.35):
+    msgs = []
+    if system:
+        msgs.append({"role": "system", "content": system})
+    msgs.append({"role": "user", "content": prompt})
+    body = {"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": temperature}
+    req = urllib.request.Request(URL, data=json.dumps(body).encode(),
+                                 headers={"Authorization": "Bearer " + KEY, "Content-Type": "application/json"},
+                                 method="POST")
+    with urllib.request.urlopen(req, timeout=400) as r:
+        d = json.loads(r.read().decode())
+    return d["choices"][0]["message"]["content"]
+
+
+def extract_code(text):
+    m = re.search(r"```(?:[a-zA-Z0-9]*)\n(.*?)```", text, re.DOTALL)
+    return m.group(1).rstrip() + "\n" if m else text
+
+
+def _read(flag):
+    a = sys.argv
+    return open(a[a.index(flag) + 1], encoding="utf-8").read() if flag in a else None
+
+
+def main():
+    a = sys.argv
+    prompt = _read("--prompt") or (a[1] if len(a) > 1 and not a[1].startswith("--") else "")
+    system = _read("--system")
+    model = a[a.index("--model") + 1] if "--model" in a else "glm-4.6"
+    maxtok = int(a[a.index("--maxtok") + 1]) if "--maxtok" in a else 8000
+    resp = glm(prompt, system, model, maxtok)
+    if "--code" in a:
+        resp = extract_code(resp)
+    out = a[a.index("--out") + 1] if "--out" in a else None
+    if out:
+        open(out, "w", encoding="utf-8").write(resp)
+        print("wrote", out, len(resp), "chars")
+    else:
+        print(resp)
+
+
+if __name__ == "__main__":
+    main()
