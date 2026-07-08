@@ -11,6 +11,9 @@ config/icon="res://icon.svg"
 [autoload]
 Palette="*res://autoload/Palette.gd"
 Tex="*res://autoload/Tex.gd"
+Events="*res://autoload/Events.gd"
+GameState="*res://autoload/GameState.gd"
+SaveManager="*res://autoload/SaveManager.gd"
 
 [display]
 window/size/viewport_width=1280
