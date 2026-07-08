@@ -98,27 +98,35 @@ def main():
     cam = bpy.data.objects.new("cam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
     e = math.radians(EL); dist = size * 4.0
 
-    def aim(center):
-        cam.location = (center.x, center.y - dist * math.cos(e), center.z + dist * math.sin(e))
+    def aim(center, az):
+        a = math.radians(az)
+        cam.location = (center.x + dist * math.cos(e) * math.sin(a),
+                        center.y - dist * math.cos(e) * math.cos(a),
+                        center.z + dist * math.sin(e))
         look = center - mathutils.Vector(cam.location)
         cam.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
 
-    tiles = []
-    for k, f in enumerate(frames):
-        sc.frame_set(f)
-        mn, mx = frame_bounds(objs)
-        aim((mn + mx) * 0.5)            # recenter each frame -> in-place, well-framed
-        sc.render.filepath = TMP
-        bpy.ops.render.render(write_still=True)
-        tiles.append(Image.open(TMP).convert("RGBA").copy())
-    sheet = Image.new("RGBA", (RES * FRAMES, RES), (0, 0, 0, 0))
-    for k, im in enumerate(tiles):
-        sheet.paste(im, (RES * k, 0), im)
-    sheet.save(OUT)
+    # facing: 1 view (front, + flip in-engine) or 4 cardinal directions.
+    DIRS = {1: [("", 0)],
+            4: [("_front", 0), ("_back", 180), ("_left", 90), ("_right", -90)]}
+    ndirs = int(argval("--dirs", 1))
+    stem, ext = os.path.splitext(OUT)
+    for suffix, az in DIRS.get(ndirs, DIRS[1]):
+        tiles = []
+        for f in frames:
+            sc.frame_set(f)
+            mn, mx = frame_bounds(objs)
+            aim((mn + mx) * 0.5, az)       # recenter each frame -> in-place, well-framed
+            sc.render.filepath = TMP
+            bpy.ops.render.render(write_still=True)
+            tiles.append(Image.open(TMP).convert("RGBA").copy())
+        sheet = Image.new("RGBA", (RES * FRAMES, RES), (0, 0, 0, 0))
+        for k, im in enumerate(tiles):
+            sheet.paste(im, (RES * k, 0), im)
+        sheet.save(stem + suffix + ext)
     if os.path.exists(TMP):
         os.remove(TMP)
-    print("SHEET", OUT, "%dx%d" % (RES * FRAMES, RES), "frames", FRAMES,
-          "range", f0, f1, os.path.exists(OUT))
+    print("SHEET", OUT, "dirs", ndirs, "%dx%d/dir" % (RES * FRAMES, RES), "frames", FRAMES)
 
 
 if __name__ == "__main__":
