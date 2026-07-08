@@ -99,17 +99,80 @@ def gen_image(image, name, pbr=False):
     return _save(task, name)
 
 
+def refine_with_retry(preview_id, name, pbr=True, tries=3):
+    """Meshy refine (texturing) times out server-side fairly often. Retry, and
+    after repeated timeouts drop PBR (lighter → far more likely to succeed).
+    Base color alone still bakes into great sprites at 2D scale."""
+    use_pbr = pbr
+    last = None
+    for attempt in range(tries):
+        rid = _task_id(_req("POST", "/v2/text-to-3d",
+                            {"mode": "refine", "preview_task_id": preview_id, "enable_pbr": use_pbr}))
+        print("REFINE %s (pbr=%s, try %d) %s" % (name, use_pbr, attempt + 1, rid), flush=True)
+        try:
+            return poll("/v2/text-to-3d/%s" % rid, name + ":refine")
+        except RuntimeError as e:
+            last = e
+            print("  refine failed: %s" % e, flush=True)
+            if "timeout" in str(e).lower() and attempt < tries - 1:
+                if attempt >= 1:
+                    use_pbr = False   # give up on PBR maps, keep base color
+                continue
+            raise
+    raise RuntimeError("refine exhausted: %s" % last)
+
+
 def gen_text(prompt, name, pbr=False):
     tid = _task_id(_req("POST", "/v2/text-to-3d",
                         {"mode": "preview", "prompt": prompt[:600], "ai_model": "meshy-6",
                          "target_formats": ["glb"]}))
     print("text-to-3d PREVIEW", tid, flush=True)
     poll("/v2/text-to-3d/%s" % tid, name + ":preview")
-    rid = _task_id(_req("POST", "/v2/text-to-3d",
-                        {"mode": "refine", "preview_task_id": tid, "enable_pbr": pbr}))
-    print("text-to-3d REFINE", rid, flush=True)
-    task = poll("/v2/text-to-3d/%s" % rid, name + ":refine")
+    task = refine_with_retry(tid, name, pbr)
     return _save(task, name)
+
+
+# ---- rigging + animation (humanoid/biped models only, per Meshy docs) ----
+# Useful action_ids (catalog 0-696): idle 0, walk 106 (Confident_Walk) / 30 (Casual_Walk),
+# run 16, attack 4, hit 178, die 8.
+ANIM_IDS = {"idle": 0, "walk": 106, "attack": 4, "hit": 178, "die": 8}
+
+
+def rig(model_task_id, name, height=1.8):
+    tid = _task_id(_req("POST", "/v1/rigging",
+                        {"input_task_id": model_task_id, "height_meters": height}))
+    print("RIG %s task %s" % (name, tid), flush=True)
+    task = poll("/v1/rigging/%s" % tid, name + ":rig")
+    outdir = os.path.join(INDIR, name); os.makedirs(outdir, exist_ok=True)
+    download(task.get("rigged_character_glb_url"), os.path.join(outdir, "rigged.glb"))
+    with open(os.path.join(outdir, "rig_task.json"), "w") as f:
+        json.dump({"rig_task_id": task.get("id")}, f)
+    print("RIGGED %s rig_task_id=%s" % (name, task.get("id")), flush=True)
+    return task.get("id")
+
+
+def animate(rig_task_id, action, name, label=None):
+    action_id = ANIM_IDS.get(action, action) if isinstance(action, str) else action
+    label = label or (action if isinstance(action, str) else "act%s" % action)
+    tid = _task_id(_req("POST", "/v1/animations",
+                        {"rig_task_id": rig_task_id, "action_id": int(action_id)}))
+    print("ANIM %s/%s (action %s) task %s" % (name, label, action_id, tid), flush=True)
+    task = poll("/v1/animations/%s" % tid, "%s:%s" % (name, label))
+    outdir = os.path.join(INDIR, name); os.makedirs(outdir, exist_ok=True)
+    p = os.path.join(outdir, "anim_%s.glb" % label)
+    download(task.get("animation_glb_url"), p)
+    print("ANIMATED %s/%s -> %s" % (name, label, p), flush=True)
+    return p
+
+
+def process_anims(name, model_task_id, labels, height=1.8):
+    rid = rig(model_task_id, name, height)
+    for lab in labels:
+        try:
+            animate(rid, lab, name, lab)
+        except Exception as e:
+            print("  anim %s failed: %s" % (lab, e), flush=True)
+    return rid
 
 
 def run_roster(path, only=None):
@@ -160,8 +223,26 @@ def main():
         gen_image(rest[0], name, pbr)
     elif kind == "roster":
         run_roster(rest[0], only)
+    elif kind == "refine":
+        # retry texturing from an existing preview task id (no re-preview cost)
+        task = refine_with_retry(rest[0], name, pbr)
+        _save(task, name)
+    elif kind == "rig":
+        rig(rest[0], name)
+    elif kind == "animate":
+        # animate <rig_task_id> <action(name or id)> --name X --label walk
+        lab = None
+        if "--label" in a:
+            lab = a[a.index("--label") + 1]
+        animate(rest[0], rest[1], name, lab)
+    elif kind == "riganim":
+        # riganim <model_task_id> --name X [--label walk,attack,die]
+        labels = ["walk"]
+        if "--label" in a:
+            labels = a[a.index("--label") + 1].split(",")
+        process_anims(name, rest[0], labels)
     else:
-        sys.exit("kind must be 'text', 'image', or 'roster'")
+        sys.exit("kind must be 'text', 'image', 'roster', 'refine', 'rig', 'animate', or 'riganim'")
 
 
 if __name__ == "__main__":
