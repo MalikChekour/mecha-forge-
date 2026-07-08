@@ -84,12 +84,23 @@ for asset in roster["assets"]:
                     made.append("%s_%s" % (name, lab))
             summary.append("%s: rigged, anims=%s" % (name, made))
         else:
-            # 4b. static sprite (procedural motion in-engine)
-            out = os.path.join(dest, "%s.png" % name)
-            run([PY, os.path.join(TOOLS, "bake_meshy.py"), model, out,
-                 "--res", str(asset.get("size", 256)), "--el", "40", "--samples", "28"],
-                "bake static")
-            summary.append("%s: static (proc=%s)" % (name, asset.get("proc")))
+            # 4b. clean static sprite (menu / fallback) ...
+            size = str(asset.get("size", 256))
+            base = os.path.join(dest, "%s.png" % name)
+            run([PY, os.path.join(TOOLS, "bake_meshy.py"), model, base,
+                 "--res", size, "--el", "40", "--samples", "28"], "bake static")
+            # 4c. ... plus a baked PROCEDURAL animation for non-humanoids (Meshy can't
+            #     rig them; hover/spin/scuttle keeps them alive).
+            proc = asset.get("proc", "static")
+            if proc in ("hover", "spin", "scuttle", "quad_walk", "boss_idle"):
+                motion = {"quad_walk": "scuttle", "boss_idle": "idle"}.get(proc, proc)
+                out = os.path.join(dest, "%s_%s.png" % (name, proc))
+                run([PY, os.path.join(TOOLS, "bake_proc.py"), model, out, motion,
+                     "--frames", "8", "--res", size, "--el", "40", "--samples", "20"],
+                    "bake proc %s" % motion)
+                summary.append("%s: static + proc:%s" % (name, proc))
+            else:
+                summary.append("%s: static (decor)" % name)
     except Exception as e:
         print("  !! %s FAILED: %s" % (name, e), flush=True)
         summary.append("%s: FAILED (%s)" % (name, e))
