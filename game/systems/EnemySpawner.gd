@@ -10,10 +10,17 @@ var _t: float = 0.0
 var _spawn_t: float = 0.0
 
 const DEFS: Dictionary = {
-	"crawler": {"hp": 18.0, "speed": 96.0, "dmg": 7.0, "radius": 22.0, "size": 92.0, "motion": "scuttle", "rank": 0, "w": 4},
-	"drone":   {"hp": 12.0, "speed": 132.0, "dmg": 6.0, "radius": 18.0, "size": 78.0, "motion": "hover", "rank": 0, "w": 3},
-	"rusher":  {"hp": 16.0, "speed": 172.0, "dmg": 9.0, "radius": 18.0, "size": 80.0, "motion": "spin", "rank": 0, "w": 3},
-	"brute":   {"hp": 64.0, "speed": 70.0, "dmg": 14.0, "radius": 30.0, "size": 124.0, "motion": "walk", "rank": 1, "w": 1},
+	# behavior: rush (melee) | ranged (kite + shoot) | dasher (wind-up + dash)
+	"crawler": {"hp": 18.0, "speed": 96.0, "dmg": 7.0, "radius": 22.0, "size": 92.0, "motion": "scuttle", "rank": 0, "w": 4,
+		"behavior": "rush"},
+	"drone":   {"hp": 12.0, "speed": 134.0, "dmg": 3.0, "radius": 18.0, "size": 78.0, "motion": "hover", "rank": 0, "w": 3,
+		"behavior": "ranged", "attack_dmg": 5.0, "attack_cd": 1.7, "prefer_dist": 300.0},
+	"rusher":  {"hp": 16.0, "speed": 170.0, "dmg": 6.0, "radius": 18.0, "size": 80.0, "motion": "spin", "rank": 0, "w": 3,
+		"behavior": "dasher", "attack_dmg": 18.0},
+	"spitter": {"hp": 26.0, "speed": 80.0, "dmg": 3.0, "radius": 22.0, "size": 104.0, "motion": "idle", "rank": 0, "w": 2,
+		"behavior": "ranged", "attack_dmg": 8.0, "attack_cd": 2.0, "prefer_dist": 360.0},
+	"brute":   {"hp": 64.0, "speed": 70.0, "dmg": 14.0, "radius": 30.0, "size": 124.0, "motion": "walk", "rank": 1, "w": 1,
+		"behavior": "rush"},
 }
 
 func _process(delta: float) -> void:

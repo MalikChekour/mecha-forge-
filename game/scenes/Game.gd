@@ -48,6 +48,7 @@ func _ready() -> void:
 	player.game = self
 	player.bot_active = _bot
 	add_child(player)
+	player.collision_mask = 8   # collide with cover props (StaticBody layer 8)
 
 	cam = Camera2D.new()
 	cam.position_smoothing_enabled = true
@@ -91,6 +92,16 @@ func spawn_xp(pos: Vector2, val: int) -> void:
 	var g: Pickup = Pickup.new()
 	pickup_layer.add_child(g)
 	g.setup(pos, "xp", val, player)
+
+func spawn_scrap(pos: Vector2, amount: int) -> void:
+	var g: Pickup = Pickup.new()
+	pickup_layer.add_child(g)
+	g.setup(pos, "scrap", amount, player)
+
+func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float) -> void:
+	var b: EnemyProjectile = EnemyProjectile.new()
+	projectile_layer.add_child(b)
+	b.setup(pos, dir, dmg)
 
 # ---- FX ----
 func _muzzle_flash(pos: Vector2, dir: Vector2) -> void:
@@ -217,6 +228,7 @@ func _build_environment() -> void:
 	fr.material = _floor_mat
 	floor_cl.add_child(fr)
 	var props: PropScatter = PropScatter.new()
+	props.game = self
 	add_child(props)
 	props.populate(46)
 	var vig_cl: CanvasLayer = CanvasLayer.new()

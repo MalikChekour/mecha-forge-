@@ -23,7 +23,7 @@ func setup(pos: Vector2, dir: Vector2, dmg: float, spd: float = 780.0) -> void:
 	life = 2.0
 	rotation = dir.angle()
 	collision_layer = 0
-	collision_mask = 2
+	collision_mask = 2 | 8   # enemies (2, areas) + cover (8, static bodies)
 	monitoring = true
 	monitorable = false
 	if not _built:
@@ -56,6 +56,7 @@ func setup(pos: Vector2, dir: Vector2, dmg: float, spd: float = 780.0) -> void:
 		_trail.material = tm
 		add_child(_trail)
 		area_entered.connect(_on_hit)
+		body_entered.connect(_on_body)
 	_trail.clear_points()
 
 func _physics_process(delta: float) -> void:
@@ -80,6 +81,14 @@ func _on_hit(area: Area2D) -> void:
 			_recycle()
 		else:
 			pierce -= 1
+
+func _on_body(body: Node) -> void:
+	if not alive:
+		return
+	if body.is_in_group("cover") and body.has_method("take_damage"):
+		body.take_damage(damage)
+		Events.hit_spark.emit(global_position, Palette.ACCENT)
+		_recycle()   # cover blocks the shot (destructible)
 
 func _recycle() -> void:
 	alive = false
