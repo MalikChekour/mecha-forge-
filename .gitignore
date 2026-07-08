@@ -12,3 +12,5 @@ meshy_in/
 .meshy_key
 .env
 *.key
+# transient bake frame
+**/_animframe.png
