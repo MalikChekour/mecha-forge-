@@ -104,6 +104,9 @@ func take_damage(amount: float) -> void:
 
 func _die() -> void:
 	GameState.add_kill(global_position, rank)
-	if game != null and game.has_method("spawn_xp"):
-		game.spawn_xp(global_position, 1 + rank)
+	if game != null:
+		if game.has_method("death_fx"):
+			game.death_fx(global_position, rank)
+		if game.has_method("spawn_xp"):
+			game.spawn_xp(global_position, 1 + rank)
 	queue_free()

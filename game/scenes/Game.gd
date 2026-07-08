@@ -21,6 +21,7 @@ var _bot: bool = false
 var _frames: int = 0
 var _draft_open: bool = false
 var _cards: Array = []
+var _floor_mat: ShaderMaterial
 
 const UPGRADES: Array = [
 	{"id": "dmg", "name": "◈  +25% Dégâts"},
@@ -37,6 +38,7 @@ func _ready() -> void:
 	_headless = DisplayServer.get_name() == "headless"
 	_bot = _headless or OS.get_cmdline_user_args().has("--autoplay")
 
+	_build_environment()
 	enemy_layer = _mk_layer()
 	projectile_layer = _mk_layer()
 	pickup_layer = _mk_layer()
@@ -65,8 +67,8 @@ func _ready() -> void:
 	Events.hit_spark.connect(_on_hit_spark)
 	Events.damage_dealt.connect(func(pos: Vector2, amt: int, crit: bool) -> void: _damage_number(pos, amt, crit))
 	Events.level_up.connect(func(_l: int) -> void: _open_draft())
+	Events.level_up.connect(func(_l: int) -> void: _level_fx())
 	Events.player_died.connect(_on_player_died)
-	queue_redraw()
 
 func _mk_layer() -> Node2D:
 	var n: Node2D = Node2D.new()
@@ -87,12 +89,14 @@ func spawn_xp(pos: Vector2, val: int) -> void:
 	g.setup(pos, "xp", val, player)
 
 # ---- FX ----
-func _muzzle_flash(pos: Vector2, _dir: Vector2) -> void:
+func _muzzle_flash(pos: Vector2, dir: Vector2) -> void:
+	_flash_sprite(pos, Color(0.72, 0.95, 1.0), 96.0, 0.11)
+	_ring(pos, Palette.CYAN, 10.0, 46.0, 0.16)
 	var l: PointLight2D = PointLight2D.new()
-	l.texture = Tex.get_tex("res://__glow", Palette.CYAN, 72)
+	l.texture = Tex.glow(Palette.CYAN, 160)
 	l.color = Palette.CYAN
-	l.energy = 1.5
-	l.position = pos
+	l.energy = 1.9
+	l.position = pos + dir * 6.0
 	fx_layer.add_child(l)
 	var tw: Tween = create_tween()
 	tw.tween_property(l, "energy", 0.0, 0.12)
@@ -121,22 +125,107 @@ func _damage_number(pos: Vector2, amt: int, crit: bool) -> void:
 		_dmg_active -= 1)
 
 func _on_hit_spark(pos: Vector2, color: Color) -> void:
+	_debris(pos, color, 6, 0.35, 90.0, 230.0)
+	_flash_sprite(pos, color, 48.0, 0.12)
+
+func death_fx(pos: Vector2, rank: int) -> void:
+	var col: Color = Color(1.0, 0.72, 0.32)
+	_flash_sprite(pos, col, 118.0 + rank * 80.0, 0.20)
+	_ring(pos, col, 14.0, 96.0 + rank * 90.0, 0.34)
+	_debris(pos, col, 12 + rank * 12, 0.5, 130.0, 360.0)
+	var l: PointLight2D = PointLight2D.new()
+	l.texture = Tex.glow(col, 240)
+	l.color = col
+	l.energy = 2.3 + float(rank)
+	l.position = pos
+	fx_layer.add_child(l)
+	var tw: Tween = create_tween()
+	tw.tween_property(l, "energy", 0.0, 0.28)
+	tw.tween_callback(l.queue_free)
+	Events.screen_shake.emit(5.0 + rank * 6.0)
+
+func _flash_sprite(pos: Vector2, color: Color, size: float, dur: float) -> void:
+	var s: Sprite2D = Sprite2D.new()
+	s.texture = Tex.glow(color, 64)
+	s.material = _add_mat()
+	s.position = pos
+	s.scale = Vector2.ONE * (size * 0.35 / 64.0)
+	fx_layer.add_child(s)
+	var tw: Tween = create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(s, "scale", Vector2.ONE * (size / 64.0), dur)
+	tw.tween_property(s, "modulate:a", 0.0, dur)
+	tw.chain().tween_callback(s.queue_free)
+
+func _ring(pos: Vector2, color: Color, r0: float, r1: float, dur: float) -> void:
+	var s: Sprite2D = Sprite2D.new()
+	s.texture = Tex.ring(color, 128)
+	s.material = _add_mat()
+	s.position = pos
+	s.scale = Vector2.ONE * (r0 / 64.0)
+	fx_layer.add_child(s)
+	var tw: Tween = create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(s, "scale", Vector2.ONE * (r1 / 64.0), dur)
+	tw.tween_property(s, "modulate:a", 0.0, dur)
+	tw.chain().tween_callback(s.queue_free)
+
+func _debris(pos: Vector2, color: Color, n: int, life: float, vmin: float, vmax: float) -> void:
 	var p: CPUParticles2D = CPUParticles2D.new()
 	p.position = pos
 	p.one_shot = true
 	p.emitting = true
-	p.amount = 8
-	p.lifetime = 0.3
+	p.amount = n
+	p.lifetime = life
 	p.explosiveness = 1.0
-	p.initial_velocity_min = 90.0
-	p.initial_velocity_max = 190.0
+	p.initial_velocity_min = vmin
+	p.initial_velocity_max = vmax
 	p.scale_amount_min = 2.0
-	p.scale_amount_max = 3.0
+	p.scale_amount_max = 4.0
+	p.damping_min = 60.0
+	p.damping_max = 120.0
 	p.color = color
+	p.material = _add_mat()
 	fx_layer.add_child(p)
 	var tw: Tween = create_tween()
-	tw.tween_interval(0.5)
+	tw.tween_interval(life + 0.2)
 	tw.tween_callback(p.queue_free)
+
+func _level_fx() -> void:
+	_ring(player.global_position, Palette.CYAN, 24.0, 340.0, 0.5)
+	_flash_sprite(player.global_position, Palette.CYAN, 200.0, 0.32)
+	Events.screen_shake.emit(4.0)
+
+func _add_mat() -> CanvasItemMaterial:
+	var m: CanvasItemMaterial = CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return m
+
+func _build_environment() -> void:
+	var floor_cl: CanvasLayer = CanvasLayer.new()
+	floor_cl.layer = -100
+	add_child(floor_cl)
+	var fr: ColorRect = ColorRect.new()
+	fr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_floor_mat = ShaderMaterial.new()
+	_floor_mat.shader = load("res://shaders/floor.gdshader")
+	fr.material = _floor_mat
+	floor_cl.add_child(fr)
+	var props: PropScatter = PropScatter.new()
+	add_child(props)
+	props.populate(46)
+	var vig_cl: CanvasLayer = CanvasLayer.new()
+	vig_cl.layer = 15
+	add_child(vig_cl)
+	var vr: ColorRect = ColorRect.new()
+	vr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vm: ShaderMaterial = ShaderMaterial.new()
+	vm.shader = load("res://shaders/vignette.gdshader")
+	vm.set_shader_parameter("strength", 0.5)
+	vr.material = vm
+	vig_cl.add_child(vr)
 
 # ---- level-up draft ----
 func _open_draft() -> void:
@@ -183,6 +272,9 @@ func _on_player_died() -> void:
 # ---- main loop + headless bot ----
 func _process(delta: float) -> void:
 	_frames += 1
+	if _floor_mat != null and player != null:
+		_floor_mat.set_shader_parameter("world_offset", player.global_position)
+		_floor_mat.set_shader_parameter("vp_size", get_viewport_rect().size)
 	if GameState.alive and not _draft_open:
 		GameState.run_time += delta
 		Events.run_time_changed.emit(GameState.run_time)
@@ -250,16 +342,3 @@ func _finish_headless() -> void:
 			GameState.kills, GameState.level])
 		get_tree().quit(1)
 
-func _draw() -> void:
-	# arena grid (world-space; camera scrolls over it)
-	var col: Color = Color(0.13, 0.14, 0.22, 0.6)
-	var a: Rect2 = Rect2(-2200, -2200, 4400, 4400)
-	var step: int = 96
-	var x: int = int(a.position.x)
-	while x <= int(a.end.x):
-		draw_line(Vector2(x, a.position.y), Vector2(x, a.end.y), col, 1.0)
-		x += step
-	var y: int = int(a.position.y)
-	while y <= int(a.end.y):
-		draw_line(Vector2(a.position.x, y), Vector2(a.end.x, y), col, 1.0)
-		y += step

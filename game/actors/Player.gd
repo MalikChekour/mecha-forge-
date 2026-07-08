@@ -23,6 +23,7 @@ var _stick_id: int = -1
 var _stick_origin: Vector2 = Vector2.ZERO
 var _stick_vec: Vector2 = Vector2.ZERO
 var _aim: Vector2 = Vector2.DOWN
+var _thruster: CPUParticles2D
 
 func get_layer_ok() -> bool:
 	return mecha != null
@@ -39,6 +40,24 @@ func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 0
 
+	_thruster = CPUParticles2D.new()
+	_thruster.amount = 24
+	_thruster.lifetime = 0.4
+	_thruster.local_coords = false
+	_thruster.emitting = false
+	_thruster.spread = 20.0
+	_thruster.gravity = Vector2.ZERO
+	_thruster.initial_velocity_min = 60.0
+	_thruster.initial_velocity_max = 140.0
+	_thruster.scale_amount_min = 2.0
+	_thruster.scale_amount_max = 4.5
+	_thruster.color = Palette.CYAN
+	_thruster.z_index = -1
+	var tm: CanvasItemMaterial = CanvasItemMaterial.new()
+	tm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_thruster.material = tm
+	add_child(_thruster)
+
 func _physics_process(delta: float) -> void:
 	if not GameState.alive:
 		return
@@ -52,10 +71,14 @@ func _physics_process(delta: float) -> void:
 	if mv.length() > 0.1:
 		_aim = mv
 		mecha.set_facing_from(mv)
+		_thruster.emitting = true
+		_thruster.direction = -mv
 		if mecha.current_anim() == "idle":
 			mecha.play("walk")
-	elif mecha.current_anim() == "walk":
-		mecha.play("idle")
+	else:
+		_thruster.emitting = false
+		if mecha.current_anim() == "walk":
+			mecha.play("idle")
 
 	_fire_t -= delta
 	if _fire_t <= 0.0:
