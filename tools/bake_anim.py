@@ -20,8 +20,8 @@ def argval(flag, default, cast=float):
     a = sys.argv
     return cast(a[a.index(flag) + 1]) if flag in a else default
 
-GLB = sys.argv[1]
-OUT = sys.argv[2]
+GLB = os.path.abspath(sys.argv[1])
+OUT = os.path.abspath(sys.argv[2])
 FRAMES = int(argval("--frames", 8))
 RES = int(argval("--res", 256))
 EL = argval("--el", 40.0)
@@ -89,26 +89,25 @@ def main():
     frames = [int(round(f0 + (f1 - f0) * i / FRAMES)) for i in range(FRAMES)]
     setup_render()
 
-    # fixed camera: union bounds over the sampled frames (stable, no jitter)
-    umn = mathutils.Vector((1e9, 1e9, 1e9)); umx = -umn
-    for f in frames:
-        sc.frame_set(f)
-        mn, mx = frame_bounds(objs)
-        for i in range(3):
-            umn[i] = min(umn[i], mn[i]); umx[i] = max(umx[i], mx[i])
-    center = (umn + umx) * 0.5
-    size = max((umx - umn).x, (umx - umn).y, (umx - umn).z, 1e-3)
-
-    cam_d = bpy.data.cameras.new("cam"); cam_d.type = "ORTHO"; cam_d.ortho_scale = size * 1.3
+    # Size the ortho frame from a representative pose (not the union — Meshy walks
+    # carry root motion, so the union would shrink the character and it would drift).
+    sc.frame_set(frames[0])
+    mn0, mx0 = frame_bounds(objs)
+    size = max((mx0 - mn0).x, (mx0 - mn0).y, (mx0 - mn0).z, 1e-3)
+    cam_d = bpy.data.cameras.new("cam"); cam_d.type = "ORTHO"; cam_d.ortho_scale = size * 1.12
     cam = bpy.data.objects.new("cam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
     e = math.radians(EL); dist = size * 4.0
-    cam.location = (center.x, center.y - dist * math.cos(e), center.z + dist * math.sin(e))
-    look = center - mathutils.Vector(cam.location)
-    cam.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
+
+    def aim(center):
+        cam.location = (center.x, center.y - dist * math.cos(e), center.z + dist * math.sin(e))
+        look = center - mathutils.Vector(cam.location)
+        cam.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
 
     tiles = []
     for k, f in enumerate(frames):
         sc.frame_set(f)
+        mn, mx = frame_bounds(objs)
+        aim((mn + mx) * 0.5)            # recenter each frame -> in-place, well-framed
         sc.render.filepath = TMP
         bpy.ops.render.render(write_still=True)
         tiles.append(Image.open(TMP).convert("RGBA").copy())

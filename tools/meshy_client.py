@@ -90,9 +90,11 @@ def _save(task, name):
 
 def gen_image(image, name, pbr=False):
     img = image if image.startswith("http") else _data_uri(image)
+    # should_remesh keeps the mesh under the 300k-face rigging limit (raw image-to-3D
+    # is ~700k faces which fails rigging); 40k is plenty of detail at sprite scale.
     body = {"image_url": img, "ai_model": "meshy-6", "should_texture": True,
             "enable_pbr": pbr, "target_formats": ["glb"], "topology": "triangle",
-            "target_polycount": 30000}
+            "should_remesh": True, "target_polycount": 40000}
     tid = _task_id(_req("POST", "/v1/image-to-3d", body))
     print("image-to-3d task", tid, flush=True)
     task = poll("/v1/image-to-3d/%s" % tid, name)
@@ -138,13 +140,24 @@ def gen_text(prompt, name, pbr=False):
 ANIM_IDS = {"idle": 0, "walk": 106, "attack": 4, "hit": 178, "die": 8}
 
 
+def remesh(input_task_id, name, target=40000):
+    tid = _task_id(_req("POST", "/v2/remesh",
+                        {"input_task_id": input_task_id, "target_polycount": target,
+                         "topology": "triangle", "target_formats": ["glb"]}))
+    print("REMESH %s task %s" % (name, tid), flush=True)
+    task = poll("/v2/remesh/%s" % tid, name + ":remesh")
+    print("REMESHED %s -> %s" % (name, task.get("id")), flush=True)
+    return task.get("id")
+
+
 def rig(model_task_id, name, height=1.8):
     tid = _task_id(_req("POST", "/v1/rigging",
                         {"input_task_id": model_task_id, "height_meters": height}))
     print("RIG %s task %s" % (name, tid), flush=True)
     task = poll("/v1/rigging/%s" % tid, name + ":rig")
     outdir = os.path.join(INDIR, name); os.makedirs(outdir, exist_ok=True)
-    download(task.get("rigged_character_glb_url"), os.path.join(outdir, "rigged.glb"))
+    res = task.get("result") or {}
+    download(res.get("rigged_character_glb_url"), os.path.join(outdir, "rigged.glb"))
     with open(os.path.join(outdir, "rig_task.json"), "w") as f:
         json.dump({"rig_task_id": task.get("id")}, f)
     print("RIGGED %s rig_task_id=%s" % (name, task.get("id")), flush=True)
@@ -160,13 +173,15 @@ def animate(rig_task_id, action, name, label=None):
     task = poll("/v1/animations/%s" % tid, "%s:%s" % (name, label))
     outdir = os.path.join(INDIR, name); os.makedirs(outdir, exist_ok=True)
     p = os.path.join(outdir, "anim_%s.glb" % label)
-    download(task.get("animation_glb_url"), p)
+    res = task.get("result") or {}
+    download(res.get("animation_glb_url"), p)
     print("ANIMATED %s/%s -> %s" % (name, label, p), flush=True)
     return p
 
 
-def process_anims(name, model_task_id, labels, height=1.8):
-    rid = rig(model_task_id, name, height)
+def process_anims(name, model_task_id, labels, height=1.8, do_remesh=False):
+    mid = remesh(model_task_id, name) if do_remesh else model_task_id
+    rid = rig(mid, name, height)
     for lab in labels:
         try:
             animate(rid, lab, name, lab)
@@ -236,11 +251,13 @@ def main():
             lab = a[a.index("--label") + 1]
         animate(rest[0], rest[1], name, lab)
     elif kind == "riganim":
-        # riganim <model_task_id> --name X [--label walk,attack,die]
+        # riganim <model_task_id> --name X [--label walk,attack,die] [--remesh]
         labels = ["walk"]
         if "--label" in a:
             labels = a[a.index("--label") + 1].split(",")
-        process_anims(name, rest[0], labels)
+        process_anims(name, rest[0], labels, do_remesh=("--remesh" in a))
+    elif kind == "remesh":
+        remesh(rest[0], name)
     else:
         sys.exit("kind must be 'text', 'image', 'roster', 'refine', 'rig', 'animate', or 'riganim'")
 
