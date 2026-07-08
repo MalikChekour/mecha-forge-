@@ -11,21 +11,31 @@ import sys, os, json, re, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KEY = open(os.path.join(ROOT, ".glm_key")).read().strip()
-URL = "https://api.z.ai/api/coding/paas/v4/chat/completions"
+Z_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions"
+OR_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-def glm(prompt, system=None, model="glm-4.6", max_tokens=8000, temperature=0.35):
+# Model id routes the provider: "a/b" -> OpenRouter (paid, reliable), else z.ai GLM.
+# Council: glm-5.2 / glm-4.6 (z.ai) | qwen/qwen3-coder, google/gemini-2.5-flash,
+# deepseek/deepseek-chat-v3-0324 (OpenRouter).
+def glm(prompt, system=None, model="glm-5.2", max_tokens=8000, temperature=0.35):
+    is_or = "/" in model
+    url = OR_URL if is_or else Z_URL
+    key = os.environ.get("OPENROUTER_API_KEY", "") if is_or else KEY
     msgs = []
     if system:
         msgs.append({"role": "system", "content": system})
     msgs.append({"role": "user", "content": prompt})
     body = {"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": temperature}
-    req = urllib.request.Request(URL, data=json.dumps(body).encode(),
-                                 headers={"Authorization": "Bearer " + KEY, "Content-Type": "application/json"},
+    if (not is_or) and model.startswith("glm-5"):
+        body["thinking"] = {"type": "disabled"}   # thinking model: answer straight into content
+    req = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                 headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
                                  method="POST")
-    with urllib.request.urlopen(req, timeout=400) as r:
+    with urllib.request.urlopen(req, timeout=600) as r:
         d = json.loads(r.read().decode())
-    return d["choices"][0]["message"]["content"]
+    msg = d["choices"][0]["message"]
+    return msg.get("content") or msg.get("reasoning_content") or ""
 
 
 def extract_code(text):

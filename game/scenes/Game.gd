@@ -53,6 +53,10 @@ func _ready() -> void:
 	cam.position_smoothing_enabled = true
 	player.add_child(cam)
 
+	var amb: Ambient = Ambient.new()
+	add_child(amb)
+	amb.setup(player)
+
 	spawner = EnemySpawner.new()
 	spawner.game = self
 	spawner.player = player
@@ -292,7 +296,7 @@ func _process(delta: float) -> void:
 				_frames, GameState.run_time, GameState.level, GameState.xp, GameState.xp_to_next,
 				GameState.kills, player.hp, get_tree().get_nodes_in_group("enemies").size(),
 				get_tree().get_nodes_in_group("pickups").size()])
-		if _headless and _frames >= 900:
+		if _headless and _frames >= 1400:
 			_finish_headless()
 
 func _drive_bot() -> void:
