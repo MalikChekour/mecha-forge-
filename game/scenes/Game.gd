@@ -550,6 +550,8 @@ func revive_player() -> void:
 	_revived = true
 	GameState.alive = true
 	player.hp = player.max_hp * 0.5
+	if player.mecha != null:
+		player.mecha.play("idle")   # get up: the death anim left the mech on the ground
 	if player.has_method("grant_invuln"):
 		player.grant_invuln(2.5)
 	# clear the crowd around the player so the revive isn't instant death
