@@ -49,7 +49,8 @@ func _physics_process(delta: float) -> void:
 		return
 	var to: Vector2 = player.global_position - global_position
 	var d: float = to.length()
-	if d < 360.0 or GameState.overdrive_active:   # Overdrive vacuums every pickup on the map
+	var mrange: float = float(player.magnet_range) if "magnet_range" in player else 360.0
+	if d < mrange or GameState.overdrive_active:   # Overdrive vacuums every pickup on the map
 		_homing = true
 	if _homing:
 		# vacuum speed stays above player speed so gems catch a fleeing player
@@ -57,6 +58,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		global_position.y = _base_y + sin(_t * 3.0) * 3.0
 	if d < 30.0:
+		Audio.sfx("scrap" if kind == "scrap" else "xp", 0.12)
 		if kind == "xp":
 			GameState.add_xp(value)
 		elif kind == "bonus":

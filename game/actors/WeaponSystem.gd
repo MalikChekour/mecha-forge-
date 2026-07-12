@@ -253,7 +253,8 @@ func _process(delta: float) -> void:
 			var t: float = float(w["timer"])
 			t -= delta
 			if t <= 0.0:
-				t = float(w["cooldown"])
+				var cdm: float = float(_player.cooldown_mult) if "cooldown_mult" in _player else 1.0
+				t = float(w["cooldown"]) * cdm   # Hâte passive
 				w["recoil"] = RECOIL_TIME
 				_do_fire(wid, w, muzzle_world)
 			w["timer"] = t
@@ -280,6 +281,8 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		"homing": bool(HOMING.get(id, false)),
 		"color": Color(COLORS.get(id, Color.CYAN)),
 		"impact": id,
+		"crit_chance": float(_player.crit_chance) if "crit_chance" in _player else 0.0,
+		"crit_mult": float(_player.crit_mult) if "crit_mult" in _player else 2.0,
 	}
 	if AOE.has(id):
 		params["aoe"] = float(AOE[id])

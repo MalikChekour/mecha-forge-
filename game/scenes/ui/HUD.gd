@@ -5,6 +5,7 @@ class_name HUD
 ## headless bot via pick()).
 
 signal card_picked(index: int)
+signal reroll_requested()
 
 var player: Player
 var _hp_fill: ColorRect
@@ -93,14 +94,14 @@ func _on_time(t: float) -> void:
 	_timer_lbl.text = "%02d:%02d" % [int(t) / 60, int(t) % 60]
 	_stat_lbl.text = "Lv %d   Kills %d   Scrap %d" % [GameState.level, GameState.kills, GameState.scrap]
 
-func show_draft(cards: Array) -> void:
+func show_draft(cards: Array, rerolls: int = 0) -> void:
 	for ch in _draft_root.get_children():
 		ch.queue_free()
 	_card_btns.clear()
-	var panel: ColorRect = _rect(_draft_root, Vector2(340, 190), Vector2(600, 340), Color(0.06, 0.08, 0.14, 0.96))
+	var panel: ColorRect = _rect(_draft_root, Vector2(340, 180), Vector2(600, 400), Color(0.06, 0.08, 0.14, 0.96))
 	var title: Label = Label.new()
 	title.text = "AMÉLIORATION — Niveau %d" % GameState.level
-	title.position = Vector2(360, 205)
+	title.position = Vector2(360, 200)
 	title.add_theme_font_size_override("font_size", 22)
 	title.add_theme_color_override("font_color", Color(0.15, 0.85, 1))
 	_draft_root.add_child(title)
@@ -108,13 +109,21 @@ func show_draft(cards: Array) -> void:
 	for i in cards.size():
 		var b: Button = Button.new()
 		b.text = String(cards[i].get("name", "?"))
-		b.position = Vector2(365, 255 + i * 82)
-		b.size = Vector2(550, 68)
+		b.position = Vector2(365, 245 + i * 78)
+		b.size = Vector2(550, 64)
 		b.add_theme_font_size_override("font_size", 20)
 		var idx: int = i
 		b.pressed.connect(func() -> void: _pick(idx))
 		_draft_root.add_child(b)
 		_card_btns.append(b)
+	var rb: Button = Button.new()
+	rb.text = "Relancer les cartes  (%d)" % rerolls
+	rb.position = Vector2(365, 245 + cards.size() * 78 + 8)
+	rb.size = Vector2(550, 42)
+	rb.add_theme_font_size_override("font_size", 18)
+	rb.disabled = rerolls <= 0
+	rb.pressed.connect(func() -> void: reroll_requested.emit())
+	_draft_root.add_child(rb)
 	_draft_root.visible = true
 
 func pick(i: int) -> void:      # headless bot entry point

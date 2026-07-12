@@ -11,6 +11,8 @@ var life: float = 2.0
 var alive: bool = true
 var game: Node = null
 var impact_kind: String = ""       # weapon family -> signature impact FX
+var crit_chance: float = 0.0
+var crit_mult: float = 2.0
 
 var _spr: Sprite2D
 var _light: PointLight2D
@@ -30,6 +32,8 @@ func setup(pos: Vector2, dir: Vector2, params: Dictionary) -> void:
 	aoe = float(params.get("aoe", 0.0))
 	bolt_color = Color(params.get("color", Color(0.75, 0.96, 1.0)))
 	impact_kind = String(params.get("impact", ""))
+	crit_chance = float(params.get("crit_chance", 0.0))
+	crit_mult = float(params.get("crit_mult", 2.0))
 	alive = true
 	life = 2.0
 	rotation = dir.angle()
@@ -123,8 +127,12 @@ func _on_hit(area: Area2D) -> void:
 		if aoe > 0.0:
 			_do_splash()
 		else:
-			(area as Enemy).take_damage(damage)
-			Events.damage_dealt.emit(global_position, int(damage), false)
+			var is_crit: bool = randf() < crit_chance
+			var dmg: float = damage * (crit_mult if is_crit else 1.0)
+			(area as Enemy).take_damage(dmg)
+			Events.damage_dealt.emit(global_position, int(dmg), is_crit)
+			if is_crit:
+				Audio.sfx("crit", 0.1)
 		if game != null and game.has_method("impact_fx"):
 			game.impact_fx(global_position, bolt_color, impact_kind)
 		else:

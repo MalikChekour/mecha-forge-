@@ -44,15 +44,20 @@ var _bot: bool = false
 var _frames: int = 0
 var _draft_open: bool = false
 var _cards: Array = []
+var _rerolls: int = 3          # reroll charges per run (agency over the draft)
 var _floor_mat: ShaderMaterial
 
 const UPGRADES: Array = [
-	{"id": "dmg", "name": "◈  +25% Dégâts"},
-	{"id": "spd", "name": "◈  +12% Vitesse"},
-	{"id": "hp", "name": "◈  +25 PV max (+soin)"},
-	{"id": "w_missile", "name": "🚀  Arme : Missiles à tête chercheuse"},
-	{"id": "w_railgun", "name": "⚡  Arme : Railgun perçant"},
-	{"id": "w_plasma", "name": "🔮  Arme : Plasma (dégâts de zone)"},
+	{"id": "dmg", "name": "+25% Degats"},
+	{"id": "spd", "name": "+12% Vitesse"},
+	{"id": "hp", "name": "+25 PV max (+soin)"},
+	{"id": "haste", "name": "+12% Cadence de tir"},
+	{"id": "crit", "name": "+8% Chance de critique"},
+	{"id": "armor", "name": "+8% Armure"},
+	{"id": "magnet", "name": "+25% Aimant a XP"},
+	{"id": "w_missile", "name": "Arme : Missiles chercheurs"},
+	{"id": "w_railgun", "name": "Arme : Railgun percant"},
+	{"id": "w_plasma", "name": "Arme : Plasma (zone)"},
 ]
 
 func _ready() -> void:
@@ -92,11 +97,13 @@ func _ready() -> void:
 	add_child(spawner)
 	player.move_mult = float(_mods.get("player_speed_mult", 1.0))
 	show_banner(String(_mods.get("label", "")))
+	Audio.music("battle")
 
 	hud = HUD.new()
 	add_child(hud)
 	hud.setup(player)
 	hud.card_picked.connect(_on_card_picked)
+	hud.reroll_requested.connect(_reroll_draft)
 
 	Events.screen_shake.connect(func(a: float) -> void: _shake = maxf(_shake, a))
 	Events.hit_spark.connect(_on_hit_spark)
@@ -125,6 +132,7 @@ func spawn_shot(muzzle: Vector2, dir: Vector2, params: Dictionary) -> void:
 		p = _proj_pool.pop_back()
 	p.setup(muzzle, dir, params)
 	_muzzle_flash(muzzle, dir, Color(params.get("color", Palette.CYAN)))
+	Audio.sfx("shoot", 0.14)
 
 func reclaim_proj(p: Projectile) -> void:
 	p.deactivate()
@@ -171,12 +179,15 @@ func impact_fx(pos: Vector2, color: Color, kind: String) -> void:
 			_ring(pos, color, 12.0, 96.0, 0.30)
 			_debris(pos, color, 12, 0.42, 130.0, 340.0)
 			Events.screen_shake.emit(3.5)
+			Audio.sfx("explosion", 0.1)
 		"railgun":
 			_flash_sprite(pos, color, 74.0, 0.12)
 			_ring(pos, color, 6.0, 44.0, 0.14)
+			Audio.sfx("hit", 0.15)
 		_:
 			_flash_sprite(pos, color, 46.0, 0.10)
 			_debris(pos, color, 4, 0.28, 80.0, 200.0)
+			Audio.sfx("hit", 0.15)
 
 # Energy-shield hit ripple (used by shielded enemies and the player's guard).
 func shield_ripple(pos: Vector2, radius: float, color: Color) -> void:
@@ -415,13 +426,24 @@ func _open_draft() -> void:
 	if _draft_open:
 		return
 	_draft_open = true
+	_draw_cards()
+	get_tree().paused = true
+	hud.show_draft(_cards, _rerolls)
+	if _headless:
+		print("[game] DRAFT opened (level %d) — 3 cards" % GameState.level)
+
+func _draw_cards() -> void:
 	var pool: Array = UPGRADES.duplicate()
 	pool.shuffle()
 	_cards = pool.slice(0, 3)
-	get_tree().paused = true
-	hud.show_draft(_cards)
-	if _headless:
-		print("[game] DRAFT opened (level %d) — 3 cards" % GameState.level)
+
+func _reroll_draft() -> void:
+	if not _draft_open or _rerolls <= 0:
+		return
+	_rerolls -= 1
+	Audio.sfx("click")
+	_draw_cards()
+	hud.show_draft(_cards, _rerolls)
 
 func _on_card_picked(index: int) -> void:
 	if index >= 0 and index < _cards.size():
@@ -437,6 +459,10 @@ func _apply_upgrade(id: String) -> void:
 			player.max_hp += 25.0
 			player.hp = minf(player.max_hp, player.hp + 25.0)
 			Events.player_damaged.emit(player.hp, player.max_hp)
+		"haste": player.cooldown_mult = maxf(0.35, player.cooldown_mult * 0.88)
+		"crit": player.crit_chance = minf(0.75, player.crit_chance + 0.08)
+		"armor": player.armor = minf(0.6, player.armor + 0.08)
+		"magnet": player.magnet_range += 90.0
 		"w_missile": player.add_weapon("missilepod")
 		"w_railgun": player.add_weapon("railgun")
 		"w_plasma": player.add_weapon("plasma")

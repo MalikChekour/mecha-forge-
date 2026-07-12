@@ -51,6 +51,7 @@ func _big_button(v: VBoxContainer, text: String, cb: Callable, color: Color = Co
 	b.custom_minimum_size = Vector2(0, 56)
 	b.add_theme_font_size_override("font_size", 26)
 	b.add_theme_color_override("font_color", Color.WHITE)
+	b.pressed.connect(func() -> void: Audio.sfx("click"))
 	b.pressed.connect(cb)
 	v.add_child(b)
 

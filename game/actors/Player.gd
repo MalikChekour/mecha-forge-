@@ -9,6 +9,12 @@ var move_mult: float = 1.0   # biome modifier on movement (e.g. swamp slows, low
 var hp: float = 100.0
 var max_hp: float = 100.0
 var damage: float = 12.0
+# passive-driven combat stats (raised by draft cards)
+var crit_chance: float = 0.05
+var crit_mult: float = 2.0
+var armor: float = 0.0            # incoming damage reduction, 0..~0.6
+var cooldown_mult: float = 1.0    # haste: <1 = faster weapons
+var magnet_range: float = 360.0   # pickup vacuum radius
 var arena: Rect2 = Rect2(-2200, -2200, 4400, 4400)
 
 var bot_active: bool = false
@@ -376,8 +382,10 @@ func take_damage(amount: float) -> void:
 		if game != null and game.has_method("shield_ripple"):
 			game.shield_ripple(global_position, 150.0, Color(1.0, 0.85, 0.4))
 		return
+	amount *= (1.0 - clampf(armor, 0.0, 0.75))   # Armure passive
 	hp -= amount
 	_iframe = 0.55
+	Audio.sfx("hurt", 0.1)
 	Events.player_damaged.emit(hp, max_hp)
 	Events.screen_shake.emit(6.0)
 	if game != null and game.has_method("shield_ripple"):

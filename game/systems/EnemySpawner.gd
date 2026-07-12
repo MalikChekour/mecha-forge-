@@ -77,6 +77,8 @@ func _spawn_boss(kind: String) -> void:
 	e.speed *= speed_mult
 	if game != null and game.has_method("show_banner"):
 		game.show_banner("!  MENACE MAJEURE  !", Color(1.0, 0.4, 0.3))
+	Audio.sfx("boss")
+	Audio.music("boss")
 
 func _weighted_pick() -> String:
 	var total: int = 0
