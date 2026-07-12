@@ -59,7 +59,8 @@ func _process(delta: float) -> void:
 	_t += delta
 	_spawn_t -= delta
 	if _spawn_t <= 0.0:
-		var rate: float = clampf(0.85 - _t * 0.005, 0.22, 0.85)
+		# easy start -> crescendo: slow spawns early, ramping up over the run
+		var rate: float = clampf(1.35 - _t * 0.0019, 0.26, 1.35)
 		_spawn_t = rate / maxf(0.2, spawn_mult)
 		_spawn()
 	if _bosses_fired < BOSS_SCHEDULE.size() and GameState.run_time >= float(BOSS_SCHEDULE[_bosses_fired]["t"]):
@@ -80,16 +81,33 @@ func _spawn_boss(kind: String) -> void:
 	Audio.sfx("boss")
 	Audio.music("boss")
 
+func _rank_unlocked(rank: int, t: float) -> bool:
+	# gate tougher foes by run time so the opening is gentle and it builds up
+	if rank <= 0:
+		return true
+	if rank == 1:
+		return t >= 90.0    # rank-1 foes after 1:30
+	return t >= 240.0       # rank-2 elites after 4:00
+
 func _weighted_pick() -> String:
+	var t: float = GameState.run_time
+	var picks: Array = []
 	var total: int = 0
 	for k in DEFS:
-		total += int(DEFS[k]["w"])
+		var w: int = int(DEFS[k]["w"])
+		if w <= 0:
+			continue                       # bosses (spawned on schedule, not here)
+		if not _rank_unlocked(int(DEFS[k]["rank"]), t):
+			continue
+		picks.append([k, w]); total += w
+	if picks.is_empty():
+		return "crawler"
 	var r: int = randi() % maxi(1, total)
-	for k in DEFS:
-		r -= int(DEFS[k]["w"])
+	for pw in picks:
+		r -= int(pw[1])
 		if r < 0:
-			return k
-	return "crawler"
+			return String(pw[0])
+	return String(picks[0][0])
 
 func _spawn() -> void:
 	if player == null or not is_instance_valid(player):
@@ -103,3 +121,6 @@ func _spawn() -> void:
 	game.enemy_layer.add_child(e)
 	e.setup(kind, DEFS[kind], player, game)
 	e.speed *= speed_mult
+	var hp_scale: float = 1.0 + GameState.run_time * 0.0011   # foes get tougher over time
+	e.hp *= hp_scale
+	e.hp_max = e.hp

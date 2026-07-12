@@ -8,7 +8,7 @@ const SFX_DIR: String = "res://assets/audio/sfx/"
 const MUSIC_DIR: String = "res://assets/audio/music/"
 const _SFX_NAMES: Array[String] = ["shoot", "hit", "crit", "explosion", "xp", "scrap",
 	"levelup", "hurt", "boss", "overdrive", "click", "victory"]
-const _THROTTLE: Dictionary = {"shoot": 0.06, "hit": 0.05, "xp": 0.04, "scrap": 0.05}
+const _THROTTLE: Dictionary = {"shoot": 0.11, "hit": 0.08, "xp": 0.05, "scrap": 0.06}
 
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
