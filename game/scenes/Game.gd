@@ -45,7 +45,17 @@ var _frames: int = 0
 var _draft_open: bool = false
 var _cards: Array = []
 var _rerolls: int = 3          # reroll charges per run (agency over the draft)
+var _banishes: int = 2         # banish charges: remove a card from the run's pool
+var _banished: Array = []      # upgrade ids banished for this run
+var _passives: Dictionary = {} # picked upgrade ids -> count (evolution eligibility)
 var _floor_mat: ShaderMaterial
+# Weapon EVOLUTIONS: base weapon at MAX level + the required passive owned -> evolved form.
+const EVO_RULES: Dictionary = {
+	"autocannon": {"passive": "haste", "evo": "vulcan", "name": "EVOLUTION : Vulcan (barrage)"},
+	"missilepod": {"passive": "crit", "evo": "hydra", "name": "EVOLUTION : Hydra (essaim)"},
+	"railgun": {"passive": "dmg", "evo": "annihilator", "name": "EVOLUTION : Annihilateur"},
+	"plasma": {"passive": "magnet", "evo": "singularity", "name": "EVOLUTION : Singularite"},
+}
 
 const UPGRADES: Array = [
 	{"id": "dmg", "name": "+25% Degats"},
@@ -104,6 +114,7 @@ func _ready() -> void:
 	hud.setup(player)
 	hud.card_picked.connect(_on_card_picked)
 	hud.reroll_requested.connect(_reroll_draft)
+	hud.banish_requested.connect(_on_banish)
 
 	Events.screen_shake.connect(func(a: float) -> void: _shake = maxf(_shake, a))
 	Events.hit_spark.connect(_on_hit_spark)
@@ -428,14 +439,35 @@ func _open_draft() -> void:
 	_draft_open = true
 	_draw_cards()
 	get_tree().paused = true
-	hud.show_draft(_cards, _rerolls)
+	hud.show_draft(_cards, _rerolls, _banishes)
 	if _headless:
 		print("[game] DRAFT opened (level %d) — 3 cards" % GameState.level)
 
 func _draw_cards() -> void:
-	var pool: Array = UPGRADES.duplicate()
+	var pool: Array = []
+	for u: Dictionary in UPGRADES:
+		if not _banished.has(u["id"]):
+			pool.append(u)
 	pool.shuffle()
 	_cards = pool.slice(0, 3)
+	# guarantee-offer any eligible weapon EVOLUTION (base at MAX + required passive owned)
+	var evos: Array = _eligible_evolutions()
+	if not evos.is_empty():
+		evos.shuffle()
+		_cards = (evos.slice(0, mini(evos.size(), 3)) + _cards).slice(0, 3)
+
+func _eligible_evolutions() -> Array:
+	var out: Array = []
+	if player == null or not player.has_method("weapons"):
+		return out
+	var ws: WeaponSystem = player.weapons()
+	if ws == null:
+		return out
+	for base: String in EVO_RULES:
+		var r: Dictionary = EVO_RULES[base]
+		if ws.is_max(base) and _passives.has(r["passive"]) and not ws.owned_weapons().has(r["evo"]):
+			out.append({"id": "evo_" + base, "name": String(r["name"]), "evo": true})
+	return out
 
 func _reroll_draft() -> void:
 	if not _draft_open or _rerolls <= 0:
@@ -443,7 +475,20 @@ func _reroll_draft() -> void:
 	_rerolls -= 1
 	Audio.sfx("click")
 	_draw_cards()
-	hud.show_draft(_cards, _rerolls)
+	hud.show_draft(_cards, _rerolls, _banishes)
+
+func _on_banish(index: int) -> void:
+	if not _draft_open or _banishes <= 0 or index < 0 or index >= _cards.size():
+		return
+	var id: String = String(_cards[index].get("id", ""))
+	if id.begins_with("evo_"):
+		return                      # never banish an evolution offer
+	_banishes -= 1
+	if not _banished.has(id):
+		_banished.append(id)
+	Audio.sfx("click")
+	_draw_cards()
+	hud.show_draft(_cards, _rerolls, _banishes)
 
 func _on_card_picked(index: int) -> void:
 	if index >= 0 and index < _cards.size():
@@ -452,6 +497,14 @@ func _on_card_picked(index: int) -> void:
 	get_tree().paused = false
 
 func _apply_upgrade(id: String) -> void:
+	if id.begins_with("evo_"):
+		var base: String = id.substr(4)
+		if EVO_RULES.has(base) and player.has_method("weapons"):
+			player.weapons().replace_weapon(base, String(EVO_RULES[base]["evo"]))
+			Audio.sfx("levelup")
+			show_banner("EVOLUTION !", Color(1.0, 0.85, 0.3))
+		return
+	_passives[id] = int(_passives.get(id, 0)) + 1
 	match id:
 		"dmg": player.damage *= 1.25
 		"spd": player.base_speed *= 1.12

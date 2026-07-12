@@ -1,7 +1,10 @@
 class_name WeaponSystem
 extends Node2D
 
-const WEAPON_ORDER: Array[String] = ["autocannon", "missilepod", "railgun", "plasma"]
+const WEAPON_ORDER: Array[String] = ["autocannon", "missilepod", "railgun", "plasma",
+	"vulcan", "hydra", "annihilator", "singularity"]
+const MAX_LEVEL: int = 5   # a weapon at MAX + its required passive can EVOLVE
+const EVOLVED: Array[String] = ["vulcan", "hydra", "annihilator", "singularity"]
 # The weapon is HELD at the mech's grip anchor (see DirectionalMecha.grip_anchor()).
 # Sprites face +X (barrel right) and are scaled by LENGTH; their pivot is the grip so
 # they rotate around the hand toward aim, staying glued to the body.
@@ -14,50 +17,44 @@ const RECOIL_TIME: float = 0.08
 const RECOIL_DIST: float = 8.0
 
 const COOLDOWNS: Dictionary = {
-	"autocannon": 0.34,
-	"missilepod": 0.95,
-	"railgun": 1.1,
-	"plasma": 0.8,
+	"autocannon": 0.34, "missilepod": 0.95, "railgun": 1.1, "plasma": 0.8,
+	"vulcan": 0.12, "hydra": 0.66, "annihilator": 0.85, "singularity": 0.66,
 }
 
 const BASE_MULT: Dictionary = {
-	"autocannon": 1.0,
-	"missilepod": 1.6,
-	"railgun": 2.2,
-	"plasma": 1.4,
+	"autocannon": 1.0, "missilepod": 1.6, "railgun": 2.2, "plasma": 1.4,
+	"vulcan": 1.5, "hydra": 1.9, "annihilator": 3.2, "singularity": 2.0,
 }
 
 const COLORS: Dictionary = {
-	"autocannon": Color(0.8, 0.95, 1.0),
-	"missilepod": Color(1.0, 0.6, 0.3),
-	"railgun": Color(0.7, 0.85, 1.0),
-	"plasma": Color(0.7, 0.4, 1.0),
+	"autocannon": Color(0.8, 0.95, 1.0), "missilepod": Color(1.0, 0.6, 0.3),
+	"railgun": Color(0.7, 0.85, 1.0), "plasma": Color(0.7, 0.4, 1.0),
+	"vulcan": Color(1.0, 0.85, 0.3), "hydra": Color(1.0, 0.5, 0.2),
+	"annihilator": Color(0.55, 0.92, 1.0), "singularity": Color(0.85, 0.4, 1.0),
 }
 
 const SPEEDS: Dictionary = {
-	"autocannon": 820.0,
-	"missilepod": 430.0,
-	"railgun": 1500.0,
-	"plasma": 540.0,
+	"autocannon": 820.0, "missilepod": 430.0, "railgun": 1500.0, "plasma": 540.0,
+	"vulcan": 950.0, "hydra": 500.0, "annihilator": 1800.0, "singularity": 560.0,
 }
 
 const PIERCE: Dictionary = {
-	"autocannon": 0,
-	"missilepod": 0,
-	"railgun": 5,
-	"plasma": 0,
+	"autocannon": 0, "missilepod": 0, "railgun": 5, "plasma": 0,
+	"vulcan": 2, "hydra": 0, "annihilator": 30, "singularity": 0,
 }
 
 const HOMING: Dictionary = {
-	"autocannon": false,
-	"missilepod": true,
-	"railgun": false,
-	"plasma": false,
+	"autocannon": false, "missilepod": true, "railgun": false, "plasma": false,
+	"vulcan": false, "hydra": true, "annihilator": false, "singularity": false,
 }
 
 const AOE: Dictionary = {
-	"missilepod": 60.0,
-	"plasma": 74.0,
+	"missilepod": 60.0, "plasma": 74.0,
+	"hydra": 80.0, "singularity": 130.0,
+}
+
+const MULTISHOT: Dictionary = {   # projectiles fired per shot, spread around aim
+	"vulcan": 3, "hydra": 3,
 }
 
 var muzzle_global: Vector2 = Vector2.ZERO
@@ -73,51 +70,70 @@ func setup(p: Node) -> void:
 func add_weapon(id: String) -> void:
 	if not WEAPON_ORDER.has(id):
 		return
-	
 	if _weapons.has(id):
 		var w: Dictionary = _weapons[id]
-		w["level"] = int(w["level"]) + 1
+		w["level"] = mini(MAX_LEVEL, int(w["level"]) + 1)
 		w["cooldown"] = maxf(0.08, float(w["cooldown"]) * 0.85)
 	else:
 		if _weapons.size() >= 4:
 			return
-		var slot: int = _weapons.size()
-		var is_primary: bool = (slot == 0)
+		_install(id, _weapons.size(), _weapons.size() == 0)
 
-		var shadow: Sprite2D = null
-		var sprite: Sprite2D = _create_sprite(id, is_primary)
-		# shadow must be added (and drawn) BEFORE the weapon so it sits under it
-		shadow = _create_shadow_sprite(sprite)
-		if shadow != null:
-			add_child(shadow)
-		add_child(sprite)
+func _install(id: String, slot: int, is_primary: bool) -> void:
+	var sprite: Sprite2D = _create_sprite(id, is_primary)
+	var shadow: Sprite2D = _create_shadow_sprite(sprite)   # drawn BEFORE the weapon (under it)
+	if shadow != null:
+		add_child(shadow)
+	add_child(sprite)
+	var muzzle: Sprite2D = _create_muzzle_sprite(id)
+	add_child(muzzle)
+	_weapons[id] = {
+		"id": id,
+		"level": 1,
+		"cooldown": float(COOLDOWNS.get(id, 0.5)),
+		"timer": 0.0,
+		"sprite": sprite,
+		"shadow": shadow,
+		"muzzle": muzzle,
+		"slot": slot,
+		"len": WEAPON_LEN_PRIMARY if is_primary else WEAPON_LEN_SECONDARY,
+		"is_primary": is_primary,
+		"recoil": 0.0,
+	}
 
-		var muzzle: Sprite2D = _create_muzzle_sprite(id)
-		add_child(muzzle)
+func is_max(id: String) -> bool:
+	return _weapons.has(id) and int(_weapons[id]["level"]) >= MAX_LEVEL
 
-		var cd: float = COOLDOWNS.get(id, 0.5)
-		_weapons[id] = {
-			"id": id,
-			"level": 1,
-			"cooldown": cd,
-			"timer": 0.0,
-			"sprite": sprite,
-			"shadow": shadow,
-			"muzzle": muzzle,
-			"slot": slot,
-			"len": WEAPON_LEN_PRIMARY if is_primary else WEAPON_LEN_SECONDARY,
-			"is_primary": is_primary,
-			"recoil": 0.0,
-		}
+func owned_weapons() -> Array:
+	return _weapons.keys()
+
+# Evolve: swap a base weapon for its upgraded form, keeping the same slot.
+func replace_weapon(old_id: String, new_id: String) -> void:
+	if not _weapons.has(old_id) or _weapons.has(new_id):
+		return
+	var w: Dictionary = _weapons[old_id]
+	for k in ["sprite", "shadow", "muzzle"]:
+		var n: Variant = w.get(k)
+		if n != null:
+			(n as Node).queue_free()
+	var slot: int = int(w.get("slot", 0))
+	var is_primary: bool = bool(w.get("is_primary", slot == 0))
+	_weapons.erase(old_id)
+	_install(new_id, slot, is_primary)
+	_weapons[new_id]["level"] = MAX_LEVEL   # an evolved weapon starts strong
 
 func set_active(a: bool) -> void:
 	_active = a
 	visible = a   # hide the held weapon entirely while inactive (e.g. Overdrive beam mode)
 
 static func _asset_path(id: String) -> String:
-	if id == "plasma":
-		return "res://assets/weapons/plasmacaster.png"
-	return "res://assets/weapons/%s.png" % id
+	# evolved weapons reuse their base sprite (tinted gold in _create_sprite)
+	match id:
+		"plasma", "singularity": return "res://assets/weapons/plasmacaster.png"
+		"vulcan": return "res://assets/weapons/autocannon.png"
+		"hydra": return "res://assets/weapons/missilepod.png"
+		"annihilator": return "res://assets/weapons/railgun.png"
+		_: return "res://assets/weapons/%s.png" % id
 
 func _create_sprite(id: String, is_primary: bool) -> Sprite2D:
 	var s: Sprite2D = Sprite2D.new()
@@ -133,7 +149,11 @@ func _create_sprite(id: String, is_primary: bool) -> Sprite2D:
 						   (0.5 - GRIP_FY) * float(tex.get_height()))
 	else:
 		s.scale = Vector2(0.5, 0.5)
-	s.self_modulate = Color(1.3, 1.35, 1.5)
+	if EVOLVED.has(id):
+		s.self_modulate = Color(1.7, 1.4, 0.6)   # evolved weapons glow gold
+		s.scale *= 1.15
+	else:
+		s.self_modulate = Color(1.3, 1.35, 1.5)
 	s.z_index = 6 if is_primary else 5
 	return s
 
@@ -291,4 +311,11 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		aim = Vector2(_player.aim_dir)
 	if aim == Vector2.ZERO:
 		aim = Vector2.RIGHT
-	game.spawn_shot(muzzle_world, aim, params)
+	var count: int = int(MULTISHOT.get(id, 1))
+	if count <= 1:
+		game.spawn_shot(muzzle_world, aim, params)
+	else:
+		var spread: float = deg_to_rad(11.0)
+		var a0: float = aim.angle() - spread * (count - 1) * 0.5
+		for i in count:
+			game.spawn_shot(muzzle_world, Vector2.from_angle(a0 + spread * i), params)

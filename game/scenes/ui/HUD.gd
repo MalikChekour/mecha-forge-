@@ -6,6 +6,12 @@ class_name HUD
 
 signal card_picked(index: int)
 signal reroll_requested()
+signal banish_requested(index: int)
+
+var _banish_mode: bool = false
+var _draft_cards: Array = []
+var _draft_rerolls: int = 0
+var _draft_banishes: int = 0
 
 var player: Player
 var _hp_fill: ColorRect
@@ -94,36 +100,60 @@ func _on_time(t: float) -> void:
 	_timer_lbl.text = "%02d:%02d" % [int(t) / 60, int(t) % 60]
 	_stat_lbl.text = "Lv %d   Kills %d   Scrap %d" % [GameState.level, GameState.kills, GameState.scrap]
 
-func show_draft(cards: Array, rerolls: int = 0) -> void:
+func show_draft(cards: Array, rerolls: int = 0, banishes: int = 0) -> void:
+	_draft_cards = cards
+	_draft_rerolls = rerolls
+	_draft_banishes = banishes
+	_banish_mode = false
+	_render_draft()
+
+func _render_draft() -> void:
 	for ch in _draft_root.get_children():
 		ch.queue_free()
 	_card_btns.clear()
-	var panel: ColorRect = _rect(_draft_root, Vector2(340, 180), Vector2(600, 400), Color(0.06, 0.08, 0.14, 0.96))
-	var title: Label = Label.new()
-	title.text = "AMÉLIORATION — Niveau %d" % GameState.level
-	title.position = Vector2(360, 200)
-	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color(0.15, 0.85, 1))
-	_draft_root.add_child(title)
+	var cards: Array = _draft_cards
+	var panel: ColorRect = _rect(_draft_root, Vector2(340, 175), Vector2(600, 410), Color(0.06, 0.08, 0.14, 0.96))
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var title: Label = Label.new()
+	title.text = "CHOISIS UNE CARTE A BANNIR" if _banish_mode else "AMÉLIORATION — Niveau %d" % GameState.level
+	title.position = Vector2(360, 195)
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(1, 0.4, 0.35) if _banish_mode else Color(0.15, 0.85, 1))
+	_draft_root.add_child(title)
 	for i in cards.size():
 		var b: Button = Button.new()
-		b.text = String(cards[i].get("name", "?"))
-		b.position = Vector2(365, 245 + i * 78)
-		b.size = Vector2(550, 64)
+		var is_evo: bool = bool(cards[i].get("evo", false))
+		b.text = ("BANNIR : " if _banish_mode else "") + String(cards[i].get("name", "?"))
+		b.position = Vector2(365, 238 + i * 76)
+		b.size = Vector2(550, 62)
 		b.add_theme_font_size_override("font_size", 20)
+		if is_evo and not _banish_mode:
+			b.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))   # gold evolution
 		var idx: int = i
-		b.pressed.connect(func() -> void: _pick(idx))
+		if _banish_mode:
+			b.disabled = is_evo   # evolutions can't be banished
+			b.pressed.connect(func() -> void: banish_requested.emit(idx))
+		else:
+			b.pressed.connect(func() -> void: _pick(idx))
 		_draft_root.add_child(b)
 		_card_btns.append(b)
+	var by: float = 238 + cards.size() * 76 + 8
 	var rb: Button = Button.new()
-	rb.text = "Relancer les cartes  (%d)" % rerolls
-	rb.position = Vector2(365, 245 + cards.size() * 78 + 8)
-	rb.size = Vector2(550, 42)
+	rb.text = "Relancer  (%d)" % _draft_rerolls
+	rb.position = Vector2(365, by); rb.size = Vector2(268, 42)
 	rb.add_theme_font_size_override("font_size", 18)
-	rb.disabled = rerolls <= 0
+	rb.disabled = _draft_rerolls <= 0 or _banish_mode
 	rb.pressed.connect(func() -> void: reroll_requested.emit())
 	_draft_root.add_child(rb)
+	var bb: Button = Button.new()
+	bb.text = "Annuler" if _banish_mode else "Bannir  (%d)" % _draft_banishes
+	bb.position = Vector2(647, by); bb.size = Vector2(268, 42)
+	bb.add_theme_font_size_override("font_size", 18)
+	bb.disabled = _draft_banishes <= 0 and not _banish_mode
+	bb.pressed.connect(func() -> void:
+		_banish_mode = not _banish_mode
+		_render_draft())
+	_draft_root.add_child(bb)
 	_draft_root.visible = true
 
 func pick(i: int) -> void:      # headless bot entry point

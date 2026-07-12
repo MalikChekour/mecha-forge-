@@ -235,6 +235,9 @@ func add_weapon(id: String) -> void:
 	if _weapons != null:
 		_weapons.add_weapon(id)
 
+func weapons() -> WeaponSystem:
+	return _weapons
+
 func _process_beam(delta: float) -> void:
 	var start: Vector2 = aim_dir * 46.0
 	var end: Vector2 = aim_dir * BEAM_LEN
