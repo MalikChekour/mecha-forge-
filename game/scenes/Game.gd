@@ -17,6 +17,29 @@ var fx_layer: Node2D
 var _shake: float = 0.0
 var _dmg_active: int = 0
 var _headless: bool = false
+var _biome: int = 0
+const CAM_OFFSET: Vector2 = Vector2(0.0, -84.0)   # view pushed up -> player ~60% down-screen
+var _hitstop: bool = false
+# 8 biome maps (Gemini-generated ground textures in assets/decor/ground_<name>.png)
+const BIOMES: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp"]
+# Each biome is GAMEPLAY, not just cosmetic: speed/spawn modifiers + optional ground hazard.
+const BIOME_MODS: Dictionary = {
+	"tech":      {"label": "SECTEUR TECH"},
+	"earth":     {"label": "FRICHE"},
+	"spaceship": {"label": "GRAVITE FAIBLE  —  tout va plus vite", "player_speed_mult": 1.15, "enemy_speed_mult": 1.12},
+	"volcanic":  {"label": "VOLCAN  —  eruptions de lave", "hazard": "lava"},
+	"desert":    {"label": "DESERT  —  ennemis enrages (+18% vit.)", "enemy_speed_mult": 1.18},
+	"ice":       {"label": "GLACE  —  ennemis ralentis (-20%)", "enemy_speed_mult": 0.8},
+	"jungle":    {"label": "JUNGLE  —  nuees denses (+35%)", "enemy_spawn_mult": 1.35},
+	"swamp":     {"label": "MARAIS  —  tout est englue", "enemy_speed_mult": 0.85, "player_speed_mult": 0.9},
+}
+var _mods: Dictionary = {}
+var _hazard: String = ""
+var _hazard_t: float = 0.0
+var _proj_pool: Array = []      # recycled Projectile nodes (no queue_free in the hot loop)
+var _pickup_pool: Array = []    # recycled Pickup nodes (xp/scrap/bonus)
+var _revived: bool = false      # one watch-ad revive per run
+var _banked: bool = false       # run scrap banked into meta wallet exactly once
 var _bot: bool = false
 var _frames: int = 0
 var _draft_open: bool = false
@@ -25,14 +48,16 @@ var _floor_mat: ShaderMaterial
 
 const UPGRADES: Array = [
 	{"id": "dmg", "name": "◈  +25% Dégâts"},
-	{"id": "rate", "name": "◈  +15% Cadence de tir"},
 	{"id": "spd", "name": "◈  +12% Vitesse"},
 	{"id": "hp", "name": "◈  +25 PV max (+soin)"},
-	{"id": "pierce", "name": "◈  Projectile perçant +1"},
+	{"id": "w_missile", "name": "🚀  Arme : Missiles à tête chercheuse"},
+	{"id": "w_railgun", "name": "⚡  Arme : Railgun perçant"},
+	{"id": "w_plasma", "name": "🔮  Arme : Plasma (dégâts de zone)"},
 ]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # keep orchestrating (bot/draft) while the tree is paused
+	randomize()   # vary the biome (and other RNG) per run
 	RenderingServer.set_default_clear_color(Palette.ARENA_BG)
 	GameState.reset()
 	_headless = DisplayServer.get_name() == "headless"
@@ -52,6 +77,7 @@ func _ready() -> void:
 
 	cam = Camera2D.new()
 	cam.position_smoothing_enabled = true
+	cam.offset = CAM_OFFSET   # push the view up so the player sits ~60% down (thumb clears the south)
 	player.add_child(cam)
 
 	var amb: Ambient = Ambient.new()
@@ -61,7 +87,11 @@ func _ready() -> void:
 	spawner = EnemySpawner.new()
 	spawner.game = self
 	spawner.player = player
+	spawner.speed_mult = float(_mods.get("enemy_speed_mult", 1.0))
+	spawner.spawn_mult = float(_mods.get("enemy_spawn_mult", 1.0))
 	add_child(spawner)
+	player.move_mult = float(_mods.get("player_speed_mult", 1.0))
+	show_banner(String(_mods.get("label", "")))
 
 	hud = HUD.new()
 	add_child(hud)
@@ -74,44 +104,99 @@ func _ready() -> void:
 	Events.level_up.connect(func(_l: int) -> void: _open_draft())
 	Events.level_up.connect(func(_l: int) -> void: _level_fx())
 	Events.player_died.connect(_on_player_died)
+	Events.run_won.connect(_on_run_won)
 	if _headless:
 		Events.player_transformed.connect(func(on: bool) -> void: print("[game] TRANSFORM ", on))
+		Events.run_won.connect(func() -> void: print("[game] VICTORY"))
 
 func _mk_layer() -> Node2D:
 	var n: Node2D = Node2D.new()
 	add_child(n)
 	return n
 
-# ---- weapon fire ----
+# ---- weapon fire (pooled: reuse instead of new/queue_free in the hot loop) ----
+func spawn_shot(muzzle: Vector2, dir: Vector2, params: Dictionary) -> void:
+	var p: Projectile
+	if _proj_pool.is_empty():
+		p = Projectile.new()
+		p.game = self
+		projectile_layer.add_child(p)
+	else:
+		p = _proj_pool.pop_back()
+	p.setup(muzzle, dir, params)
+	_muzzle_flash(muzzle, dir, Color(params.get("color", Palette.CYAN)))
+
+func reclaim_proj(p: Projectile) -> void:
+	p.deactivate()
+	_proj_pool.append(p)
+
 func spawn_bolt(pos: Vector2, dir: Vector2, dmg: float) -> void:
-	var p: Projectile = Projectile.new()
-	projectile_layer.add_child(p)
-	p.setup(pos, dir, dmg)
-	p.pierce = player.bolt_pierce
-	_muzzle_flash(pos, dir)
+	spawn_shot(pos, dir, {"dmg": dmg, "pierce": player.bolt_pierce})
+
+func _spawn_pickup(pos: Vector2, kind: String, val: int) -> void:
+	var g: Pickup
+	if _pickup_pool.is_empty():
+		g = Pickup.new()
+		g.game = self
+		pickup_layer.add_child(g)
+	else:
+		g = _pickup_pool.pop_back()
+	g.setup(pos, kind, val, player)
+
+func reclaim_pickup(p: Pickup) -> void:
+	p.deactivate()
+	_pickup_pool.append(p)
 
 func spawn_xp(pos: Vector2, val: int) -> void:
-	var g: Pickup = Pickup.new()
-	pickup_layer.add_child(g)
-	g.setup(pos, "xp", val, player)
+	_spawn_pickup(pos, "xp", val)
 
 func spawn_scrap(pos: Vector2, amount: int) -> void:
-	var g: Pickup = Pickup.new()
-	pickup_layer.add_child(g)
-	g.setup(pos, "scrap", amount, player)
+	_spawn_pickup(pos, "scrap", amount)
 
-func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float) -> void:
+func spawn_bonus(pos: Vector2) -> void:
+	# a gold cache: heals + tops up overdrive + a little scrap when vacuumed up
+	_spawn_pickup(pos, "bonus", 1)
+
+func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25)) -> void:
 	var b: EnemyProjectile = EnemyProjectile.new()
+	b.tint = color
 	projectile_layer.add_child(b)
 	b.setup(pos, dir, dmg)
 
+# Weapon-signature impact FX: each weapon family hits differently.
+func impact_fx(pos: Vector2, color: Color, kind: String) -> void:
+	match kind:
+		"missilepod", "plasma":
+			_flash_sprite(pos, color, 108.0, 0.18)
+			_ring(pos, color, 12.0, 96.0, 0.30)
+			_debris(pos, color, 12, 0.42, 130.0, 340.0)
+			Events.screen_shake.emit(3.5)
+		"railgun":
+			_flash_sprite(pos, color, 74.0, 0.12)
+			_ring(pos, color, 6.0, 44.0, 0.14)
+		_:
+			_flash_sprite(pos, color, 46.0, 0.10)
+			_debris(pos, color, 4, 0.28, 80.0, 200.0)
+
+# Energy-shield hit ripple (used by shielded enemies and the player's guard).
+func shield_ripple(pos: Vector2, radius: float, color: Color) -> void:
+	_ring(pos, color, radius * 0.6, radius * 1.15, 0.22)
+	_flash_sprite(pos, color, radius * 0.9, 0.12)
+
+func shield_break(pos: Vector2, radius: float, color: Color) -> void:
+	_ring(pos, color, radius * 0.4, radius * 1.5, 0.34)
+	_flash_sprite(pos, color, radius * 1.4, 0.22)
+	_debris(pos, color, 16, 0.5, 150.0, 360.0)
+	Events.screen_shake.emit(4.0)
+
 # ---- FX ----
-func _muzzle_flash(pos: Vector2, dir: Vector2) -> void:
-	_flash_sprite(pos, Color(0.72, 0.95, 1.0), 96.0, 0.11)
-	_ring(pos, Palette.CYAN, 10.0, 46.0, 0.16)
+func _muzzle_flash(pos: Vector2, dir: Vector2, color: Color = Palette.CYAN) -> void:
+	var bright: Color = color.lerp(Color.WHITE, 0.5)
+	_flash_sprite(pos, bright, 96.0, 0.11)
+	_ring(pos, color, 10.0, 46.0, 0.16)
 	var l: PointLight2D = PointLight2D.new()
-	l.texture = Tex.glow(Palette.CYAN, 160)
-	l.color = Palette.CYAN
+	l.texture = Tex.glow(color, 160)
+	l.color = color
 	l.energy = 1.9
 	l.position = pos + dir * 6.0
 	fx_layer.add_child(l)
@@ -146,6 +231,8 @@ func _on_hit_spark(pos: Vector2, color: Color) -> void:
 	_flash_sprite(pos, color, 48.0, 0.12)
 
 func death_fx(pos: Vector2, rank: int) -> void:
+	if rank >= 2:
+		hit_stop(0.05)   # punchy freeze on heavy/elite kills
 	var col: Color = Color(1.0, 0.72, 0.32)
 	_flash_sprite(pos, col, 118.0 + rank * 80.0, 0.20)
 	_ring(pos, col, 14.0, 96.0 + rank * 90.0, 0.34)
@@ -160,6 +247,65 @@ func death_fx(pos: Vector2, rank: int) -> void:
 	tw.tween_property(l, "energy", 0.0, 0.28)
 	tw.tween_callback(l.queue_free)
 	Events.screen_shake.emit(5.0 + rank * 6.0)
+
+## Brief real-time freeze for weighty impacts (crits / heavy deaths). Uses an
+## ignore-time-scale timer so it self-restores even while the game is slowed.
+func hit_stop(dur: float) -> void:
+	if _hitstop or _headless:
+		return
+	_hitstop = true
+	Engine.time_scale = 0.03
+	await get_tree().create_timer(dur, true, false, true).timeout
+	Engine.time_scale = 1.0
+	_hitstop = false
+
+# Volcanic biome ground hazard: a telegraphed lava eruption that hurts the player if
+# they linger in it. Telegraphs (red ring grows) then bursts.
+func _spawn_lava_hazard() -> void:
+	var ang: float = randf() * TAU
+	var pos: Vector2 = player.global_position + Vector2(cos(ang), sin(ang)) * randf_range(110.0, 430.0)
+	var R: float = 96.0
+	var warn: Sprite2D = Sprite2D.new()
+	warn.texture = Tex.ring(Color(1.0, 0.32, 0.1), 128)
+	warn.material = _add_mat()
+	warn.position = pos
+	warn.scale = Vector2.ONE * (R * 2.0 / 128.0)
+	warn.modulate = Color(1.0, 0.4, 0.1, 0.0)
+	fx_layer.add_child(warn)
+	var tw: Tween = create_tween()
+	tw.tween_property(warn, "modulate:a", 0.85, 0.7)   # telegraph window
+	tw.tween_callback(func() -> void:
+		_flash_sprite(pos, Color(1.0, 0.6, 0.2), R * 2.4, 0.22)
+		_ring(pos, Color(1.0, 0.5, 0.15), R * 0.5, R * 1.7, 0.32)
+		_debris(pos, Color(1.0, 0.5, 0.2), 14, 0.5, 150.0, 380.0)
+		Events.screen_shake.emit(4.0)
+		if GameState.alive and player != null and player.global_position.distance_to(pos) < R:
+			if player.has_method("take_damage"):
+				player.take_damage(14.0)
+		warn.queue_free())
+
+func show_banner(text: String, color: Color = Color(1.0, 0.92, 0.7)) -> void:
+	if text == "" or _headless:
+		return
+	var cl: CanvasLayer = CanvasLayer.new(); cl.layer = 20
+	add_child(cl)
+	var lb: Label = Label.new()
+	lb.text = text
+	lb.add_theme_font_size_override("font_size", 32)
+	lb.add_theme_color_override("font_color", color)
+	lb.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	lb.add_theme_constant_override("outline_size", 6)
+	lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	lb.offset_top = 74.0
+	lb.offset_bottom = 120.0
+	cl.add_child(lb)
+	lb.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.tween_property(lb, "modulate:a", 1.0, 0.4)
+	tw.tween_interval(2.4)
+	tw.tween_property(lb, "modulate:a", 0.0, 0.6)
+	tw.tween_callback(cl.queue_free)
 
 func _flash_sprite(pos: Vector2, color: Color, size: float, dur: float) -> void:
 	var s: Sprite2D = Sprite2D.new()
@@ -233,14 +379,25 @@ func _build_environment() -> void:
 	var fr: ColorRect = ColorRect.new()
 	fr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_biome = _pick_biome()
+	var biome_name: String = BIOMES[clampi(_biome, 0, BIOMES.size() - 1)]
+	_mods = BIOME_MODS.get(biome_name, {})
+	_hazard = String(_mods.get("hazard", ""))
 	_floor_mat = ShaderMaterial.new()
-	_floor_mat.shader = load("res://shaders/floor.gdshader")
+	var ground_path: String = "res://assets/decor/ground_%s.png" % biome_name
+	if ResourceLoader.exists(ground_path):
+		# seamless Blender-baked ground tile, repeated in world space (sharp + scrolls)
+		_floor_mat.shader = load("res://shaders/floor_tex.gdshader")
+		_floor_mat.set_shader_parameter("ground", load(ground_path))
+		_floor_mat.set_shader_parameter("tile", 1080.0)   # ~1 tile per screen -> no side-by-side repeat
+	else:
+		_floor_mat.shader = load("res://shaders/floor.gdshader")
+		_floor_mat.set_shader_parameter("biome", float(_biome))   # 0 tech / 1 earth / 2 spaceship / 3 volcanic
 	fr.material = _floor_mat
 	floor_cl.add_child(fr)
-	var props: PropScatter = PropScatter.new()
-	props.game = self
-	add_child(props)
-	props.populate(46)
+	# 3D scatter decor (background formations + cover props) removed per design — the
+	# arena is now just the biome ground. SceneryScatter/PropScatter are kept in the
+	# codebase but no longer spawned.
 	var vig_cl: CanvasLayer = CanvasLayer.new()
 	vig_cl.layer = 15
 	add_child(vig_cl)
@@ -275,25 +432,53 @@ func _on_card_picked(index: int) -> void:
 func _apply_upgrade(id: String) -> void:
 	match id:
 		"dmg": player.damage *= 1.25
-		"rate": player.fire_interval = maxf(0.08, player.fire_interval * 0.85)
 		"spd": player.base_speed *= 1.12
 		"hp":
 			player.max_hp += 25.0
 			player.hp = minf(player.max_hp, player.hp + 25.0)
 			Events.player_damaged.emit(player.hp, player.max_hp)
-		"pierce": player.bolt_pierce += 1
+		"w_missile": player.add_weapon("missilepod")
+		"w_railgun": player.add_weapon("railgun")
+		"w_plasma": player.add_weapon("plasma")
+
+func ensure_banked() -> void:
+	# bank the run's scrap into the persistent meta wallet exactly once
+	if _banked:
+		return
+	_banked = true
+	SaveManager.bank_scrap(GameState.scrap)
 
 func _on_player_died() -> void:
-	var lbl: Label = Label.new()
-	lbl.text = "MECHA DÉTRUIT\nNiveau %d · %d kills" % [GameState.level, GameState.kills]
-	lbl.add_theme_font_size_override("font_size", 40)
-	lbl.set_anchors_preset(Control.PRESET_CENTER)
-	lbl.position = Vector2(480, 300)
-	var cl: CanvasLayer = CanvasLayer.new()
-	cl.layer = 30
-	cl.add_child(lbl)
-	add_child(cl)
-	SaveManager.bank_scrap(GameState.scrap)
+	if _headless:
+		ensure_banked()
+		return
+	var ms: MetaScreen = MetaScreen.new()   # offer a revive first, else the meta shop
+	add_child(ms)
+	ms.setup(self, true, not _revived)
+
+func _on_run_won() -> void:
+	if not GameState.alive:
+		return
+	GameState.alive = false   # stop spawns/movement, freeze the run on the win
+	ensure_banked()
+	if _headless:
+		return
+	var ms: MetaScreen = MetaScreen.new()
+	add_child(ms)
+	ms.setup(self, false, false)
+
+func revive_player() -> void:
+	_revived = true
+	GameState.alive = true
+	player.hp = player.max_hp * 0.5
+	if player.has_method("grant_invuln"):
+		player.grant_invuln(2.5)
+	# clear the crowd around the player so the revive isn't instant death
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e is Enemy and player.global_position.distance_to((e as Node2D).global_position) < 420.0:
+			(e as Enemy).take_damage(99999.0)
+	show_banner("SECONDE CHANCE", Color(0.5, 1.0, 0.6))
+	Events.player_damaged.emit(player.hp, player.max_hp)
 
 # ---- main loop + headless bot ----
 func _process(delta: float) -> void:
@@ -304,12 +489,17 @@ func _process(delta: float) -> void:
 	if GameState.alive and not _draft_open:
 		GameState.run_time += delta
 		Events.run_time_changed.emit(GameState.run_time)
+		if _hazard == "lava" and player != null:
+			_hazard_t -= delta
+			if _hazard_t <= 0.0:
+				_hazard_t = randf_range(1.1, 1.9)
+				_spawn_lava_hazard()
 
 	if bool(SaveManager.data.get("settings", {}).get("shake", true)) and _shake > 0.0:
 		_shake = maxf(0.0, _shake - delta * 34.0)
-		cam.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
-	elif cam.offset != Vector2.ZERO:
-		cam.offset = Vector2.ZERO
+		cam.offset = CAM_OFFSET + Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+	elif cam.offset != CAM_OFFSET:
+		cam.offset = CAM_OFFSET
 
 	if _bot:
 		_drive_bot()
@@ -322,8 +512,8 @@ func _process(delta: float) -> void:
 			_finish_headless()
 
 func _drive_bot() -> void:
-	if _headless and _frames == 300 and GameState.overdrive < 1.0:
-		GameState.overdrive = 1.0     # CI: force-fill so the transform/beam path is exercised
+	if _headless and _frames == 1050 and GameState.overdrive < 1.0:
+		GameState.overdrive = 1.0     # CI: force-fill LATE so normal collection/level-up runs first, then beam
 		Events.overdrive_changed.emit(1.0)
 	if _draft_open:
 		hud.pick(0)
@@ -347,6 +537,15 @@ func _drive_bot() -> void:
 		else:
 			move = strafe + (Vector2.ZERO - player.global_position) * 0.0006
 	player.bot_move = (move + strafe * 0.2).limit_length(1.0)
+
+func _pick_biome() -> int:
+	# On web, allow forcing a biome via the URL hash (#0..#3) for demos; otherwise random.
+	# eval returns a NUMBER: 0 when no hash (-> random), else biome+1.
+	if OS.has_feature("web"):
+		var v = JavaScriptBridge.eval("location.hash.length>1 ? ((parseInt(location.hash.slice(1))||0)+1) : 0", true)
+		if v != null and int(v) > 0:
+			return clampi(int(v) - 1, 0, BIOMES.size() - 1)
+	return randi() % BIOMES.size()
 
 func _nearest_pickup() -> Node2D:
 	var best: Node2D = null

@@ -1,39 +1,242 @@
 {
   "_comment": "MECHA-FORGE asset roster for Meshy v6. Each asset -> textured GLB -> (if rig) Meshy auto-rig + animations -> bake_anim.py spritesheets, else bake_meshy.py static sprite + procedural 2D motion. Meshy auto-rig is humanoid-biped only, so non-humanoids (flying/6-leg/wheeled/quad) get proc='...' animated in-engine. action ids: idle 0, walk 106, attack 4, hit 178, die 8.",
-  "bake": { "res": 384, "el": 40 },
+  "bake": {
+    "res": 384,
+    "el": 40
+  },
   "assets": [
-    { "name": "vanguard", "group": "mecha", "size": 256, "pbr": false, "rig": true,
-      "anims": ["idle", "walk", "attack", "hit", "die"],
-      "prompt": "heroic bipedal battle mecha robot, sleek blue and steel armor plates, glowing cyan reactor core in the chest, twin shoulder weapon hardpoints, clean hard-surface paneling, sharp edges, standing neutral A-pose, high quality game character, no base" },
-    { "name": "titan", "group": "mecha", "size": 256, "pbr": false, "rig": true,
-      "anims": ["idle", "walk", "attack", "die"],
-      "prompt": "heavy assault mecha robot, thick olive-bronze armor, very wide torso, short sturdy legs, low bunker head, glowing orange energy core, hard-surface, battle-worn, standing A-pose, humanoid biped, game character, no base" },
-
-    { "name": "drone", "group": "enemies", "size": 160, "pbr": false, "rig": false, "proc": "hover",
-      "prompt": "small hostile flying combat drone, single red glowing eye lens, dark metal chassis, four small thrusters, menacing, hard-surface game asset, no base" },
-    { "name": "crawler", "group": "enemies", "size": 176, "pbr": false, "rig": false, "proc": "scuttle",
-      "prompt": "insectoid mechanical crawler robot, six sharp legs, red sensor cluster, dark chitin-metal plating, hard-surface game asset, no base" },
-    { "name": "spitter", "group": "enemies", "size": 176, "pbr": false, "rig": true, "anims": ["idle", "attack"],
-      "prompt": "ranged bipedal turret walker robot, two digitigrade legs, glowing purple plasma cannon, vented body, hard-surface humanoid biped game asset, no base" },
-    { "name": "rusher", "group": "enemies", "size": 160, "pbr": false, "rig": false, "proc": "spin",
-      "prompt": "fast four-wheeled kamikaze robot, forward ram blade, orange and black hazard stripes, aggressive low profile, hard-surface game asset, no base" },
-    { "name": "brute", "group": "enemies", "size": 224, "pbr": false, "rig": true, "anims": ["idle", "walk", "attack", "die"],
-      "prompt": "heavy armored bruiser battle robot, humanoid biped, huge oversized fists, thick grey plating, glowing red eyes, hulking, hard-surface game asset, no base" },
-    { "name": "shielded", "group": "enemies", "size": 192, "pbr": false, "rig": true, "anims": ["idle", "walk", "die"],
-      "prompt": "defensive humanoid robot soldier holding a large glowing hexagonal teal energy shield, riot-armor plating, biped, hard-surface game asset, no base" },
-    { "name": "elite", "group": "enemies", "size": 224, "pbr": false, "rig": true, "anims": ["idle", "walk", "attack", "hit", "die"],
-      "prompt": "elite commander war robot, humanoid biped, golden trim on dark armor, glowing violet energy aura, imposing back plates, hard-surface game asset, no base" },
-
-    { "name": "midboss", "group": "enemies", "size": 384, "pbr": false, "rig": false, "proc": "quad_walk",
-      "prompt": "large boss mecha, four heavy legs, dual gatling arm cannons, glowing orange energy core, battle-scarred armor, menacing, hard-surface game asset, no base" },
-    { "name": "endboss", "group": "enemies", "size": 512, "pbr": false, "rig": false, "proc": "boss_idle",
-      "prompt": "colossal final boss war titan robot, massive dual shoulder cannons, glowing red reactor chest, spiked armor, terrifying scale, hard-surface game asset, no base" },
-
-    { "name": "crate", "group": "decor", "size": 96, "pbr": false, "rig": false, "proc": "static",
-      "prompt": "sci-fi military cargo crate, metal ribs, glowing status light, worn stencil markings, hard-surface prop, game asset" },
-    { "name": "barrier", "group": "decor", "size": 128, "pbr": false, "rig": false, "proc": "static",
-      "prompt": "sci-fi hazard barrier block, angular concrete-and-metal, orange warning stripes, glowing edge light, hard-surface prop, game asset" },
-    { "name": "wreck", "group": "decor", "size": 160, "pbr": false, "rig": false, "proc": "static",
-      "prompt": "destroyed broken mech wreckage, torn armor plates, exposed dark frame, cold dead lights, hard-surface prop, game asset" }
+    {
+      "name": "vanguard",
+      "group": "mecha",
+      "size": 256,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "walk",
+        "attack",
+        "hit",
+        "die"
+      ],
+      "prompt": "highly detailed heroic bipedal battle mecha, sleek dark-blue and brushed-steel layered armor plates, glowing cyan reactor core in the chest, sharp clean hard-surface paneling with fine panel lines, agile scout proportions, articulated shoulders and free hands with NO built-in cannons, no weapon, standing neutral A-pose, dramatic studio rim lighting, crisp AAA game character, full body, no base"
+    },
+    {
+      "name": "titan",
+      "group": "mecha",
+      "size": 256,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "walk",
+        "attack",
+        "die"
+      ],
+      "prompt": "heavy assault mecha robot, thick olive-bronze armor, very wide torso, short sturdy legs, low bunker head, glowing orange energy core, hard-surface, battle-worn, standing A-pose, humanoid biped, game character, no base"
+    },
+    {
+      "name": "grunt",
+      "group": "enemies",
+      "size": 176,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "walk",
+        "run",
+        "attack",
+        "die"
+      ],
+      "prompt": "fast agile combat mecha grunt soldier, bipedal humanoid, sleek grey and orange plating, glowing sensor eyes, hard-surface game asset, no base"
+    },
+    {
+      "name": "drone",
+      "group": "enemies",
+      "size": 160,
+      "pbr": false,
+      "rig": false,
+      "proc": "hover",
+      "prompt": "small hostile flying combat drone, single red glowing eye lens, dark metal chassis, four small thrusters, menacing, hard-surface game asset, no base"
+    },
+    {
+      "name": "crawler",
+      "group": "enemies",
+      "size": 176,
+      "pbr": false,
+      "rig": false,
+      "proc": "scuttle",
+      "prompt": "insectoid mechanical crawler robot, six sharp legs, red sensor cluster, dark chitin-metal plating, hard-surface game asset, no base"
+    },
+    {
+      "name": "spitter",
+      "group": "enemies",
+      "size": 176,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "attack"
+      ],
+      "prompt": "ranged bipedal turret walker robot, two digitigrade legs, glowing purple plasma cannon, vented body, hard-surface humanoid biped game asset, no base"
+    },
+    {
+      "name": "rusher",
+      "group": "enemies",
+      "size": 160,
+      "pbr": false,
+      "rig": false,
+      "proc": "spin",
+      "prompt": "fast four-wheeled kamikaze robot, forward ram blade, orange and black hazard stripes, aggressive low profile, hard-surface game asset, no base"
+    },
+    {
+      "name": "brute",
+      "group": "enemies",
+      "size": 224,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "walk",
+        "attack",
+        "die"
+      ],
+      "prompt": "heavy armored bruiser battle robot, humanoid biped, huge oversized fists, thick grey plating, glowing red eyes, hulking, hard-surface game asset, no base"
+    },
+    {
+      "name": "shielded",
+      "group": "enemies",
+      "size": 192,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "walk",
+        "die"
+      ],
+      "prompt": "defensive humanoid robot soldier holding a large glowing hexagonal teal energy shield, riot-armor plating, biped, hard-surface game asset, no base"
+    },
+    {
+      "name": "elite",
+      "group": "enemies",
+      "size": 224,
+      "pbr": false,
+      "rig": true,
+      "anims": [
+        "idle",
+        "walk",
+        "attack",
+        "hit",
+        "die"
+      ],
+      "prompt": "elite commander war robot, humanoid biped, golden trim on dark armor, glowing violet energy aura, imposing back plates, hard-surface game asset, no base"
+    },
+    {
+      "name": "midboss",
+      "group": "enemies",
+      "size": 384,
+      "pbr": false,
+      "rig": false,
+      "proc": "quad_walk",
+      "prompt": "large boss mecha, four heavy legs, dual gatling arm cannons, glowing orange energy core, battle-scarred armor, menacing, hard-surface game asset, no base"
+    },
+    {
+      "name": "endboss",
+      "group": "enemies",
+      "size": 512,
+      "pbr": false,
+      "rig": false,
+      "proc": "boss_idle",
+      "prompt": "colossal final boss war titan robot, massive dual shoulder cannons, glowing red reactor chest, spiked armor, terrifying scale, hard-surface game asset, no base"
+    },
+    {
+      "name": "crate",
+      "group": "decor",
+      "size": 96,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "sci-fi military cargo crate, metal ribs, glowing status light, worn stencil markings, hard-surface prop, game asset"
+    },
+    {
+      "name": "barrier",
+      "group": "decor",
+      "size": 128,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "sci-fi hazard barrier block, angular concrete-and-metal, orange warning stripes, glowing edge light, hard-surface prop, game asset"
+    },
+    {
+      "name": "wreck",
+      "group": "decor",
+      "size": 160,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "destroyed broken mech wreckage, torn armor plates, exposed dark frame, cold dead lights, hard-surface prop, game asset"
+    },
+    {
+      "name": "rock",
+      "group": "decor",
+      "size": 220,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a cluster of large angular grey stone boulders, sharp rocky facets, subtle moss, game prop, dramatic top light, isolated on plain background, high detail, no base"
+    },
+    {
+      "name": "crystal",
+      "group": "decor",
+      "size": 200,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a cluster of glowing cyan energy crystals growing from dark rock, faceted translucent gems, emissive glow, sci-fi game prop, isolated on plain background, high detail, no base"
+    },
+    {
+      "name": "pillar",
+      "group": "decor",
+      "size": 260,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a broken ancient stone pillar column, cracked carved ruin, weathered, game environment prop, isolated on plain background, high detail, no base"
+    },
+    {
+      "name": "autocannon",
+      "group": "weapons",
+      "size": 220,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a detailed sci-fi rotary autocannon gun, chunky twin barrels pointing to the RIGHT, blue-steel and dark metal, side profile 3/4 top view, isolated on plain flat background, game weapon asset, sharp high detail, no character, no background scenery"
+    },
+    {
+      "name": "missilepod",
+      "group": "weapons",
+      "size": 210,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a sci-fi missile pod launcher block with several visible rocket tips pointing to the RIGHT, dark metal and orange warheads, side profile 3/4 top view, isolated on plain flat background, game weapon asset, sharp high detail, no background"
+    },
+    {
+      "name": "railgun",
+      "group": "weapons",
+      "size": 250,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a long sci-fi railgun sniper cannon with glowing cyan energy coils along a long barrel pointing to the RIGHT, sleek blue-steel, side profile 3/4 top view, isolated on plain flat background, game weapon asset, sharp high detail, no background"
+    },
+    {
+      "name": "plasmacaster",
+      "group": "weapons",
+      "size": 220,
+      "pbr": false,
+      "rig": false,
+      "proc": "static",
+      "prompt": "a sci-fi plasma caster cannon with a glowing purple plasma orb at the muzzle pointing to the RIGHT, dark tech housing, side profile 3/4 top view, isolated on plain flat background, game weapon asset, sharp high detail, no background"
+    }
   ]
 }

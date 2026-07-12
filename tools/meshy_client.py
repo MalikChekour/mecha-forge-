@@ -137,7 +137,7 @@ def gen_text(prompt, name, pbr=False):
 # ---- rigging + animation (humanoid/biped models only, per Meshy docs) ----
 # Useful action_ids (catalog 0-696): idle 0, walk 106 (Confident_Walk) / 30 (Casual_Walk),
 # run 16, attack 4, hit 178, die 8.
-ANIM_IDS = {"idle": 0, "walk": 106, "attack": 4, "hit": 178, "die": 8}
+ANIM_IDS = {"idle": 0, "walk": 30, "run": 16, "attack": 4, "hit": 178, "die": 8}
 
 
 def remesh(input_task_id, name, target=40000):

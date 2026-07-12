@@ -5,6 +5,7 @@ uniform vec2 world_offset = vec2(0.0);
 uniform vec2 vp_size = vec2(1280.0, 720.0);
 uniform vec4 base_col : source_color = vec4(0.065, 0.08, 0.12, 1.0);
 uniform vec4 glow_col : source_color = vec4(0.12, 0.62, 0.82, 1.0);
+uniform float biome = 0.0;
 
 float hash12(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -31,86 +32,85 @@ float fbm(vec2 p) {
 	}
 	return v;
 }
-float line_g(vec2 world, float cell, float thick) {
-	vec2 f = abs(fract(world / cell + 0.5) - 0.5) * cell;
-	float d = min(f.x, f.y);
-	return 1.0 - smoothstep(0.0, thick, d);
-}
-float voro_dist(vec2 world, float cell) {
-	vec2 g = floor(world / cell);
-	vec2 f = fract(world / cell);
-	float md = 10.0;
-	for (int y = -1; y <= 1; y++) {
-		for (int x = -1; x <= 1; x++) {
-			vec2 offset = vec2(float(x), float(y));
-			float h = hash21(g + offset);
-			if (h < 0.66) continue;
-			vec2 point = offset + vec2(h, fract(h * 137.3)) - f;
-			md = min(md, 0.5 * dot(point, point));
-		}
+float ridged(vec2 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 3; i++) {
+		v += a * (1.0 - abs(vnoise(p) * 2.0 - 1.0));
+		p = p * 2.03 + vec2(7.1, 3.3);
+		a *= 0.5;
 	}
-	return sqrt(max(md, 0.0));
+	return v;
 }
 
 void fragment() {
 	vec2 world = (UV - 0.5) * vp_size + world_offset;
-	vec3 col = base_col.rgb;
+	vec3 col = vec3(0.0);
 
-	// 1. Wear & Grime
-	float grime = fbm(world * 0.008 + vec2(10.0));
-	float scuffs = fbm(world * 0.02);
-	col *= mix(0.75, 1.15, grime) * mix(0.9, 1.05, scuffs);
+	if (biome < 0.5) {
+        // BIOME 0: TECH DECK
+        float low = fbm(world * 0.004);
+        float high = vnoise(world * 0.08);
+        col = mix(vec3(0.02, 0.03, 0.05), vec3(0.09, 0.11, 0.16), low);
+        float brush = smoothstep(-0.1, 0.1, sin(world.x * 0.05 + high * 5.0));
+        col *= mix(0.85, 1.15, brush);
+        float fine = vnoise(world * 0.3 + 50.0);
+        col *= mix(0.9, 1.05, fine);
+        float n1 = fbm(world * 0.006 + 10.0);
+        float n2 = fbm(world * 0.006 + vec2(20.0, 0.0));
+        float dist = abs(n1 - 0.5) + abs(n2 - 0.5);
+        float filament = smoothstep(0.05, 0.0, dist);
+        float pulse = sin(TIME * 1.2 + n1 * 6.28) * 0.5 + 0.5;
+        col += glow_col.rgb * filament * (1.0 + pulse * 0.8);
 
-	// 2. Base Hex Tech Accents
-	float hd = abs(dot(vec2(1.0, 0.577), fract(world * 0.04 + vec2(0.0, 0.288)) - 0.5) - 0.0);
-	hd = min(hd, abs(dot(vec2(1.0, 0.577), fract(world * 0.04) - 0.5)));
-	float hex_mask = smoothstep(0.02, 0.005, hd);
-	col = mix(col, col * 1.4 + base_col.rgb * 0.05, hex_mask * 0.4);
+    } else if (biome < 1.5) {
+        // BIOME 1: EARTH
+        float low = fbm(world * 0.005);
+        float stone_mask = smoothstep(0.4, 0.55, fbm(world * 0.008 + 5.0));
+        vec3 dirt_col = mix(vec3(0.14, 0.09, 0.05), vec3(0.28, 0.20, 0.11), low);
+        vec3 stone_col = mix(vec3(0.35, 0.32, 0.26), vec3(0.48, 0.45, 0.38), fbm(world * 0.02));
+        col = mix(dirt_col, stone_col, stone_mask);
+        float moss_mask = smoothstep(0.6, 0.7, fbm(world * 0.01 + 12.0));
+        vec3 moss_col = mix(vec3(0.08, 0.18, 0.06), vec3(0.14, 0.28, 0.10), fbm(world * 0.04));
+        col = mix(col, moss_col, moss_mask);
+        float fine = vnoise(world * 0.2);
+        col *= mix(0.92, 1.08, fine);
+        col += vec3(0.6, 0.4, 0.1) * 0.02;
+        
+    } else if (biome < 2.5) {
+        // BIOME 2: SPACESHIP
+        float low = fbm(world * 0.003);
+        float med = fbm(world * 0.015);
+        col = mix(vec3(0.70, 0.74, 0.80), vec3(0.92, 0.94, 0.98), low);
+        float fine = vnoise(world * 0.1);
+        col *= mix(0.96, 1.04, fine);
+        float panel = smoothstep(0.3, 0.45, med) - smoothstep(0.55, 0.7, med);
+        col -= vec3(0.05) * panel;
+        float sheen = smoothstep(-0.1, 0.1, sin(world.y * 0.02 + low * 4.0));
+        col += vec3(0.05, 0.12, 0.15) * sheen * 0.5;
+        
+    } else {
+        // BIOME 3: VOLCANIC
+        float low = fbm(world * 0.005);
+        float high = vnoise(world * 0.05);
+        col = mix(vec3(0.01, 0.01, 0.02), vec3(0.05, 0.04, 0.04), low);
+        col *= mix(0.8, 1.2, high);
+        float r1 = ridged(world * 0.008);
+        float r2 = ridged(world * 0.008 + vec2(10.0, 10.0));
+        float vein = smoothstep(0.72, 0.90, r1) + smoothstep(0.78, 0.94, r2);
+        float pulse = pow(sin(TIME * 1.5 + low * 10.0) * 0.5 + 0.5, 1.5);
+        vec3 lava_col = mix(vec3(0.9, 0.25, 0.02), vec3(1.0, 0.65, 0.12), pulse);
+        col = mix(col, lava_col, clamp(vein, 0.0, 1.0) * (1.0 + pulse * 0.6));
+        // ROUND embers (per-cell dot via radial falloff, never square)
+        vec2 ec = world * 0.02 + vec2(TIME * 0.4, 0.0);
+        vec2 cid = floor(ec);
+        vec2 cf = fract(ec) - 0.5;
+        float eh = hash12(cid);
+        float ember = step(0.986, eh) * smoothstep(0.32, 0.0, length(cf)) * (0.5 + 0.5 * sin(TIME * 7.0 + eh * 40.0));
+        col += vec3(1.0, 0.45, 0.12) * ember * 0.7;
+    }
 
-	// 3. Large Panels (Different Sizes & Variations)
-	float p128 = line_g(world, 128.0, 2.5);
-	float p256 = line_g(world, 256.0, 3.5);
-	float large_groove = max(p128, p256);
-	col = mix(col, col * 0.45, large_groove * 0.8);
-
-	// Faces variation
-	float p_val = hash21(floor(world / 128.0));
-	col *= mix(0.85, 1.15, p_val);
-
-	// 4. Fine Rivets
-	float riv = line_g(world, 32.0, 0.75);
-	col = mix(col, col * 0.7, riv * 0.6);
-
-	// 5. Glowing Energy Conduits (along seams)
-	vec2 g_id = floor(world / 256.0);
-	float g1 = hash21(g_id);
-	float g2 = hash21(g_id + 0.123);
-
-	float pulse = sin(TIME * 1.5 + (g_id.x + g_id.y) * 1.3) * 0.5 + 0.5;
-	pulse = pow(pulse, 2.0);
-
-	vec2 f256 = abs(fract(world / 256.0 + 0.5) - 0.5) * 256.0;
-
-	float line_v = 0.0;
-	if (g1 > 0.65) {
-		float intensity = (g1 - 0.65) / 0.35;
-		float d = f256.x;
-		line_v += smoothstep(2.5, 0.0, d) * intensity;
-	}
-	if (g2 > 0.7) {
-		float intensity = (g2 - 0.7) / 0.3;
-		float d = f256.y;
-		line_v += smoothstep(2.5, 0.0, d) * intensity;
-	}
-
-	float dot_h = hash21(floor(world / 128.0) + 0.5);
-	float nodes = voro_dist(world, 128.0);
-	if (dot_h > 0.9) {
-		line_v += smoothstep(5.0, 0.0, nodes * 128.0) * ((dot_h - 0.9) / 0.1) * 2.0;
-	}
-	col += glow_col.rgb * line_v * (0.8 + pulse * 0.6);
-
-	// 6. Soft Radial Vignette
+	// SOFT RADIAL VIGNETTE
 	float vig = smoothstep(1.25, 0.3, length(UV - 0.5) * 1.45);
 	col *= mix(0.55, 1.15, vig);
 

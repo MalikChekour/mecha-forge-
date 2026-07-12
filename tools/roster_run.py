@@ -25,7 +25,8 @@ if "--only" in sys.argv:
 
 DEST = {"mecha": os.path.join(ROOT, "game", "assets", "mecha"),
         "enemies": os.path.join(ROOT, "game", "assets", "enemies"),
-        "decor": os.path.join(ROOT, "game", "assets", "decor")}
+        "decor": os.path.join(ROOT, "game", "assets", "decor"),
+        "weapons": os.path.join(ROOT, "game", "assets", "weapons")}
 for d in DEST.values():
     os.makedirs(d, exist_ok=True)
 

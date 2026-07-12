@@ -76,42 +76,62 @@ def main():
     cam_d = bpy.data.cameras.new("cam"); cam_d.type = "ORTHO"; cam_d.ortho_scale = size * 1.35
     cam = bpy.data.objects.new("cam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
     e = math.radians(EL); dist = size * 4.0
-    cam.location = (center.x, center.y - dist * math.cos(e), center.z + dist * math.sin(e))
-    look = center - mathutils.Vector(cam.location)
-    cam.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
+
+    def aim(az):
+        a = math.radians(az)
+        cam.location = (center.x + dist * math.cos(e) * math.sin(a),
+                        center.y - dist * math.cos(e) * math.cos(a),
+                        center.z + dist * math.sin(e))
+        look = center - mathutils.Vector(cam.location)
+        cam.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
 
     def pose(t):
         root.location = center.copy()
         root.rotation_euler = (0.0, 0.0, 0.0)
+        ph = TAU * t
         if MOTION == "hover":
-            root.location.z += 0.07 * size * math.sin(TAU * t)
-            root.rotation_euler.z = math.radians(10.0 * math.sin(TAU * t))
-            root.rotation_euler.x = math.radians(4.0 * math.sin(TAU * t + 1.0))
+            root.location.z += 0.11 * size * math.sin(ph)                     # strong bob
+            root.rotation_euler.z = math.radians(15.0 * math.sin(ph))
+            root.rotation_euler.x = math.radians(8.0 * math.sin(ph + 1.0))
         elif MOTION == "spin":
-            root.rotation_euler.z = TAU * t
-            root.location.z += 0.02 * size * math.sin(2 * TAU * t)
+            root.rotation_euler.z = ph
+            root.location.z += 0.035 * size * math.sin(2 * ph)
+            root.rotation_euler.x = math.radians(6.0 * math.sin(3 * ph))
+        elif MOTION == "march":   # heavy walking mech: stomp bob + side sway + forward lean per step
+            root.location.z += 0.08 * size * abs(math.sin(ph))               # up-down stomp (2 steps/cycle-ish)
+            root.rotation_euler.y = math.radians(12.0 * math.sin(ph))         # side rock / weight shift
+            root.rotation_euler.x = math.radians(9.0 * math.sin(2 * ph + 0.6))  # forward lean per step
+            root.rotation_euler.z = math.radians(6.0 * math.sin(ph))          # yaw wobble
         elif MOTION == "scuttle":
-            root.location.z += 0.035 * size * abs(math.sin(TAU * t * 2))
-            root.rotation_euler.y = math.radians(5.0 * math.sin(TAU * t * 2))
-            root.rotation_euler.z = math.radians(4.0 * math.sin(TAU * t))
-        else:  # idle
-            root.location.z += 0.02 * size * math.sin(TAU * t)
-            root.rotation_euler.z = math.radians(3.0 * math.sin(TAU * t))
+            root.location.z += 0.05 * size * abs(math.sin(ph * 2))
+            root.rotation_euler.y = math.radians(9.0 * math.sin(ph * 2))
+            root.rotation_euler.x = math.radians(6.0 * math.sin(ph * 4))
+            root.rotation_euler.z = math.radians(6.0 * math.sin(ph))
+        else:  # idle (gentle breathing bob)
+            root.location.z += 0.035 * size * math.sin(ph)
+            root.rotation_euler.z = math.radians(5.0 * math.sin(ph))
+            root.rotation_euler.x = math.radians(3.0 * math.sin(ph + 0.7))
         bpy.context.view_layer.update()
 
-    tiles = []
-    for i in range(FRAMES):
-        pose(i / FRAMES)
-        sc.render.filepath = TMP
-        bpy.ops.render.render(write_still=True)
-        tiles.append(Image.open(TMP).convert("RGBA").copy())
-    sheet = Image.new("RGBA", (RES * FRAMES, RES), (0, 0, 0, 0))
-    for k, im in enumerate(tiles):
-        sheet.paste(im, (RES * k, 0), im)
-    sheet.save(OUT)
+    DIRS = {1: [("", 0.0)],
+            4: [("_front", 0.0), ("_back", 180.0), ("_left", 90.0), ("_right", -90.0)]}
+    ndirs = int(argval("--dirs", 1))
+    stem, ext = os.path.splitext(OUT)
+    for suffix, az in DIRS.get(ndirs, DIRS[1]):
+        aim(az)
+        tiles = []
+        for i in range(FRAMES):
+            pose(i / FRAMES)
+            sc.render.filepath = TMP
+            bpy.ops.render.render(write_still=True)
+            tiles.append(Image.open(TMP).convert("RGBA").copy())
+        sheet = Image.new("RGBA", (RES * FRAMES, RES), (0, 0, 0, 0))
+        for k, im in enumerate(tiles):
+            sheet.paste(im, (RES * k, 0), im)
+        sheet.save(stem + suffix + ext)
     if os.path.exists(TMP):
         os.remove(TMP)
-    print("PROC", MOTION, OUT, "%dx%d" % (RES * FRAMES, RES), FRAMES, "frames")
+    print("PROC", MOTION, OUT, "dirs", ndirs, "%dx%d" % (RES * FRAMES, RES), FRAMES, "frames")
 
 
 if __name__ == "__main__":

@@ -74,7 +74,10 @@ def frame_bounds(objs):
 
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=GLB)
+    if GLB.lower().endswith(".fbx"):          # Mixamo returns animated FBX
+        bpy.ops.import_scene.fbx(filepath=GLB, automatic_bone_orientation=True)
+    else:
+        bpy.ops.import_scene.gltf(filepath=GLB)
     objs = meshes()
     if not objs:
         raise RuntimeError("no mesh in GLB")
@@ -93,6 +96,7 @@ def main():
     # carry root motion, so the union would shrink the character and it would drift).
     sc.frame_set(frames[0])
     mn0, mx0 = frame_bounds(objs)
+    center0 = (mn0 + mx0) * 0.5
     size = max((mx0 - mn0).x, (mx0 - mn0).y, (mx0 - mn0).z, 1e-3)
     cam_d = bpy.data.cameras.new("cam"); cam_d.type = "ORTHO"; cam_d.ortho_scale = size * 1.12
     cam = bpy.data.objects.new("cam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
@@ -116,7 +120,10 @@ def main():
         for f in frames:
             sc.frame_set(f)
             mn, mx = frame_bounds(objs)
-            aim((mn + mx) * 0.5, az)       # recenter each frame -> in-place, well-framed
+            cen = (mn + mx) * 0.5
+            cen.z = center0.z              # anchor vertical -> kill pose bob/jitter
+            aim(cen, az)                   # track XY (root motion), stable height
+
             sc.render.filepath = TMP
             bpy.ops.render.render(write_still=True)
             tiles.append(Image.open(TMP).convert("RGBA").copy())

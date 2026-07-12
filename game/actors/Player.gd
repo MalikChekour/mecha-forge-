@@ -1,24 +1,21 @@
 extends CharacterBody2D
 class_name Player
-## Top-down player with an "Overdrive" transformation and continuous energy beam.
-## Base mode: manual aim + auto-firing bolts. Transformed mode: continuous beam.
+## Top-down player with an "Overdrive" transformation, continuous energy beam, and melee saber.
 
 var game: Node
 var mecha: DirectionalMecha
 var base_speed: float = 320.0
+var move_mult: float = 1.0   # biome modifier on movement (e.g. swamp slows, low-g speeds up)
 var hp: float = 100.0
 var max_hp: float = 100.0
 var damage: float = 12.0
-var fire_interval: float = 0.45
 var arena: Rect2 = Rect2(-2200, -2200, 4400, 4400)
 
-var bolt_pierce: int = 0
 var bot_active: bool = false
 var bot_move: Vector2 = Vector2.ZERO
 var aim_dir: Vector2 = Vector2.DOWN
 
 var _iframe: float = 0.0
-var _fire_t: float = 0.0
 var _stick_id: int = -1
 var _stick_origin: Vector2 = Vector2.ZERO
 var _stick_vec: Vector2 = Vector2.ZERO
@@ -27,11 +24,12 @@ var _aim_stick_origin: Vector2 = Vector2.ZERO
 var _thruster: CPUParticles2D
 var _laser: Line2D
 var _laser_dot: Sprite2D
+var _weapons: WeaponSystem
 
 var transformed: bool = false
 var _tf_t: float = 0.0
 var base_chassis: String = ""
-const TF_DUR: float = 15.0
+const TF_DUR: float = 8.0   # Overdrive "harvester" spike: short, intense, then vulnerable again
 var _space_was: bool = false
 
 const BEAM_LEN: float = 1000.0
@@ -41,16 +39,27 @@ var _beam_glow: Line2D
 var _beam_dot: Sprite2D
 var _beam_light: PointLight2D
 
+var _od_aura: Sprite2D       # overdrive/transform aura around the mech
+
 func get_layer_ok() -> bool:
 	return mecha != null
 
 func _ready() -> void:
 	add_to_group("player")
+	# apply persistent meta-progression talents (computed by GameState.reset)
+	max_hp += GameState.meta_hp
+	hp = max_hp
+	damage *= (1.0 + GameState.meta_dmg)
+	base_speed *= (1.0 + GameState.meta_speed)
 	mecha = DirectionalMecha.new()
-	mecha.chassis = String(SaveManager.data.get("equipped_chassis", "vanguard"))
+	mecha.chassis = "mecha_joueur"   # new Gemini-designed hero mecha (baked 3D rig + 6 animations)
 	mecha.display_height = 190.0
 	add_child(mecha)
 	base_chassis = mecha.chassis
+
+	_weapons = WeaponSystem.new()
+	add_child(_weapons)
+	_weapons.setup(self)   # setup() already mounts the starter "autocannon"
 
 	var cs: CollisionShape2D = CollisionShape2D.new()
 	var c: CircleShape2D = CircleShape2D.new()
@@ -134,8 +143,20 @@ func _ready() -> void:
 	_beam_light.color = Color(0.6, 0.95, 1.0, 0.9)
 	_beam_light.energy = 2.0
 	_beam_light.texture_scale = 1.5
+	_beam_light.texture = Tex.glow(Color(0.7, 0.97, 1.0), 128)
 	_beam_light.visible = false
 	add_child(_beam_light)
+
+	# overdrive aura around the mech during the transform
+	_od_aura = Sprite2D.new()
+	_od_aura.texture = Tex.glow(Color(1.0, 0.6, 0.2), 128)
+	var aum: CanvasItemMaterial = CanvasItemMaterial.new()
+	aum.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_od_aura.material = aum
+	_od_aura.scale = Vector2(2.4, 2.4)
+	_od_aura.z_index = -1
+	_od_aura.visible = false
+	add_child(_od_aura)
 
 func _physics_process(delta: float) -> void:
 	var alive_now: bool = GameState.alive
@@ -144,6 +165,8 @@ func _physics_process(delta: float) -> void:
 		_laser_dot.visible = false
 		_thruster.emitting = false
 		_hide_beam()
+		if _weapons != null:
+			_weapons.set_active(false)
 		return
 
 	var edge: bool = Input.is_key_pressed(KEY_SPACE)
@@ -160,7 +183,7 @@ func _physics_process(delta: float) -> void:
 
 	_iframe = maxf(0.0, _iframe - delta)
 	var mv: Vector2 = _move_input()
-	velocity = mv * base_speed
+	velocity = mv * base_speed * move_mult * (2.0 if transformed else 1.0)   # Overdrive = x2 speed
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
@@ -168,35 +191,43 @@ func _physics_process(delta: float) -> void:
 	if mv.length() > 0.1:
 		_thruster.emitting = true
 		_thruster.direction = -mv
-		if mecha.current_anim() == "idle":
-			mecha.play("walk")
+		if transformed or base_speed > 360.0:
+			if mecha.current_anim() in ["idle", "walk"]:
+				mecha.play("run")
+		else:
+			if mecha.current_anim() in ["idle", "run"]:
+				mecha.play("walk")
 	else:
 		_thruster.emitting = false
-		if mecha.current_anim() == "walk":
+		if mecha.current_anim() in ["walk", "run"]:
 			mecha.play("idle")
 
 	_update_aim()
 	mecha.set_facing_from(aim_dir)
 
 	if transformed:
+		if _od_aura != null:
+			var ta: float = Time.get_ticks_msec() / 1000.0
+			_od_aura.scale = Vector2.ONE * (2.3 + 0.3 * sin(ta * 6.0))
+			_od_aura.modulate = Color(1, 1, 1, 0.55 + 0.2 * sin(ta * 6.0))
+		_weapons.set_active(false)
 		_laser.visible = false
 		_laser_dot.visible = false
 		_process_beam(delta)
 	else:
 		_hide_beam()
-		_laser.set_point_position(0, aim_dir * 40.0)
-		_laser.set_point_position(1, aim_dir * 900.0)
-		_laser_dot.position = aim_dir * 900.0
-		_laser.visible = true
-		_laser_dot.visible = true
+		_weapons.set_active(true)
+		if _weapons != null:
+			var m: Vector2 = _weapons.muzzle_global
+			_laser.set_point_position(0, to_local(m))
+			_laser.set_point_position(1, to_local(m + aim_dir * 900.0))
+			_laser_dot.position = to_local(m + aim_dir * 900.0)
+			_laser.visible = true
+			_laser_dot.visible = true
 
-		_fire_t -= delta
-		if _fire_t <= 0.0:
-			var target: Node2D = _nearest_enemy()
-			if target != null:
-				_fire_t = fire_interval
-				if game != null and game.has_method("spawn_bolt"):
-					game.spawn_bolt(global_position + aim_dir * 46.0, aim_dir, damage)
+func add_weapon(id: String) -> void:
+	if _weapons != null:
+		_weapons.add_weapon(id)
 
 func _process_beam(delta: float) -> void:
 	var start: Vector2 = aim_dir * 46.0
@@ -245,35 +276,47 @@ func _hide_beam() -> void:
 		_beam_light.visible = false
 
 func _transform_on() -> void:
+	# OVERDRIVE "HARVESTER": invincible + double speed + global XP magnet for TF_DUR seconds,
+	# plus the continuous energy beam. A huge dopamine spike, then back to vulnerable.
 	transformed = true
 	_tf_t = TF_DUR
 	GameState.overdrive = 0.0
+	GameState.overdrive_active = true
 	Events.overdrive_changed.emit(0.0)
-	mecha.set_chassis("vanguard2")
-	base_speed *= 1.15
+	if mecha.has_method("set_tint"):
+		mecha.set_tint(Color(1.6, 1.35, 0.95))
+	if _od_aura != null:
+		_od_aura.visible = true
 	if game != null and game.has_method("transform_fx"):
 		game.transform_fx(global_position, true)
 	Events.player_transformed.emit(true)
 
 func _transform_off() -> void:
 	transformed = false
-	mecha.set_chassis(base_chassis)
-	base_speed /= 1.15
+	GameState.overdrive_active = false
+	if mecha.has_method("set_tint"):
+		mecha.set_tint(Color.WHITE)
+	if _od_aura != null:
+		_od_aura.visible = false
 	if game != null and game.has_method("transform_fx"):
 		game.transform_fx(global_position, false)
 	Events.player_transformed.emit(false)
 
 func _update_aim() -> void:
-	if bot_active:
-		var t: Node2D = _nearest_enemy()
-		if t != null:
-			aim_dir = (t.global_position - global_position).normalized()
-		else:
-			aim_dir = Vector2.DOWN
-		return
+	# AUTO-AIM by default (bullet-heaven standard): the player only steers movement,
+	# weapons target the nearest foe. Manual overrides: the right aim-stick (touch) or
+	# holding a mouse button (desktop). No target + no manual input -> keep last dir.
 	if _aim_stick_id != -1:
+		return   # manual aim stick wins
+	if not bot_active and (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+			or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
+		var m: Vector2 = (get_global_mouse_position() - global_position).normalized()
+		if m != Vector2.ZERO:
+			aim_dir = m
 		return
-	aim_dir = (get_global_mouse_position() - global_position).normalized()
+	var t: Node2D = _nearest_enemy()
+	if t != null:
+		aim_dir = (t.global_position - global_position).normalized()
 	if aim_dir == Vector2.ZERO:
 		aim_dir = Vector2.DOWN
 
@@ -329,12 +372,27 @@ func _nearest_enemy() -> Node2D:
 func take_damage(amount: float) -> void:
 	if _iframe > 0.0 or not GameState.alive:
 		return
+	if transformed:   # Overdrive = invincible; the hit just sparks off the aura
+		if game != null and game.has_method("shield_ripple"):
+			game.shield_ripple(global_position, 150.0, Color(1.0, 0.85, 0.4))
+		return
 	hp -= amount
 	_iframe = 0.55
 	Events.player_damaged.emit(hp, max_hp)
 	Events.screen_shake.emit(6.0)
+	if game != null and game.has_method("shield_ripple"):
+		game.shield_ripple(global_position, 130.0, Color(0.5, 0.8, 1.0))   # armour absorb flash
 	if hp <= 0.0:
 		hp = 0.0
 		GameState.alive = false
 		mecha.play("die")
 		Events.player_died.emit()
+
+func heal(amount: float) -> void:
+	if not GameState.alive:
+		return
+	hp = minf(max_hp, hp + amount)
+	Events.player_damaged.emit(hp, max_hp)   # refresh the health bar
+
+func grant_invuln(t: float) -> void:
+	_iframe = maxf(_iframe, t)

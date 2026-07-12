@@ -2,6 +2,11 @@
 game/.godot/
 game/build/
 game/android/
+# Deployed web builds (throwaway, huge wasm/pck — never commit)
+web/
+# keystores (never commit signing material)
+*.keystore
+*.jks
 # Python
 __pycache__/
 *.pyc
