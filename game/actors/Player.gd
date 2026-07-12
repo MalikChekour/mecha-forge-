@@ -15,7 +15,7 @@ var crit_mult: float = 2.0
 var armor: float = 0.0            # incoming damage reduction, 0..~0.6
 var cooldown_mult: float = 1.0    # haste: <1 = faster weapons
 var magnet_range: float = 360.0   # pickup vacuum radius
-var arena: Rect2 = Rect2(-2200, -2200, 4400, 4400)
+var arena: Rect2 = Rect2(-1000000, -1000000, 2000000, 2000000)   # effectively unbounded (no felt wall)
 
 var bot_active: bool = false
 var bot_move: Vector2 = Vector2.ZERO
