@@ -134,7 +134,7 @@ func _on_hit(area: Area2D) -> void:
 			if is_crit:
 				Audio.sfx("crit", 0.1)
 		if game != null and game.has_method("impact_fx"):
-			game.impact_fx(global_position, bolt_color, impact_kind)
+			game.impact_fx(global_position, bolt_color, impact_kind, velocity.normalized())
 		else:
 			Events.hit_spark.emit(global_position, bolt_color)
 		if pierce <= 0:
@@ -149,8 +149,12 @@ func _do_splash() -> void:
 		if e is Enemy and is_instance_valid(e) and (e as Enemy).alive:
 			var d: float = global_position.distance_squared_to((e as Node2D).global_position)
 			if d <= aoe_sq:
-				(e as Enemy).take_damage(damage)
-				Events.damage_dealt.emit((e as Node2D).global_position, int(damage), false)
+				var is_crit: bool = randf() < crit_chance   # AoE hits crit like single-target ones
+				var dmg: float = damage * (crit_mult if is_crit else 1.0)
+				(e as Enemy).take_damage(dmg)
+				Events.damage_dealt.emit((e as Node2D).global_position, int(dmg), is_crit)
+				if is_crit:
+					Audio.sfx("crit", 0.1)
 
 func _on_body(body: Node) -> void:
 	if not alive:

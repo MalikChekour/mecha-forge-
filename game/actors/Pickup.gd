@@ -34,13 +34,25 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 		_light = PointLight2D.new()
 		add_child(_light)
 	# refresh appearance every time (a pooled xp gem may be reused as scrap/bonus)
-	var col: Color = Palette.CYAN if k == "xp" else (Palette.BONUS if k == "bonus" else Palette.ACCENT)
+	# XP gems are colour-tiered by value so the player reads a swarm-drop vs an elite-drop at a glance
+	var col: Color
+	if k == "xp":
+		col = Color(0.45, 1.0, 0.55) if val <= 1 else (Color(0.35, 0.7, 1.0) if val == 2 else Palette.BONUS)  # green<blue<gold
+	elif k == "bonus":
+		col = Palette.BONUS
+	elif k == "skill":
+		col = Color(0.78, 0.52, 1.0)          # violet competence orb (from a broken skill-crate)
+	elif k == "scrap":
+		col = Palette.ACCENT
+	else:
+		col = Palette.CYAN
 	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 24)
+	_spr.modulate = col if k == "xp" else Color.WHITE   # tint the gem itself (texture may ignore fallback colour)
 	var th: float = float(_spr.texture.get_height())
 	if th > 0.0:
-		_spr.scale = Vector2.ONE * ((26.0 if k == "bonus" else 18.0) / th)
+		_spr.scale = Vector2.ONE * ((28.0 if (k == "bonus" or k == "skill") else 18.0) / th)
 	_light.color = col
-	_light.energy = 1.0 if k == "bonus" else 0.5
+	_light.energy = 1.1 if (k == "bonus" or k == "skill") else 0.5
 	_light.texture = _spr.texture
 
 func _physics_process(delta: float) -> void:
@@ -61,12 +73,21 @@ func _physics_process(delta: float) -> void:
 		Audio.sfx("scrap" if kind == "scrap" else "xp", 0.12)
 		if kind == "xp":
 			GameState.add_xp(value)
+		elif kind == "skill":
+			if game != null and game.has_method("grant_skill"):
+				game.grant_skill()                                          # free random competence
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("levelup", player.global_position, 0.0, 1.2)  # golden burst
 		elif kind == "bonus":
 			if player.has_method("heal"):
 				player.heal(25.0)
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("heal", player.global_position, 0.0, 1.3)   # green rising sparkles on the player
 			GameState.add_overdrive(0.18)
 			GameState.add_scrap(6)
 		else:
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("pickup", global_position, 0.0, 0.42, Color(1.0, 0.85, 0.4))   # small sparkle on scrap
 			GameState.add_scrap(value)
 		_collected()
 

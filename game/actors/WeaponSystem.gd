@@ -1,6 +1,12 @@
 class_name WeaponSystem
 extends Node2D
 
+signal fired(muzzle_world: Vector2)   # a weapon volley left the barrel (drives the mech's shoot pose)
+
+## When true, the flat held-weapon sprites are hidden (the layered MechaRig shows the gun
+## via its own aiming hardpoint instead). Firing/muzzle math still runs.
+var visuals_hidden: bool = false
+
 const WEAPON_ORDER: Array[String] = ["autocannon", "missilepod", "railgun", "plasma",
 	"vulcan", "hydra", "annihilator", "singularity"]
 const MAX_LEVEL: int = 5   # a weapon at MAX + its required passive can EVOLVE
@@ -63,9 +69,13 @@ var _player: Node = null
 var _active: bool = true
 var _weapons: Dictionary = {}
 
-func setup(p: Node) -> void:
+func setup(p: Node, starters: Array = ["autocannon"]) -> void:
 	_player = p
-	add_weapon("autocannon")
+	for wid in starters:
+		add_weapon(String(wid))
+
+func weapon_level(id: String) -> int:
+	return int(_weapons[id]["level"]) if _weapons.has(id) else 0
 
 func add_weapon(id: String) -> void:
 	if not WEAPON_ORDER.has(id):
@@ -237,14 +247,15 @@ func _process(delta: float) -> void:
 			base_pos = gun - aim * recoil_off
 			muzzle_dist = 26.0
 
+		var show_wp: bool = not baked and not visuals_hidden
 		var sp: Sprite2D = w["sprite"] as Sprite2D
-		sp.visible = not baked
+		sp.visible = show_wp
 		sp.position = base_pos
 		sp.rotation = aim_ang
 
 		var shadow: Sprite2D = w.get("shadow", null) as Sprite2D
 		if shadow != null:
-			shadow.visible = not baked
+			shadow.visible = show_wp
 			shadow.position = base_pos + perp * 2.0
 			shadow.rotation = aim_ang
 
@@ -259,6 +270,7 @@ func _process(delta: float) -> void:
 
 		var muzzle_sprite: Sprite2D = w.get("muzzle", null) as Sprite2D
 		if muzzle_sprite != null:
+			muzzle_sprite.visible = show_wp
 			muzzle_sprite.position = muzzle_local
 			muzzle_sprite.rotation = aim_ang
 			if recoil_t > 0.0:
@@ -319,3 +331,4 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		var a0: float = aim.angle() - spread * (count - 1) * 0.5
 		for i in count:
 			game.spawn_shot(muzzle_world, Vector2.from_angle(a0 + spread * i), params)
+	fired.emit(muzzle_world)

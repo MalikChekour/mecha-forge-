@@ -18,6 +18,7 @@ const LOOP: Dictionary = {"idle": true, "walk": true, "run": true, "attack": fal
 const FPS: Dictionary = {"idle": 10.0, "walk": 16.0, "run": 20.0, "attack": 22.0, "hit": 14.0, "die": 12.0}
 
 var _spr: Sprite2D
+var _shadow: Sprite2D                 # ground contact shadow so the mech doesn't look airborne
 var _cache: Dictionary = {}          # "anim_dir" -> Texture2D
 var _anim: String = "idle"
 var _dir: String = "front"
@@ -26,6 +27,14 @@ var _frame: int = 0
 var _oneshot: bool = false
 
 func _ready() -> void:
+	# ground contact shadow (behind the mech) so the player doesn't look like it floats
+	_shadow = Sprite2D.new()
+	_shadow.texture = Tex.glow(Color(0, 0, 0, 1), 64)
+	_shadow.modulate = Color(0, 0, 0, 0.55)
+	_shadow.position = Vector2(0.0, display_height * 0.26)   # at George's feet (~0.75 of the frame)
+	_shadow.scale = Vector2(display_height / 64.0 * 0.42, display_height / 64.0 * 0.14)
+	_shadow.z_index = -1
+	add_child(_shadow)
 	_spr = Sprite2D.new()
 	_spr.centered = true
 	_spr.hframes = frame_count
@@ -40,6 +49,8 @@ func _tex(anim: String, dir: String) -> Texture2D:
 	var candidates: Array[String] = [
 		"res://assets/mecha/%s_%s_%s.png" % [chassis, anim, dir],
 		"res://assets/mecha/%s_%s.png" % [chassis, anim],
+		"res://assets/mecha/%s_walk_%s.png" % [chassis, dir],   # anim fallback: any chassis missing
+		"res://assets/mecha/%s_idle_%s.png" % [chassis, dir],   # 'run'/'hit' still renders cleanly
 		"res://assets/mecha/%s.png" % chassis,
 	]
 	for p in candidates:
@@ -124,11 +135,18 @@ func set_tint(c: Color) -> void:
 		_spr.modulate = c
 
 ## Pick facing from a movement/aim vector. +y (down, toward camera) = front.
+## HYSTERESIS: near a 45-degree diagonal the two axes are almost equal, so a raw |x|>|y|
+## test flip-flops between (e.g.) front and right every frame -> visible spinning. We only
+## switch facing when one axis clearly dominates (>18%); otherwise we keep the current one.
 func set_facing_from(v: Vector2) -> void:
 	if v.length() < 0.05:
 		return
+	var ax: float = absf(v.x)
+	var ay: float = absf(v.y)
+	if maxf(ax, ay) < 1.18 * minf(ax, ay):
+		return   # too diagonal to decide -> hold current facing (no flip-flop)
 	var d: String
-	if absf(v.x) > absf(v.y):
+	if ax > ay:
 		d = "right" if v.x > 0.0 else "left"
 	else:
 		d = "front" if v.y > 0.0 else "back"

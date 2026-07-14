@@ -18,6 +18,7 @@ var _hp_fill: ColorRect
 var _xp_fill: ColorRect
 var _od_fill: ColorRect
 var _od_lbl: Label
+var _od_btn: Button       # tactile trigger for Overdrive (mobile) — pulses when ready
 var _timer_lbl: Label
 var _stat_lbl: Label
 var _draft_root: Control
@@ -40,8 +41,21 @@ func setup(p: Player) -> void:
 func _on_overdrive(v: float) -> void:
 	if _od_fill != null:
 		_od_fill.size.x = BAR_W * clampf(v, 0.0, 1.0)
+	var ready: bool = v >= 1.0 and (player == null or not player.transformed)
 	if _od_lbl != null:
-		_od_lbl.visible = v >= 1.0
+		_od_lbl.visible = ready
+	if _od_btn != null:
+		_od_btn.visible = ready
+
+func _process(_delta: float) -> void:
+	# pulse the Overdrive button so the player notices it's ready to tap
+	if _od_btn != null and _od_btn.visible:
+		var p: float = 0.7 + 0.3 * sin(Time.get_ticks_msec() / 140.0)
+		_od_btn.modulate = Color(1, 1, 1, p)
+
+func _on_od_pressed() -> void:
+	if player != null and player.has_method("activate_overdrive"):
+		player.activate_overdrive()
 
 func _rect(parent: Node, pos: Vector2, size: Vector2, col: Color) -> ColorRect:
 	var c: ColorRect = ColorRect.new()
@@ -68,9 +82,22 @@ func _build() -> void:
 	_od_lbl.position = Vector2(16, 52)
 	_od_lbl.add_theme_font_size_override("font_size", 17)
 	_od_lbl.add_theme_color_override("font_color", Color(1, 0.75, 0.2))
-	_od_lbl.text = "⚡ OVERDRIVE — ESPACE"
+	_od_lbl.text = "SURCHARGE PRETE"
 	_od_lbl.visible = false
 	root.add_child(_od_lbl)
+
+	# big thumb-reachable Overdrive button (bottom-right), only shown when the gauge is full
+	_od_btn = Button.new()
+	_od_btn.text = "SURCHARGE"
+	_od_btn.position = Vector2(1080, 588)
+	_od_btn.size = Vector2(184, 84)
+	_od_btn.add_theme_font_size_override("font_size", 24)
+	_od_btn.add_theme_color_override("font_color", Color(0.15, 0.08, 0.0))
+	_od_btn.add_theme_color_override("font_color_hover", Color(0.15, 0.08, 0.0))
+	_od_btn.modulate = Color(1, 1, 1, 1)
+	_od_btn.visible = false
+	_od_btn.pressed.connect(_on_od_pressed)
+	add_child(_od_btn)
 
 	_timer_lbl = Label.new()
 	_timer_lbl.position = Vector2(596, 10)

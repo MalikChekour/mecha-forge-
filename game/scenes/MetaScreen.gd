@@ -6,12 +6,14 @@ class_name MetaScreen
 var game: Node
 var died: bool = false
 var _revive_ok: bool = false
+var _new_record: bool = false
 
 func setup(g: Node, d: bool, revive_available: bool) -> void:
 	game = g
 	died = d
 	_revive_ok = revive_available
 	layer = 40
+	_new_record = SaveManager.record_score(GameState.difficulty, GameState.score)
 	if died and revive_available:
 		_build_revive()
 	else:
@@ -61,7 +63,8 @@ func _build_revive() -> void:
 	var v: VBoxContainer = _scaffold()
 	_title(v, "MECHA DÉTRUIT", Color(1.0, 0.5, 0.4))
 	_title(v, "Une seconde chance ?", Color(0.85, 0.9, 1.0), 22)
-	_big_button(v, "REVIVRE  (pub)", _on_revive, Color(0.2, 0.7, 0.4))
+	# TODO (Vague 1): brancher sur Ads.show_rewarded() une fois AdMob integre -> redevient "(pub)".
+	_big_button(v, "REVIVRE", _on_revive, Color(0.2, 0.7, 0.4))
 	_big_button(v, "Abandonner", _on_abandon, Color(0.4, 0.4, 0.5))
 
 func _on_revive() -> void:
@@ -83,6 +86,12 @@ func _build_shop() -> void:
 	else:
 		_title(v, "VICTOIRE !", Color(1.0, 0.9, 0.45))
 	_title(v, "Niveau %d · %d kills · %ds" % [GameState.level, GameState.kills, int(GameState.run_time)], Color(0.8, 0.85, 0.95), 20)
+	var dn: String = String(GameState.diff().get("name", "NORMAL"))
+	_title(v, "SCORE  %d    GRADE  %s    [%s]" % [GameState.score, GameState.grade(), dn], Color(1.0, 0.85, 0.4), 24)
+	if _new_record:
+		_title(v, "NOUVEAU RECORD !", Color(0.5, 1.0, 0.6), 20)
+	else:
+		_title(v, "record %s : %d" % [dn, SaveManager.best_score(GameState.difficulty)], Color(0.7, 0.78, 0.9), 16)
 	_title(v, "%d  ferraille" % int(SaveManager.data.get("meta_scrap", 0)), Color(0.6, 0.9, 1.0), 26)
 
 	for id: String in GameState.META:
@@ -112,11 +121,60 @@ func _build_shop() -> void:
 	var spacer: Control = Control.new()
 	spacer.custom_minimum_size = Vector2(0, 10)
 	v.add_child(spacer)
+	_big_button(v, "GARAGE  (mechs)", _build_garage, Color(0.3, 0.5, 0.72))
 	_big_button(v, "REJOUER", _replay, Color(0.2, 0.6, 0.95))
 
 func _buy(id: String, cost: int) -> void:
 	if SaveManager.buy_meta(id, cost):
 		_build_shop()   # refresh levels + scrap + button states
+
+# --- mech garage: buy alternate chassis with scrap, equip for the next run ---
+func _build_garage() -> void:
+	_clear()
+	var v: VBoxContainer = _scaffold(640.0)
+	_title(v, "GARAGE", Color(0.7, 0.9, 1.0))
+	_title(v, "%d  ferraille" % int(SaveManager.data.get("meta_scrap", 0)), Color(0.6, 0.9, 1.0), 22)
+	var equipped: String = SaveManager.equipped_mech()
+	for mech: Dictionary in GameState.MECHS:
+		var id: String = String(mech["id"])
+		var owned: bool = SaveManager.owns_mech(id)
+		var row: HBoxContainer = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var name_l: Label = Label.new()
+		name_l.text = "%s   -   %s" % [String(mech["name"]), String(mech["desc"])]
+		name_l.custom_minimum_size = Vector2(450, 0)
+		name_l.add_theme_font_size_override("font_size", 17)
+		if id == equipped:
+			name_l.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
+		row.add_child(name_l)
+		var b: Button = Button.new()
+		b.custom_minimum_size = Vector2(150, 44)
+		if id == equipped:
+			b.text = "EQUIPE"
+			b.disabled = true
+		elif owned:
+			b.text = "EQUIPER"
+			b.pressed.connect(_equip_mech.bind(id))
+		else:
+			var cost: int = int(mech["cost"])
+			b.text = str(cost)
+			b.disabled = int(SaveManager.data.get("meta_scrap", 0)) < cost
+			b.pressed.connect(_buy_mech.bind(id, cost))
+		row.add_child(b)
+		v.add_child(row)
+	var spacer: Control = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 10)
+	v.add_child(spacer)
+	_big_button(v, "RETOUR", _build_shop, Color(0.4, 0.4, 0.5))
+
+func _buy_mech(id: String, cost: int) -> void:
+	Audio.sfx("levelup" if SaveManager.buy_mech(id, cost) else "click")
+	_build_garage()
+
+func _equip_mech(id: String) -> void:
+	SaveManager.equip_mech(id)
+	Audio.sfx("click")
+	_build_garage()
 
 func _replay() -> void:
 	get_tree().paused = false

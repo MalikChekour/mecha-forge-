@@ -18,5 +18,8 @@ meshy_in/
 .glm_key
 .env
 *.key
-# transient bake frame
+# transient bake frames
 **/_animframe.png
+**/_tmp/
+# temp backup of the old blurred ground textures (superseded by clean Gemini re-encode)
+.ground_blurred_backup/

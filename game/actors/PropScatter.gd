@@ -1,138 +1,176 @@
 extends Node2D
 class_name PropScatter
+## Scatters the Gemini decor sprites across the arena, coherently per biome. Every prop is a
+## StaticBody2D (blocks the player; enemies steer around it via Game.cover_list). Some crates are
+## DESTRUCTIBLE and drop a skill bonus; the rest are indestructible obstacles.
 
 var game: Node
-var biome: String = "tech"            # set by Game -> decor is painted to harmonise
+var biome: String = "tech"
 
-const _BONUS_RATE: float = 0.25       # fraction of destructible props holding a bonus cache
+# kind -> f(ile g<n>), hp, sz(on-screen height px), destruct, skill(chance a broken crate holds a
+# competence), glow(optional accent colour for emissive props)
+const DECOR: Dictionary = {
+	"baril":      {"f": "g20", "hp": 30.0,  "sz": 88.0,  "destruct": true,  "skill": 0.35},
+	"caisses":    {"f": "g21", "hp": 26.0,  "sz": 96.0,  "destruct": true,  "skill": 0.50},
+	"generateur": {"f": "g22", "hp": 130.0, "sz": 124.0, "glow": "cyan"},
+	"antenne":    {"f": "g23", "hp": 80.0,  "sz": 132.0},
+	"conduit":    {"f": "g24", "hp": 90.0,  "sz": 112.0, "glow": "cyan"},
+	"emetteur":   {"f": "g25", "hp": 100.0, "sz": 118.0, "glow": "cyan"},
+	"epave":      {"f": "g26", "hp": 240.0, "sz": 150.0},
+	"tourelle":   {"f": "g27", "hp": 140.0, "sz": 130.0},
+	"container":  {"f": "g28", "hp": 34.0,  "sz": 140.0, "destruct": true,  "skill": 0.55},
+	"rocher":     {"f": "g29", "hp": 170.0, "sz": 120.0},
+	"cristaux":   {"f": "g30", "hp": 48.0,  "sz": 110.0, "destruct": true,  "skill": 0.25, "glow": "cyan"},
+	"arbre":      {"f": "g31", "hp": 70.0,  "sz": 142.0},
+	"plante":     {"f": "g32", "hp": 40.0,  "sz": 100.0, "destruct": true,  "glow": "green"},
+	"glace":      {"f": "g33", "hp": 58.0,  "sz": 122.0, "destruct": true},
+	"arche":      {"f": "g34", "hp": 190.0, "sz": 152.0},
+	"lave":       {"f": "g35", "hp": 150.0, "sz": 112.0, "glow": "orange"},
+	"racines":    {"f": "g36", "hp": 95.0,  "sz": 132.0, "glow": "green"},
+	# --- ruined-city map (guerre des robots) ---
+	"immeuble":   {"f": "g37",  "hp": 400.0, "sz": 224.0, "glow": "cyan"},   # ruined tower — big obstacle
+	"immeuble2":  {"f": "g37b", "hp": 400.0, "sz": 212.0},
+	"vaisseau":   {"f": "g39",  "hp": 350.0, "sz": 202.0},                   # crashed dropship
+	"vaisseau2":  {"f": "g39b", "hp": 350.0, "sz": 196.0},
+	"voiture":    {"f": "g40",  "hp": 45.0,  "sz": 120.0, "destruct": true, "skill": 0.30},
+	"gravats":    {"f": "g41",  "hp": 30.0,  "sz": 102.0, "destruct": true},
+	"gravats2":   {"f": "g41b", "hp": 30.0,  "sz": 110.0, "destruct": true},
+	"pylone":     {"f": "g42",  "hp": 90.0,  "sz": 150.0},
+	"panneau":    {"f": "g43",  "hp": 70.0,  "sz": 150.0, "glow": "cyan"},
+	"barricade":  {"f": "g44",  "hp": 40.0,  "sz": 130.0, "destruct": true, "skill": 0.40},
+	"carcasse":   {"f": "g45",  "hp": 300.0, "sz": 172.0},
+	# --- biome enrichers ---
+	"lave_geyser":{"f": "g47",  "hp": 9999.0,"sz": 132.0, "glow": "orange"},
+	"champignon": {"f": "g48",  "hp": 40.0,  "sz": 122.0, "destruct": true, "glow": "cyan"},
+	"campement":  {"f": "g49",  "hp": 50.0,  "sz": 122.0, "destruct": true},
+	"epave_gel":  {"f": "g50",  "hp": 120.0, "sz": 132.0},
+	"serveurs":   {"f": "g51",  "hp": 60.0,  "sz": 122.0, "glow": "cyan"},
+	"capsule":    {"f": "g52",  "hp": 80.0,  "sz": 116.0, "glow": "cyan"},
+}
+# Biome-coherent placement: climate/nature props ONLY in their biome (no ice in the spaceship);
+# generic industrial (baril/caisses/container/epave) shows up as scattered wreckage most places.
+const BIOME_DECOR: Dictionary = {
+	"earth":     ["rocher", "arbre", "epave", "caisses", "baril", "rocher"],
+	"volcanic":  ["lave", "lave", "lave_geyser", "epave", "rocher", "baril", "caisses"],
+	"spaceship": ["generateur", "conduit", "emetteur", "container", "caisses", "baril", "cristaux", "tourelle", "antenne", "serveurs", "capsule"],
+	"tech":      ["generateur", "conduit", "antenne", "baril", "caisses", "tourelle", "cristaux", "container", "serveurs"],
+	"desert":    ["arche", "rocher", "arbre", "epave", "caisses", "baril", "campement"],
+	"ice":       ["glace", "glace", "cristaux", "epave", "caisses", "rocher", "epave_gel"],
+	"jungle":    ["plante", "racines", "rocher", "arbre", "plante", "champignon"],
+	"swamp":     ["racines", "plante", "arbre", "rocher", "racines"],
+	"ruines":    ["immeuble", "immeuble2", "vaisseau", "vaisseau2", "voiture", "gravats", "gravats2",
+	              "pylone", "panneau", "barricade", "carcasse", "gravats"],
+}
 
-func populate(count: int = 34) -> void:
-	# large cover props (collidable, destructible), painted into the biome (harmonised).
-	var kinds: Array[String] = ["boulder", "rock_cluster", "container", "pillar", "pylon", "debris"]
-	for i in count:
-		var pos: Vector2 = Vector2(randf_range(-2050.0, 2050.0), randf_range(-2050.0, 2050.0))
-		if pos.length() < 280.0:
+func populate(count: int = 28) -> void:
+	var kinds: Array = BIOME_DECOR.get(biome, BIOME_DECOR["tech"])
+	var placed: Array = []               # [{pos, gap}] — gap scales with prop size
+	var tries: int = 0
+	while placed.size() < count and tries < count * 6:
+		tries += 1
+		var pos: Vector2 = Vector2(randf_range(-2000.0, 2000.0), randf_range(-2000.0, 2000.0))
+		if pos.length() < 340.0:
+			continue                     # keep the spawn area clear
+		var kind: String = String(kinds[randi() % kinds.size()])
+		# footprint radius: big ruins props (immeuble/vaisseau) need far more room so their
+		# enemy-repulsion bubbles never overlap (which would jitter/bottleneck the swarm).
+		var gap: float = 55.0 + float((DECOR.get(kind, {}) as Dictionary).get("sz", 110.0)) * 0.45
+		var ok: bool = true
+		for e in placed:
+			if pos.distance_to(e["pos"]) < gap + float(e["gap"]):
+				ok = false; break
+		if not ok:
 			continue
-		_place(kinds[randi() % kinds.size()], pos, false, randf() < _BONUS_RATE)
-	# ambient detail scatter (small, NO collision) for a richer ground
-	var detail: Array[String] = ["boulder", "crystal", "debris"]
-	for i in count * 3:
-		var dp: Vector2 = Vector2(randf_range(-2100.0, 2100.0), randf_range(-2100.0, 2100.0))
-		if dp.length() < 220.0:
-			continue
-		_place(detail[randi() % detail.size()], dp, true)
+		placed.append({"pos": pos, "gap": gap})
+		_place(kind, pos)
 
-func _place(kind: String, pos: Vector2, ambient: bool = false, bonus: bool = false) -> void:
+func _place(kind: String, pos: Vector2) -> void:
 	var prop: Prop = Prop.new()
 	prop.game = game
 	prop.kind = kind
+	prop.def = DECOR.get(kind, {})
 	prop.position = pos
-	prop.ambient = ambient
-	prop.tint = Palette.biome_tint(biome)
-	prop.has_bonus = bonus
 	add_child(prop)
 
 class Prop extends StaticBody2D:
 	var game: Node
 	var kind: String
-	var ambient: bool = false
+	var def: Dictionary
 	var hp: float
-	var sprite: Sprite2D
-	var shadow: Sprite2D
-	var tint: Color = Color.WHITE     # biome tint (painted decor)
-	var has_bonus: bool = false       # destroys into a bonus cache
+	var block_r: float = 40.0        # radius enemies steer around (read by Enemy)
+	var _sprite: Sprite2D
+	var _skill: bool = false
 
 	func _ready() -> void:
-		match kind:
-			"boulder":
-				hp = 120.0
-			"rock_cluster":
-				hp = 160.0
-			"container":
-				hp = 40.0
-			"pillar":
-				hp = 200.0
-			"pylon":
-				hp = 90.0
-			"debris":
-				hp = 25.0
-			"crystal":
-				hp = 40.0
-			_:
-				hp = 60.0
-
-		var variant: int = 1 + (randi() % 2)
-		var tex: Texture2D = Tex.get_tex("res://assets/decor/d_%s_%d.png" % [kind, variant], Palette.STEEL_DK, 128)
+		hp = float(def.get("hp", 60.0))
+		var tex: Texture2D = load("res://assets/decor/%s.png" % String(def.get("f", "g20")))
 		var th: float = maxf(1.0, float(tex.get_height()))
-		var base_h: float = 58.0 if ambient else 150.0
-		var sc: float = randf_range(0.7, 1.3) * (base_h / th)
-		var span: float = th * sc
+		var sc: float = randf_range(0.86, 1.16) * (float(def.get("sz", 110.0)) / th)
+		var spanx: float = float(tex.get_width()) * sc
+		var spany: float = th * sc
 
-		shadow = Sprite2D.new()
+		# ground contact shadow -> the prop sits in the world instead of floating
+		var shadow: Sprite2D = Sprite2D.new()
 		shadow.texture = Tex.glow(Color(0, 0, 0, 1), 64)
-		shadow.modulate = Color(0, 0, 0, 0.4 if ambient else 0.5)
-		shadow.position = Vector2(0.0, span * 0.30)
-		shadow.scale = Vector2(span / 64.0 * 1.15, span / 64.0 * 0.45)
+		shadow.modulate = Color(0, 0, 0, 0.5)
+		shadow.position = Vector2(0.0, spany * 0.36)
+		shadow.scale = Vector2(spanx / 64.0 * 0.66, spany / 64.0 * 0.20)
 		shadow.z_index = -2
 		add_child(shadow)
 
-		sprite = Sprite2D.new()
-		sprite.texture = tex
-		sprite.scale = Vector2.ONE * sc
-		sprite.flip_h = randf() < 0.5
-		sprite.modulate = tint            # painted into the biome
-		add_child(sprite)
+		_sprite = Sprite2D.new()
+		_sprite.texture = tex
+		_sprite.scale = Vector2.ONE * sc
+		add_child(_sprite)
 
-		# crystals softly glow -> adds 3D depth/ambiance to the ground
-		if kind == "crystal" or kind == "crystal_cluster":
-			var glow := PointLight2D.new()
-			glow.texture = Tex.glow(Palette.CYAN, 128)
-			glow.color = Palette.CYAN
-			glow.energy = 0.5 if ambient else 0.9
-			glow.texture_scale = span / 128.0 * (2.2 if ambient else 3.0)
-			add_child(glow)
+		var glow: String = String(def.get("glow", ""))
+		if glow != "":
+			var gc: Color = Palette.CYAN
+			if glow == "green": gc = Color(0.4, 1.0, 0.5)
+			elif glow == "orange": gc = Color(1.0, 0.55, 0.2)
+			var l: PointLight2D = PointLight2D.new()
+			l.texture = Tex.glow(gc, 128); l.color = gc; l.energy = 0.7
+			l.texture_scale = maxf(spanx, spany) / 128.0 * 1.8
+			add_child(l)
 
-		# bonus caches read as special: a warm gold glow so the player knows to break them
-		if has_bonus and not ambient:
-			var bl := PointLight2D.new()
-			bl.texture = Tex.glow(Palette.BONUS, 128)
-			bl.color = Palette.BONUS
-			bl.energy = 1.1
-			bl.texture_scale = span / 128.0 * 2.6
+		# a destructible crate MAY hold a competence -> warm gold tell so the player breaks it
+		if bool(def.get("destruct", false)) and randf() < float(def.get("skill", 0.0)):
+			_skill = true
+			var bl: PointLight2D = PointLight2D.new()
+			bl.texture = Tex.glow(Palette.BONUS, 128); bl.color = Palette.BONUS; bl.energy = 1.2
+			bl.texture_scale = maxf(spanx, spany) / 128.0 * 2.2
 			add_child(bl)
 
-		if ambient:
-			z_index = -1   # small ground details: behind actors, no collision
-			return
-
-		var shape: Shape2D
-		if kind == "container":
-			shape = RectangleShape2D.new()
-			(shape as RectangleShape2D).size = Vector2(span * 0.8, span * 0.8)
-		else:
-			shape = CircleShape2D.new()
-			(shape as CircleShape2D).radius = span * 0.5
-
-		var collision := CollisionShape2D.new()
-		collision.shape = shape
-		add_child(collision)
-
+		# collision: blocks the player (mask 8) and bullets; enemies avoid via Game.cover_list
+		block_r = maxf(spanx, spany) * 0.30
+		var shape: CircleShape2D = CircleShape2D.new()
+		shape.radius = block_r
+		var col: CollisionShape2D = CollisionShape2D.new()
+		col.shape = shape
+		col.position = Vector2(0.0, spany * 0.12)   # centre the collider on the base, not the top
+		add_child(col)
 		add_to_group("cover")
 		collision_layer = 8
 		collision_mask = 0
+		if game != null and "cover_list" in game:
+			game.cover_list.append(self)
 
 	func take_damage(amount: float) -> void:
+		if not bool(def.get("destruct", false)):
+			return   # indestructible obstacle (bullets already stopped by the collider)
 		hp -= amount
-		if hp <= 0:
+		if hp <= 0.0:
 			if game != null:
 				if game.has_method("death_fx"):
 					game.death_fx(global_position, 0)
-				if has_bonus and game.has_method("spawn_bonus"):
-					game.spawn_bonus(global_position)     # the reward for breaking a cache
+				if _skill and game.has_method("spawn_skill"):
+					game.spawn_skill(global_position)          # the reward: a competence
 				elif game.has_method("spawn_scrap"):
 					game.spawn_scrap(global_position, 2 + randi() % 3)
+				if "cover_list" in game:
+					game.cover_list.erase(self)
 			call_deferred("queue_free")
 		else:
-			var tween := create_tween()
-			tween.tween_property(sprite, "modulate", Color.WHITE, 0.05)
-			tween.tween_property(sprite, "modulate", tint, 0.15)
+			var tw: Tween = create_tween()
+			tw.tween_property(_sprite, "modulate", Color(2.2, 2.2, 2.4), 0.05)
+			tw.tween_property(_sprite, "modulate", Color.WHITE, 0.15)

@@ -128,6 +128,21 @@ func fire(i: int) -> void:
 	var tip: Vector2 = _hardpoint_tip(hp, _mount_now(hp))
 	fired.emit(i, to_global(tip), aim_dir)
 
+# --- drop-in compatibility with the Player's DirectionalMecha API ---
+# The rig animates PROCEDURALLY from `velocity` + `aim_dir`, so the frame-based calls are
+# no-ops; set_tint tints every layer, current_anim() reports a coarse walk/idle state.
+func set_tint(c: Color) -> void:
+	modulate = c
+
+func play(_anim: String) -> void:
+	pass
+
+func set_facing_from(_v: Vector2) -> void:
+	pass
+
+func current_anim() -> String:
+	return "walk" if _walk_w > 0.5 else "idle"
+
 func get_layer_count() -> int:
 	return _layers.size()
 

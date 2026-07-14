@@ -3,7 +3,7 @@ class_name Enemy
 
 var game: Node
 var player: Node2D
-var kind: String = "crawler"
+var kind: String = "brute"
 var hp: float = 20.0
 var hp_max: float = 20.0
 var speed: float = 90.0
@@ -38,6 +38,11 @@ var _shield_regen_t: float = 0.0
 var _shield_flash: float = 0.0
 var _body_radius: float = 24.0
 var _bolt_color: Color = Color(1.0, 0.55, 0.25)   # per-enemy ranged-bolt colour
+var drops_bonus: bool = false                     # intermediate foes drop a bonus pickup on death
+# Shared per-physics-frame snapshot of the enemy group: querying the group per-enemy per-frame is
+# O(N^2) allocation at 220 foes (dominant mobile CPU cost). Build it ONCE per frame, all read it.
+static var _enemies_frame: int = -1
+static var _enemies_cache: Array = []
 
 # Movement internals
 var velocity: Vector2 = Vector2.ZERO
@@ -96,12 +101,15 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	shield = shield_max
 	_body_radius = float(def.get("radius", 24.0))
 	_bolt_color = _kind_bolt_color(k)
+	drops_bonus = bool(def.get("drops_bonus", false))
 
 	_speed_mult = randf_range(0.85, 1.15)
 	_wander_phase = randf() * TAU
 	velocity = Vector2.ZERO
 	
 	_atk_cd = attack_cd
+	_phase = _PH_DASH_WIND
+	_phase_timer = 0.5   # so the dasher's FIRST dash also telegraphs (wind-up/flash) instead of firing raw
 	_strafe_dir = 1.0 if randf() > 0.5 else -1.0
 	
 	add_to_group("enemies")
@@ -159,13 +167,21 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	if fh > 0.0:
 		_spr.scale = Vector2.ONE * (float(def.get("size", 92.0)) / fh)
 
-	# ground shadow: anchors the enemy to the floor so it doesn't look like it floats on glass
+	# Ground shadow: anchors the enemy to the floor so it doesn't look like it floats on glass.
+	# WALKING foes get a strong, tight contact shadow at the FEET (the old faint glow was invisible
+	# on the dark floor -> they looked airborne). FLYERS (drone: motion "hover") keep a small, faint,
+	# higher shadow so they still read as hovering.
 	var gsize: float = float(def.get("size", 92.0))
+	var grounded: bool = motion != "hover"
+	# Place the shadow at the sprite's ACTUAL feet (measured from the art's alpha), not a guessed
+	# offset. The mech content sits high in the frame (feet ~0.6-0.8 down), so a fixed 0.42 offset
+	# dropped the shadow well BELOW the feet -> the walker looked detached from its shadow (floating).
+	var feet_y: float = (_feet_frac_of(_spr.texture) - 0.5) * gsize
 	var shadow: Sprite2D = Sprite2D.new()
 	shadow.texture = Tex.glow(Color(0, 0, 0, 1), 64)
-	shadow.modulate = Color(0, 0, 0, 0.45)
-	shadow.position = Vector2(0.0, gsize * 0.34)
-	shadow.scale = Vector2(gsize / 64.0 * 0.9, gsize / 64.0 * 0.38)
+	shadow.modulate = Color(0, 0, 0, 0.6 if grounded else 0.22)
+	shadow.position = Vector2(0.0, feet_y if grounded else gsize * 0.30)
+	shadow.scale = Vector2(gsize / 64.0 * (0.82 if grounded else 0.5), gsize / 64.0 * (0.24 if grounded else 0.2))
 	shadow.z_index = -1
 	add_child(shadow)
 
@@ -206,13 +222,44 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		add_child(_hp_fill)
 
 
+## Fraction (0..1 of texture height) of the LOWEST opaque row in frame 0 = where the feet are.
+## Cached per texture path (computed once per kind). Used to sit the ground shadow at the feet.
+static var _feet_cache: Dictionary = {}
+func _feet_frac_of(tex: Texture2D) -> float:
+	if tex == null:
+		return 0.65
+	var key: String = tex.resource_path
+	if key != "" and _feet_cache.has(key):
+		return _feet_cache[key]
+	var ff: float = 0.65
+	var img: Image = tex.get_image()
+	if img != null:
+		var tw: int = img.get_width()
+		var th: int = img.get_height()
+		var frames: int = 8 if tw >= th * 4 else 1   # 8-frame strips vs single-frame statics
+		var fw: int = int(tw / maxi(1, frames))
+		var y: int = th - 1
+		while y >= 0:
+			var x: int = 0
+			var hit: bool = false
+			while x < fw:
+				if img.get_pixel(x, y).a > 0.08:
+					hit = true
+					break
+				x += 3
+			if hit:
+				ff = float(y) / float(th)
+				break
+			y -= 1
+	if key != "":
+		_feet_cache[key] = ff
+	return ff
+
 func _kind_bolt_color(k: String) -> Color:
 	# Readability rule: WARM = enemy/danger (cold hues are reserved for the player).
 	match k:
-		"spitter": return Color(1.0, 0.35, 0.7)    # magenta plasma
 		"drone": return Color(1.0, 0.6, 0.2)       # orange
 		"warden": return Color(1.0, 0.28, 0.22)    # red
-		"raider": return Color(1.0, 0.72, 0.25)    # amber
 		_: return Color(1.0, 0.5, 0.2)             # orange
 
 
@@ -316,7 +363,9 @@ func _physics_process(delta: float) -> void:
 					if dist < 44.0 and _contact_cd <= 0.0:
 						_contact_cd = 0.5
 						if player.has_method("take_damage"):
-							player.take_damage(contact_dmg)
+							# the charge lands the big hit (attack_dmg), not the light contact graze
+							var charge_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg
+							player.take_damage(charge_dmg)
 							
 					if _phase_timer <= 0.0:
 						_phase = _PH_DASH_COOLDOWN
@@ -341,7 +390,11 @@ func _physics_process(delta: float) -> void:
 
 			var separation: Vector2 = Vector2.ZERO
 			var count: int = 0
-			var enemies: Array[Node] = get_tree().get_nodes_in_group("enemies")
+			var pf: int = Engine.get_physics_frames()
+			if pf != _enemies_frame:
+				_enemies_frame = pf
+				_enemies_cache = get_tree().get_nodes_in_group("enemies")   # one alloc/frame, shared
+			var enemies: Array = _enemies_cache
 			var sep_rad_sq: float = _SEP_RADIUS * _SEP_RADIUS
 			
 			for e: Node in enemies:
@@ -374,7 +427,18 @@ func _physics_process(delta: float) -> void:
 
 	velocity = velocity.move_toward(desired_vel, _ACCEL * delta)
 	global_position += velocity * delta
-	
+
+	# enemies can't walk over decor props (like the player): push out of any solid prop -> they slide around
+	if game != null and "cover_list" in game:
+		for c in game.cover_list:
+			if not is_instance_valid(c):
+				continue
+			var toc: Vector2 = global_position - (c as Node2D).global_position
+			var minr: float = float(c.block_r) + _body_radius * 0.6
+			var d2c: float = toc.length_squared()
+			if d2c < minr * minr and d2c > 0.01:
+				global_position = (c as Node2D).global_position + toc / sqrt(d2c) * minr
+
 	if _directional:
 		# Ranged foes face their target (they shoot at the player while strafing);
 		# melee foes face where they move (which is toward the player anyway).
@@ -483,6 +547,8 @@ func take_damage(amount: float) -> void:
 			shield = 0.0
 			if game != null and game.has_method("shield_break"):
 				game.shield_break(global_position, _body_radius * 1.7, Palette.CYAN)
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("shield", global_position, 0.0, _body_radius / 55.0, Palette.CYAN)
 		if amount <= 0.0:
 			return
 	hp -= amount
@@ -515,8 +581,12 @@ func _die() -> void:
 			game.death_fx(global_position, rank)
 		if game.has_method("spawn_xp"):
 			game.spawn_xp(global_position, 1 + rank)
+		if drops_bonus and game.has_method("spawn_bonus"):
+			game.spawn_bonus(global_position)   # intermediate foe -> guaranteed bonus drop (heal/scrap)
 	if is_final:
 		Events.run_won.emit()   # the endboss is down -> victory
+	elif rank >= 3 and game != null and game.has_method("next_map"):
+		game.next_map()         # a major threat cleared -> shift to a new, harder zone
 	if _anims.has("die"):
 		play("die", true)
 		_die_timer = 0.7

@@ -28,19 +28,31 @@ float vnoise(vec2 p) {
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-// blend 4 randomly-offset crops of the tile -> no visible repeat, seams become diffuse
+// blend 4 randomly-offset crops of the tile -> no visible repeat, seams become diffuse.
+// CRITICAL: each crop is sampled with textureGrad using ONE shared gradient taken from the
+// continuous coordinate. Plain texture() would let the GPU compute per-quad derivatives
+// across the per-cell offset jump, pick a different mip on each side of a cell edge, and
+// paint a visible grid of seams every tile. Shared gradients = coherent mip = no grid.
 vec4 detile(vec2 uv) {
+	vec2 ddx = dFdx(uv);
+	vec2 ddy = dFdy(uv);
+	// gentle domain-warp: breaks the repeat rhythm without visibly smearing the texture.
+	// (textureGrad already kills the hard mip seam, so this only needs to be subtle.)
+	vec2 w = vec2(vnoise(uv * 1.7), vnoise(uv * 1.7 + 41.3)) - 0.5;
+	uv += w * 0.12;
 	vec2 iuv = floor(uv);
 	vec2 fuv = fract(uv);
+	// NARROW blend band: tile interior stays a single crisp sample, only the cell edges
+	// cross-fade. A full-tile gradient (0..1) ghosts all 4 offset copies everywhere.
 	vec2 b = smoothstep(0.2, 0.8, fuv);
 	vec2 o00 = hash4(iuv + vec2(0.0, 0.0)).xy;
 	vec2 o10 = hash4(iuv + vec2(1.0, 0.0)).xy;
 	vec2 o01 = hash4(iuv + vec2(0.0, 1.0)).xy;
 	vec2 o11 = hash4(iuv + vec2(1.0, 1.0)).xy;
-	vec4 c00 = texture(ground, uv + o00);
-	vec4 c10 = texture(ground, uv + o10);
-	vec4 c01 = texture(ground, uv + o01);
-	vec4 c11 = texture(ground, uv + o11);
+	vec4 c00 = textureGrad(ground, uv + o00, ddx, ddy);
+	vec4 c10 = textureGrad(ground, uv + o10, ddx, ddy);
+	vec4 c01 = textureGrad(ground, uv + o01, ddx, ddy);
+	vec4 c11 = textureGrad(ground, uv + o11, ddx, ddy);
 	return mix(mix(c00, c10, b.x), mix(c01, c11, b.x), b.y);
 }
 
