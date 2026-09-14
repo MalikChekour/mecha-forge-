@@ -42,17 +42,22 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 		col = Palette.BONUS
 	elif k == "skill":
 		col = Color(0.78, 0.52, 1.0)          # violet competence orb (from a broken skill-crate)
+	elif k == "heal":
+		col = Color(0.4, 1.0, 0.5)            # green med-pack
+	elif k == "od":
+		col = Color(1.0, 0.62, 0.2)           # amber energy cell -> Overdrive gauge
 	elif k == "scrap":
 		col = Palette.ACCENT
 	else:
 		col = Palette.CYAN
+	var big: bool = k == "bonus" or k == "skill" or k == "heal" or k == "od"
 	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 24)
-	_spr.modulate = col if k == "xp" else Color.WHITE   # tint the gem itself (texture may ignore fallback colour)
+	_spr.modulate = col if (k == "xp" or k == "heal" or k == "od") else Color.WHITE
 	var th: float = float(_spr.texture.get_height())
 	if th > 0.0:
-		_spr.scale = Vector2.ONE * ((28.0 if (k == "bonus" or k == "skill") else 18.0) / th)
+		_spr.scale = Vector2.ONE * ((28.0 if big else 18.0) / th)
 	_light.color = col
-	_light.energy = 1.1 if (k == "bonus" or k == "skill") else 0.5
+	_light.energy = 1.1 if big else 0.5
 	_light.texture = _spr.texture
 
 func _physics_process(delta: float) -> void:
@@ -85,6 +90,15 @@ func _physics_process(delta: float) -> void:
 				game.spawn_vfx("heal", player.global_position, 0.0, 1.3)   # green rising sparkles on the player
 			GameState.add_overdrive(0.18)
 			GameState.add_scrap(6)
+		elif kind == "heal":
+			if player.has_method("heal"):
+				player.heal(30.0)
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("heal", player.global_position, 0.0, 1.2)
+		elif kind == "od":
+			GameState.add_overdrive(0.30)                                   # a real chunk of the gauge
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("energy", player.global_position, 0.0, 1.0, Color(1.0, 0.7, 0.3))
 		else:
 			if game != null and game.has_method("spawn_vfx"):
 				game.spawn_vfx("pickup", global_position, 0.0, 0.42, Color(1.0, 0.85, 0.4))   # small sparkle on scrap

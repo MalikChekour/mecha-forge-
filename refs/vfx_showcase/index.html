@@ -1,0 +1,46 @@
+<title>MECHA-FORGE — Ce que je sais faire en VFX animés</title>
+<style>
+:root{--bg:#090a0f;--panel:#12151d;--ink:#eaf0f8;--dim:#8b93a7;--line:#20252f}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(120% 80% at 50% -10%,#161c28 0%,var(--bg) 60%);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif}
+header{text-align:center;padding:40px 20px 6px}
+header h1{margin:0;font-size:30px}header h1 span{color:#5ad6ff}
+header p{margin:12px auto 0;color:var(--dim);font-size:14px;max-width:760px;line-height:1.65}
+section{max-width:1180px;margin:30px auto 0;padding:0 20px}
+section h2{font-size:13px;letter-spacing:2.5px;text-transform:uppercase;color:var(--acc);border-bottom:1px solid var(--line);padding-bottom:8px;margin:0 0 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:transform .15s,border-color .15s}
+.card:hover{transform:translateY(-4px);border-color:var(--acc)}
+.w{aspect-ratio:1;background:#05060a;display:flex;align-items:center;justify-content:center}
+.w img{width:100%;height:100%;object-fit:contain;image-rendering:auto}
+.m{padding:11px 13px 14px}
+.m h3{margin:0;font-size:15px}
+.m code{color:var(--acc);font-size:11px}
+.m p{margin:6px 0 0;color:var(--dim);font-size:12px;line-height:1.45}
+footer{max-width:1180px;margin:34px auto 60px;padding:0 20px;text-align:center;color:var(--dim);font-size:14px;line-height:1.8}
+footer b{color:#5ad6ff}
+</style>
+<header><h1>VFX animés — <span>ce que je sais faire</span></h1>
+<p><b style="color:#eaf0f8">20 effets, générés en procédural</b> (numpy/scipy), tous styles confondus. Chacun est une <b style="color:#eaf0f8">planche de sprites prête pour le jeu</b> (fond noir = fusion additive, boucle propre). Zéro asset externe, zéro crédit, 100&nbsp;% paramétrable.</p></header>
+<section><h2 style="--acc:#ff8a4d">Réaliste</h2><div class="grid"><article class="card" style="--acc:#ff8a4d"><div class="w"><img src="./fireball.gif" alt="Boule de feu"></div>
+        <div class="m"><h3>Boule de feu</h3><code>fireball</code><p>turbulence + rampe de chaleur, noyau blanc</p></div></article><article class="card" style="--acc:#ff8a4d"><div class="w"><img src="./fire_jet.gif" alt="Jet de flamme"></div>
+        <div class="m"><h3>Jet de flamme</h3><code>fire_jet</code><p>cône de feu bruité, dirigé</p></div></article><article class="card" style="--acc:#ff8a4d"><div class="w"><img src="./sparks.gif" alt="Gerbe d'étincelles"></div>
+        <div class="m"><h3>Gerbe d'étincelles</h3><code>sparks</code><p>particules physiques + gravité</p></div></article><article class="card" style="--acc:#ff8a4d"><div class="w"><img src="./smoke.gif" alt="Fumée"></div>
+        <div class="m"><h3>Fumée</h3><code>smoke</code><p>bruit gaussien qui monte et se dissipe</p></div></article></div></section><section><h2 style="--acc:#ffd24d">Anime / stylisé</h2><div class="grid"><article class="card" style="--acc:#ffd24d"><div class="w"><img src="./anime_impact.gif" alt="Impact anime"></div>
+        <div class="m"><h3>Impact anime</h3><code>anime_impact</code><p>étoile 6 branches + noyau, punch net</p></div></article><article class="card" style="--acc:#ffd24d"><div class="w"><img src="./slash.gif" alt="Coup tranchant"></div>
+        <div class="m"><h3>Coup tranchant</h3><code>slash</code><p>arc de lame qui balaie</p></div></article><article class="card" style="--acc:#ffd24d"><div class="w"><img src="./nova.gif" alt="Nova"></div>
+        <div class="m"><h3>Nova</h3><code>nova</code><p>rayons radiaux + anneau qui s'étend</p></div></article></div></section><section><h2 style="--acc:#5ad6ff">Élémentaire</h2><div class="grid"><article class="card" style="--acc:#5ad6ff"><div class="w"><img src="./lightning.gif" alt="Éclair"></div>
+        <div class="m"><h3>Éclair</h3><code>lightning</code><p>polyligne dentelée regénérée par frame + glow</p></div></article><article class="card" style="--acc:#5ad6ff"><div class="w"><img src="./frost.gif" alt="Givre"></div>
+        <div class="m"><h3>Givre</h3><code>frost</code><p>pics cristallins radiaux</p></div></article><article class="card" style="--acc:#5ad6ff"><div class="w"><img src="./toxic_cloud.gif" alt="Nuage toxique"></div>
+        <div class="m"><h3>Nuage toxique</h3><code>toxic_cloud</code><p>bruit vert bouillonnant</p></div></article></div></section><section><h2 style="--acc:#c47dff">Magie / Sci-fi</h2><div class="grid"><article class="card" style="--acc:#c47dff"><div class="w"><img src="./rune_circle.gif" alt="Cercle runique"></div>
+        <div class="m"><h3>Cercle runique</h3><code>rune_circle</code><p>anneau + graduations + triangle en rotation</p></div></article><article class="card" style="--acc:#c47dff"><div class="w"><img src="./portal.gif" alt="Portail"></div>
+        <div class="m"><h3>Portail</h3><code>portal</code><p>spirale tournante</p></div></article><article class="card" style="--acc:#c47dff"><div class="w"><img src="./plasma_orb.gif" alt="Orbe plasma"></div>
+        <div class="m"><h3>Orbe plasma</h3><code>plasma_orb</code><p>sphère pulsée + arcs de surface</p></div></article><article class="card" style="--acc:#c47dff"><div class="w"><img src="./shockwave.gif" alt="Onde de choc"></div>
+        <div class="m"><h3>Onde de choc</h3><code>shockwave</code><p>anneau qui s'étend et s'éteint</p></div></article><article class="card" style="--acc:#c47dff"><div class="w"><img src="./beam.gif" alt="Rayon"></div>
+        <div class="m"><h3>Rayon</h3><code>beam</code><p>cœur horizontal pulsé</p></div></article><article class="card" style="--acc:#c47dff"><div class="w"><img src="./muzzle_cone.gif" alt="Flash de bouche"></div>
+        <div class="m"><h3>Flash de bouche</h3><code>muzzle_cone</code><p>cône dirigé (→ droite) qui s'éteint</p></div></article><article class="card" style="--acc:#c47dff"><div class="w"><img src="./heal.gif" alt="Soin"></div>
+        <div class="m"><h3>Soin</h3><code>heal</code><p>croix vertes montantes + halo</p></div></article></div></section><section><h2 style="--acc:#6be3b8">Pixel / digital</h2><div class="grid"><article class="card" style="--acc:#6be3b8"><div class="w"><img src="./pixel_explosion.gif" alt="Explosion pixel"></div>
+        <div class="m"><h3>Explosion pixel</h3><code>pixel_explosion</code><p>rétro, palette 4 couleurs, blocs</p></div></article><article class="card" style="--acc:#6be3b8"><div class="w"><img src="./holo_glitch.gif" alt="Glitch holo"></div>
+        <div class="m"><h3>Glitch holo</h3><code>holo_glitch</code><p>scanlines + décalage RVB</p></div></article><article class="card" style="--acc:#6be3b8"><div class="w"><img src="./implosion.gif" alt="Implosion"></div>
+        <div class="m"><h3>Implosion</h3><code>implosion</code><p>particules aspirées + flash final</p></div></article></div></section>
+<footer>Chaque effet = ~40 lignes de code que je peux <b>régler à l'infini</b> : couleur, vitesse, taille, nombre d'images, direction.<br>Dis-moi lesquels tu veux dans le jeu (et pour quoi : tir, mort d'ennemi, level-up…) et je les câble — ou je t'en fabrique de nouveaux sur mesure.</footer>

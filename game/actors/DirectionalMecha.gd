@@ -26,6 +26,14 @@ var _t: float = 0.0
 var _frame: int = 0
 var _oneshot: bool = false
 
+# Procedural life for STATIC baked models (frame_count==1, e.g. TRELLIS mechs with no rig):
+# a breathing bob, a walk bounce, and a fire recoil kick opposite the facing — so the mech
+# reads as alive and as "bracing when it shoots" without any skeletal animation.
+var _static: bool = false
+var _bob_t: float = 0.0
+var _recoil_t: float = 0.0
+const _DIRVEC: Dictionary = {"front": Vector2(0, 1), "back": Vector2(0, -1), "left": Vector2(-1, 0), "right": Vector2(1, 0)}
+
 func _ready() -> void:
 	# ground contact shadow (behind the mech) so the player doesn't look like it floats
 	_shadow = Sprite2D.new()
@@ -39,6 +47,7 @@ func _ready() -> void:
 	_spr.centered = true
 	_spr.hframes = frame_count
 	add_child(_spr)
+	_static = frame_count <= 1        # a single-frame chassis -> drive it procedurally
 	_apply()
 
 func _tex(anim: String, dir: String) -> Texture2D:
@@ -155,6 +164,8 @@ func set_facing_from(v: Vector2) -> void:
 		_apply()
 
 func play(anim: String) -> void:
+	if anim == "attack":
+		_recoil_t = 1.0            # every shot kicks the mech back a touch (static + rigged alike)
 	if anim == _anim and bool(LOOP.get(anim, false)):
 		return
 	_anim = anim
@@ -166,6 +177,29 @@ func play(anim: String) -> void:
 func current_anim() -> String:
 	return _anim
 
+## Kick the mech back a touch on each shot, without changing the animation state.
+func recoil() -> void:
+	_recoil_t = 1.0
+
+## Static baked model: no frames to step, so we animate the sprite's OFFSET instead.
+## - idle: slow breathing bob
+## - walk/run: faster bob + a vertical bounce (it plods)
+## - firing: a recoil kick opposite the facing (set by play("attack"))
+## - die: sink + fade
+func _process_static(delta: float) -> void:
+	if _anim == "die":
+		_recoil_t = 0.0
+		_spr.position.y = lerp(_spr.position.y, 14.0, minf(1.0, delta * 4.0))
+		_spr.modulate.a = maxf(0.0, _spr.modulate.a - delta * 0.9)
+		return
+	var moving: bool = _anim == "walk" or _anim == "run"
+	_bob_t += delta * (9.5 if moving else 3.2)
+	var bob: float = sin(_bob_t) * (2.0 if not moving else 3.0)
+	var bounce: float = absf(sin(_bob_t)) * 4.5 if moving else 0.0
+	_recoil_t = maxf(0.0, _recoil_t - delta * 5.5)
+	var kick: Vector2 = (_DIRVEC.get(_dir, Vector2.ZERO) as Vector2) * (-_recoil_t * 13.0)
+	_spr.position = Vector2(kick.x, -bob - bounce + kick.y)
+
 ## Swap the whole chassis (e.g. base 'vanguard' <-> transformed 'vanguard2').
 ## Clears the texture cache so the new chassis' sheets load on the next frame.
 func set_chassis(c: String) -> void:
@@ -174,6 +208,9 @@ func set_chassis(c: String) -> void:
 	_apply()
 
 func _process(delta: float) -> void:
+	if _static:
+		_process_static(delta)
+		return
 	_t += delta
 	var step: float = 1.0 / float(FPS.get(_anim, 10.0))
 	while _t >= step:

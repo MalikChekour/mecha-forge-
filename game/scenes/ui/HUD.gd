@@ -1,8 +1,16 @@
 extends CanvasLayer
 class_name HUD
-## In-run HUD: HP/XP bars, run timer, level/kills/scrap, a touch-stick ring, and the
-## level-up DRAFT-of-3 overlay (pauses the tree, real buttons — also drivable by the
-## headless bot via pick()).
+## In-run HUD: HP/XP/Overdrive bars, run timer, level/kills/scrap, the touch-stick ring, the
+## DAMAGE feedback (red vignette + low-HP pulse) and the level-up DRAFT-of-3 overlay (pauses
+## the tree, real buttons — also drivable by the headless bot via pick()).
+##
+## 🚨 TOUT est ANCRE et mis a l'echelle par Palette.fs()/_k().
+## L'ancienne version ecrivait des positions ABSOLUES dans un espace fige 1280x720
+## (barre du haut (0,0)-(1280,52), SURCHARGE en (1080,588), panneau de draft en (340,175)).
+## Mesure par les testeurs : en 21:9 il manquait 400 px de barre et la carte d'amelioration
+## etait decalee de 200 px ; en PORTRAIT (480x854 — atteignable, l'orientation du projet
+## est 6 = capteur) tout se recroquevillait en haut a gauche, texte a ~7 px.
+## Toute nouvelle position doit passer par des ancres, jamais par des pixels bruts.
 
 signal card_picked(index: int)
 signal reroll_requested()
@@ -14,118 +22,344 @@ var _draft_rerolls: int = 0
 var _draft_banishes: int = 0
 
 var player: Player
+var _root: Control
+var _topbar: ColorRect
 var _hp_fill: ColorRect
+var _hp_bg: ColorRect
 var _xp_fill: ColorRect
+var _xp_bg: ColorRect
 var _od_fill: ColorRect
+var _od_bg: ColorRect
 var _od_lbl: Label
 var _od_btn: Button       # tactile trigger for Overdrive (mobile) — pulses when ready
+var _menu_btn: Button     # opens the in-run settings panel
 var _timer_lbl: Label
 var _stat_lbl: Label
+var _chip: Label
 var _draft_root: Control
 var _card_btns: Array[Button] = []
-const BAR_W: float = 360.0
+var _hurt: TextureRect    # red vignette — damage feedback + low-HP pulse
+var _stick: Control       # virtual move-stick ring (touch)
+var _bar_w: float = 360.0
+var _last_hp: float = -1.0
+var _hurt_flash: float = 0.0
+
+## Echelle d'interface commune (meme formule que Palette.fs / MetaScreen._ui_k).
+func _k() -> float:
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	return clampf(minf(vp.x, vp.y) / 720.0, 0.62, 1.75)
+
+func _vp() -> Vector2:
+	return get_viewport().get_visible_rect().size
 
 func setup(p: Player) -> void:
 	player = p
 	layer = 20
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("hud")   # la cinematique s'en sert pour masquer le HUD pendant qu'elle joue
 	_build()
 	Events.run_time_changed.connect(_on_time)
-	Events.player_damaged.connect(func(_hp: float, _mx: float) -> void: _update_hp())
+	Events.player_damaged.connect(_on_damaged)
 	Events.xp_gained.connect(func(_a: int) -> void: _update_xp())
 	Events.level_up.connect(func(_l: int) -> void: _update_xp())
 	Events.overdrive_changed.connect(_on_overdrive)
+	# B6 : le HUD restait affiche PAR-DESSUS l'ecran de fin de partie.
+	Events.player_died.connect(_on_died)
+	get_viewport().size_changed.connect(_relayout)
 	_update_hp()
 	_update_xp()
 
+func _on_died() -> void:
+	# l'ecran de resultats prend la main : plus rien du HUD ne doit rester dessus
+	visible = false
+	if _draft_root != null:
+		_draft_root.visible = false
+
 func _on_overdrive(v: float) -> void:
-	if _od_fill != null:
-		_od_fill.size.x = BAR_W * clampf(v, 0.0, 1.0)
+	if _od_fill != null and _od_bg != null:
+		_od_fill.size.x = _od_bg.size.x * clampf(v, 0.0, 1.0)
 	var ready: bool = v >= 1.0 and (player == null or not player.transformed)
 	if _od_lbl != null:
 		_od_lbl.visible = ready
 	if _od_btn != null:
 		_od_btn.visible = ready
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# pulse the Overdrive button so the player notices it's ready to tap
 	if _od_btn != null and _od_btn.visible:
-		var p: float = 0.7 + 0.3 * sin(Time.get_ticks_msec() / 140.0)
+		var p: float = 0.78 + 0.22 * sin(Time.get_ticks_msec() / 140.0)
 		_od_btn.modulate = Color(1, 1, 1, p)
+	_update_hurt(delta)
+	if _stick != null:
+		_stick.queue_redraw()
+
+## RETOUR DE DEGATS. Constat des testeurs : « sur une douzaine de captures ou la vie tombe de
+## 100 % a 8 %, aucune image ne me dit que j'encaisse ». L'onde de blessure existante est CYAN,
+## exactement la couleur de nos propres tirs. Ici : un vignettage ROUGE, franc au moment du coup,
+## puis une pulsation permanente sous 30 % de vie.
+func _update_hurt(delta: float) -> void:
+	if _hurt == null:
+		return
+	if _hurt_flash > 0.0:
+		_hurt_flash = maxf(0.0, _hurt_flash - delta * 2.6)
+	var low: float = 0.0
+	if player != null and is_instance_valid(player) and player.max_hp > 0.0 and GameState.alive:
+		var f: float = clampf(player.hp / player.max_hp, 0.0, 1.0)
+		if f < 0.30:
+			# plus la vie est basse, plus la pulsation est forte et rapide
+			var sev: float = 1.0 - f / 0.30
+			var spd: float = 3.2 + 3.4 * sev
+			low = (0.16 + 0.30 * sev) * (0.55 + 0.45 * sin(Time.get_ticks_msec() / 1000.0 * spd))
+	_hurt.modulate.a = clampf(maxf(_hurt_flash, low), 0.0, 1.0)
+
+func _on_damaged(hp: float, _mx: float) -> void:
+	# player_damaged sert aussi au soin et a la regeneration : on ne flashe que si la vie BAISSE.
+	if _last_hp >= 0.0 and hp < _last_hp - 0.01:
+		_hurt_flash = 0.85
+	_last_hp = hp
+	_update_hp()
 
 func _on_od_pressed() -> void:
 	if player != null and player.has_method("activate_overdrive"):
 		player.activate_overdrive()
 
-func _rect(parent: Node, pos: Vector2, size: Vector2, col: Color) -> ColorRect:
+func _on_menu_pressed() -> void:
+	if player != null and "game" in player and player.game != null and player.game.has_method("show_settings"):
+		player.game.show_settings()
+
+func _rect(parent: Node, col: Color) -> ColorRect:
 	var c: ColorRect = ColorRect.new()
 	c.color = col
-	c.position = pos
-	c.size = size
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(c)
 	return c
 
+## Vignette radiale rouge, sans shader : un GradientTexture2D en remplissage radial,
+## transparent au centre et opaque sur les bords.
+func _make_vignette() -> TextureRect:
+	var g: Gradient = Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	g.colors = PackedColorArray([
+		Color(0.9, 0.05, 0.05, 0.0),
+		Color(0.85, 0.04, 0.04, 0.20),
+		Color(0.75, 0.02, 0.02, 0.95)])
+	var gt: GradientTexture2D = GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 192
+	gt.height = 192
+	var tr: TextureRect = TextureRect.new()
+	tr.texture = gt
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tr.modulate.a = 0.0
+	return tr
+
 func _build() -> void:
-	var root: Control = Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(root)
-	_rect(root, Vector2(0, 0), Vector2(1280, 52), Color(0, 0, 0, 0.32))
-	_rect(root, Vector2(16, 12), Vector2(BAR_W, 15), Color(0.22, 0.05, 0.05, 0.9))
-	_hp_fill = _rect(root, Vector2(16, 12), Vector2(BAR_W, 15), Color(0.92, 0.26, 0.2, 1))
-	_rect(root, Vector2(16, 31), Vector2(BAR_W, 7), Color(0.05, 0.12, 0.2, 0.9))
-	_xp_fill = _rect(root, Vector2(16, 31), Vector2(0, 7), Color(0.15, 0.85, 1, 1))
-	_rect(root, Vector2(16, 41), Vector2(BAR_W, 6), Color(0.22, 0.14, 0.03, 0.9))
-	_od_fill = _rect(root, Vector2(16, 41), Vector2(0, 6), Color(1.0, 0.72, 0.16, 1))
+	_root = Control.new()
+	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_root)
+
+	# --- bandeau du haut (ancre TOP_WIDE : suit TOUTE la largeur, quel que soit le format) ---
+	_topbar = _rect(_root, Color(0, 0, 0, 0.38))
+	_topbar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_hp_bg = _rect(_root, Color(0.22, 0.05, 0.05, 0.9))
+	_hp_fill = _rect(_root, Color(0.92, 0.26, 0.2, 1))
+	_xp_bg = _rect(_root, Color(0.05, 0.12, 0.2, 0.9))
+	_xp_fill = _rect(_root, Color(0.15, 0.85, 1, 1))
+	_od_bg = _rect(_root, Color(0.22, 0.14, 0.03, 0.9))
+	_od_fill = _rect(_root, Color(1.0, 0.72, 0.16, 1))
+
 	_od_lbl = Label.new()
-	_od_lbl.position = Vector2(16, 52)
-	_od_lbl.add_theme_font_size_override("font_size", 17)
-	_od_lbl.add_theme_color_override("font_color", Color(1, 0.75, 0.2))
+	_od_lbl.add_theme_color_override("font_color", Color(1, 0.78, 0.25))
+	_od_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_od_lbl.add_theme_constant_override("outline_size", 4)
 	_od_lbl.text = "SURCHARGE PRETE"
 	_od_lbl.visible = false
-	root.add_child(_od_lbl)
-
-	# big thumb-reachable Overdrive button (bottom-right), only shown when the gauge is full
-	_od_btn = Button.new()
-	_od_btn.text = "SURCHARGE"
-	_od_btn.position = Vector2(1080, 588)
-	_od_btn.size = Vector2(184, 84)
-	_od_btn.add_theme_font_size_override("font_size", 24)
-	_od_btn.add_theme_color_override("font_color", Color(0.15, 0.08, 0.0))
-	_od_btn.add_theme_color_override("font_color_hover", Color(0.15, 0.08, 0.0))
-	_od_btn.modulate = Color(1, 1, 1, 1)
-	_od_btn.visible = false
-	_od_btn.pressed.connect(_on_od_pressed)
-	add_child(_od_btn)
+	_od_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_od_lbl)
 
 	_timer_lbl = Label.new()
-	_timer_lbl.position = Vector2(596, 10)
-	_timer_lbl.add_theme_font_size_override("font_size", 26)
-	_timer_lbl.add_theme_color_override("font_color", Color(0.85, 0.92, 1))
-	root.add_child(_timer_lbl)
+	_timer_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_timer_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1))
+	_timer_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	_timer_lbl.add_theme_constant_override("outline_size", 5)
+	_timer_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_timer_lbl)
 
 	_stat_lbl = Label.new()
-	_stat_lbl.position = Vector2(410, 15)
-	_stat_lbl.add_theme_color_override("font_color", Color(0.6, 0.72, 0.9))
-	root.add_child(_stat_lbl)
+	_stat_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_stat_lbl.add_theme_color_override("font_color", Color(0.72, 0.83, 0.98))
+	_stat_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	_stat_lbl.add_theme_constant_override("outline_size", 4)
+	_stat_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_stat_lbl)
+
+	# PROTOCOLES du run — rappel permanent sous le bandeau.
+	# 🚨 le glyphe ◈ (U+25C8) est ABSENT de Rajdhani ET d'Orbitron : il s'affichait en carre
+	#    vide avec son code hexa. Verifie a fontTools : seul « • » (U+2022) existe partout.
+	if Protocols.active.size() > 0:
+		var pcol: Color = Color(Protocols.active[0].get("color", Color(0.9, 0.6, 0.3)))
+		_chip = Label.new()
+		_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_chip.add_theme_color_override("font_color", Color(pcol.r, pcol.g, pcol.b, 0.9))
+		_chip.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		_chip.add_theme_constant_override("outline_size", 4)
+		_chip.text = "• " + Protocols.label()
+		_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_root.add_child(_chip)
+		# The big one-shot ANNOUNCE is fired by Game._begin_run (sequenced after the sector title,
+		# once the biome-intro card is gone) — not here, so it can't play hidden under the intro.
+
+	# --- vignette de degats (sous les boutons, au-dessus du jeu) ---
+	_hurt = _make_vignette()
+	_root.add_child(_hurt)
+
+	# --- anneau du stick tactile : le testeur signalait qu'AUCUN stick n'etait dessine ---
+	var sr: StickRing = StickRing.new()
+	sr.hud = self
+	_stick = sr
+	_stick.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_stick)
+
+	# --- SURCHARGE : gros bouton ancre EN BAS A DROITE ---
+	# Deux testeurs sur quatre l'ont dit illisible alors que c'est la SEULE action manuelle
+	# du jeu. Il a maintenant un fond ambre plein + bordure, et il est ancre (avant : x=1080
+	# en dur, soit 416 px du bord droit en 21:9).
+	_od_btn = Button.new()
+	_od_btn.text = "SURCHARGE"
+	_od_btn.add_theme_color_override("font_color", Color(0.12, 0.06, 0.0))
+	_od_btn.add_theme_color_override("font_color_hover", Color(0.12, 0.06, 0.0))
+	_od_btn.add_theme_color_override("font_color_pressed", Color(0.12, 0.06, 0.0))
+	for st: String in ["normal", "hover", "pressed", "focus"]:
+		var sb: StyleBoxFlat = StyleBoxFlat.new()
+		sb.bg_color = Color(1.0, 0.74, 0.18) if st != "pressed" else Color(1.0, 0.88, 0.45)
+		sb.border_color = Color(1.0, 0.95, 0.72)
+		sb.set_border_width_all(3)
+		sb.set_corner_radius_all(6)
+		_od_btn.add_theme_stylebox_override(st, sb)
+	_od_btn.visible = false
+	_od_btn.pressed.connect(_on_od_pressed)
+	_root.add_child(_od_btn)
+
+	# OPTIONS button (top-right) — opens the in-run settings panel (music/sfx/auto-aim/orientation)
+	_menu_btn = Button.new()
+	_menu_btn.text = "OPTIONS"
+	_menu_btn.pressed.connect(_on_menu_pressed)
+	_root.add_child(_menu_btn)
 
 	_draft_root = Control.new()
 	_draft_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_draft_root.visible = false
 	add_child(_draft_root)
 
+	_relayout()
+
+## Toute la geometrie vit ICI et se recalcule sur size_changed : portrait, 4:3, 16:9, 21:9.
+func _relayout() -> void:
+	if _root == null or not is_inside_tree():
+		return
+	var vp: Vector2 = _vp()
+	var k: float = _k()
+	var pad: float = 14.0 * k
+	var portrait: bool = vp.y > vp.x
+	# largeur de barre PROPORTIONNELLE : 360 px en dur mangeaient 75 % d'un ecran portrait 480.
+	_bar_w = clampf(vp.x * (0.56 if portrait else 0.30), 150.0, 460.0)
+	var hp_h: float = maxf(12.0, 15.0 * k)
+	var xp_h: float = maxf(6.0, 7.0 * k)
+	var od_h: float = maxf(5.0, 6.0 * k)
+	var gap: float = 4.0 * k
+	var top: float = pad * 0.8
+	var bar_total: float = hp_h + xp_h + od_h + gap * 2.0
+	var band_h: float = top + bar_total + pad * 0.7
+
+	_topbar.offset_bottom = band_h
+	_hp_bg.position = Vector2(pad, top)
+	_hp_bg.size = Vector2(_bar_w, hp_h)
+	_hp_fill.position = _hp_bg.position
+	_hp_fill.size = Vector2(_bar_w, hp_h)
+	_xp_bg.position = Vector2(pad, top + hp_h + gap)
+	_xp_bg.size = Vector2(_bar_w, xp_h)
+	_xp_fill.position = _xp_bg.position
+	_xp_fill.size = Vector2(0, xp_h)
+	_od_bg.position = Vector2(pad, top + hp_h + xp_h + gap * 2.0)
+	_od_bg.size = Vector2(_bar_w, od_h)
+	_od_fill.position = _od_bg.position
+	_od_fill.size = Vector2(0, od_h)
+
+	# OPTIONS : ancre en haut a DROITE, cible tactile >= 48 dp
+	var mb: Vector2 = Vector2(maxf(118.0, 134.0 * k), maxf(48.0, 44.0 * k))
+	_menu_btn.add_theme_font_size_override("font_size", Palette.fs(15))
+	_menu_btn.size = mb
+	_menu_btn.position = Vector2(vp.x - mb.x - pad, top)
+
+	# horloge + stats : centrees sur la largeur reelle, jamais a x=596 en dur.
+	# En portrait la place manque a cote des barres -> on les descend sous le bandeau.
+	_timer_lbl.add_theme_font_size_override("font_size", Palette.fs(24))
+	_stat_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
+	var mid_x: float = _bar_w + pad * 2.0
+	var mid_w: float = maxf(80.0, vp.x - mid_x - mb.x - pad * 2.0)
+	# 🚨 Tout ce qui vit SOUS le bandeau (horloge + stats en portrait, « SURCHARGE PRETE »,
+	# rappel de protocole) partait de la meme ordonnee et se superposait — visible en capture
+	# portrait : « 00:11 » ecrit par-dessus le libelle de protocole. On empile avec un curseur.
+	_od_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
+	_chip_fs()
+	var cur: float = band_h + 3.0 * k
+	if portrait or mid_w < 150.0 * k:
+		_timer_lbl.position = Vector2(0, cur)
+		_timer_lbl.size = Vector2(vp.x, 0)
+		cur += float(Palette.fs(24)) * 1.22
+		_stat_lbl.position = Vector2(0, cur)
+		_stat_lbl.size = Vector2(vp.x, 0)
+		cur += float(Palette.fs(14)) * 1.35
+	else:
+		_timer_lbl.position = Vector2(mid_x, top - 2.0 * k)
+		_timer_lbl.size = Vector2(mid_w, 0)
+		_stat_lbl.position = Vector2(mid_x, top + float(Palette.fs(24)) * 1.15)
+		_stat_lbl.size = Vector2(mid_w, 0)
+	# « SURCHARGE PRETE » va a GAUCHE sous les barres, le protocole occupe la ligne suivante
+	_od_lbl.position = Vector2(pad, cur)
+	cur += float(Palette.fs(14)) * 1.35
+	if _chip != null:
+		_chip.position = Vector2(0, cur)
+		_chip.size = Vector2(vp.x, 0)
+		cur += float(Palette.fs(13)) * 1.35
+	# En PORTRAIT l'horloge, les stats et le rappel de protocole descendent SOUS les barres :
+	# sans fond ils se posaient a meme le decor (verifie en capture — « • FRENESIE » en ambre
+	# sur un sol bleu nuit). On prolonge le voile du bandeau jusqu'a la derniere ligne.
+	if portrait:
+		_topbar.offset_bottom = maxf(band_h, cur)
+
+	# SURCHARGE : ancre en bas a droite, et plus GRAND (48 dp mini, ~22 % de la largeur)
+	var ob: Vector2 = Vector2(clampf(vp.x * 0.22, 150.0, 230.0), maxf(64.0, 78.0 * k))
+	_od_btn.add_theme_font_size_override("font_size", Palette.fs(19))
+	_od_btn.size = ob
+	_od_btn.position = Vector2(vp.x - ob.x - pad, vp.y - ob.y - pad * 1.4)
+
+	if _draft_root != null and _draft_root.visible:
+		_render_draft()
+
+func _chip_fs() -> void:
+	if _chip != null:
+		_chip.add_theme_font_size_override("font_size", Palette.fs(13))
+
 func _update_hp() -> void:
 	if player != null and _hp_fill != null:
-		_hp_fill.size.x = BAR_W * clampf(player.hp / maxf(1.0, player.max_hp), 0.0, 1.0)
+		_hp_fill.size.x = _bar_w * clampf(player.hp / maxf(1.0, player.max_hp), 0.0, 1.0)
 
 func _update_xp() -> void:
 	if _xp_fill != null:
-		_xp_fill.size.x = BAR_W * clampf(float(GameState.xp) / maxf(1.0, float(GameState.xp_to_next)), 0.0, 1.0)
+		_xp_fill.size.x = _bar_w * clampf(float(GameState.xp) / maxf(1.0, float(GameState.xp_to_next)), 0.0, 1.0)
 
 func _on_time(t: float) -> void:
 	_timer_lbl.text = "%02d:%02d" % [int(t) / 60, int(t) % 60]
-	_stat_lbl.text = "Lv %d   Kills %d   Scrap %d" % [GameState.level, GameState.kills, GameState.scrap]
+	_stat_lbl.text = "Niv %d   ·   %d kills   ·   %d ferraille" % [GameState.level, GameState.kills, GameState.scrap]
 
 func show_draft(cards: Array, rerolls: int = 0, banishes: int = 0) -> void:
 	_draft_cards = cards
@@ -134,26 +368,44 @@ func show_draft(cards: Array, rerolls: int = 0, banishes: int = 0) -> void:
 	_banish_mode = false
 	_render_draft()
 
+## Panneau de draft CENTRE et ancre (avant : (340,175) taille 600x410 en dur -> decale de
+## 200 px en 21:9, et completement hors cadre en portrait).
 func _render_draft() -> void:
 	for ch in _draft_root.get_children():
 		ch.queue_free()
 	_card_btns.clear()
 	var cards: Array = _draft_cards
-	var panel: ColorRect = _rect(_draft_root, Vector2(340, 175), Vector2(600, 410), Color(0.06, 0.08, 0.14, 0.96))
+	var vp: Vector2 = _vp()
+	var k: float = _k()
+	var pw: float = clampf(vp.x * 0.86, 280.0, 640.0)
+	var row_h: float = maxf(56.0, 62.0 * k)
+	var row_gap: float = 12.0 * k
+	var mar: float = 20.0 * k
+
+	var panel: ColorRect = ColorRect.new()
+	panel.color = Color(0.06, 0.08, 0.14, 0.97)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_draft_root.add_child(panel)
+
+	var vb: VBoxContainer = VBoxContainer.new()
+	vb.add_theme_constant_override("separation", int(row_gap))
+	_draft_root.add_child(vb)
+
 	var title: Label = Label.new()
 	title.text = "CHOISIS UNE CARTE A BANNIR" if _banish_mode else "AMÉLIORATION — Niveau %d" % GameState.level
-	title.position = Vector2(360, 195)
-	title.add_theme_font_size_override("font_size", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", Palette.fs(20))
 	title.add_theme_color_override("font_color", Color(1, 0.4, 0.35) if _banish_mode else Color(0.15, 0.85, 1))
-	_draft_root.add_child(title)
+	vb.add_child(title)
+
 	for i in cards.size():
 		var b: Button = Button.new()
 		var is_evo: bool = bool(cards[i].get("evo", false))
 		b.text = ("BANNIR : " if _banish_mode else "") + String(cards[i].get("name", "?"))
-		b.position = Vector2(365, 238 + i * 76)
-		b.size = Vector2(550, 62)
-		b.add_theme_font_size_override("font_size", 20)
+		b.custom_minimum_size = Vector2(0, row_h)
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.add_theme_font_size_override("font_size", Palette.fs(17))
 		if is_evo and not _banish_mode:
 			b.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))   # gold evolution
 		var idx: int = i
@@ -162,25 +414,47 @@ func _render_draft() -> void:
 			b.pressed.connect(func() -> void: banish_requested.emit(idx))
 		else:
 			b.pressed.connect(func() -> void: _pick(idx))
-		_draft_root.add_child(b)
+		vb.add_child(b)
 		_card_btns.append(b)
-	var by: float = 238 + cards.size() * 76 + 8
+
+	var hb: HBoxContainer = HBoxContainer.new()
+	hb.add_theme_constant_override("separation", int(row_gap))
+	vb.add_child(hb)
 	var rb: Button = Button.new()
 	rb.text = "Relancer  (%d)" % _draft_rerolls
-	rb.position = Vector2(365, by); rb.size = Vector2(268, 42)
-	rb.add_theme_font_size_override("font_size", 18)
+	rb.custom_minimum_size = Vector2(0, maxf(48.0, 44.0 * k))
+	rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rb.add_theme_font_size_override("font_size", Palette.fs(15))
 	rb.disabled = _draft_rerolls <= 0 or _banish_mode
 	rb.pressed.connect(func() -> void: reroll_requested.emit())
-	_draft_root.add_child(rb)
+	hb.add_child(rb)
 	var bb: Button = Button.new()
 	bb.text = "Annuler" if _banish_mode else "Bannir  (%d)" % _draft_banishes
-	bb.position = Vector2(647, by); bb.size = Vector2(268, 42)
-	bb.add_theme_font_size_override("font_size", 18)
+	bb.custom_minimum_size = Vector2(0, maxf(48.0, 44.0 * k))
+	bb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bb.add_theme_font_size_override("font_size", Palette.fs(15))
 	bb.disabled = _draft_banishes <= 0 and not _banish_mode
 	bb.pressed.connect(func() -> void:
 		_banish_mode = not _banish_mode
 		_render_draft())
-	_draft_root.add_child(bb)
+	hb.add_child(bb)
+
+	# Hauteur CALCULEE, pas mesuree.
+	# 🚨 get_combined_minimum_size() donnait une hauteur enorme (panneau occupant presque tout
+	# l'ecran, verifie en capture portrait et 21:9) : les boutons ont autowrap_mode actif et
+	# sont mesures a une largeur encore nulle, donc le texte « s'enroule » sur des dizaines de
+	# lignes imaginaires. On additionne donc les hauteurs qu'on connait deja.
+	var title_h: float = float(Palette.fs(20)) * 1.4
+	var foot_h: float = maxf(48.0, 44.0 * k)
+	var content_h: float = title_h + float(cards.size()) * row_h + foot_h 		+ row_gap * float(cards.size() + 1)
+	vb.size = Vector2(pw - mar * 2.0, 0)
+	var ph: float = minf(vp.y * 0.92, content_h + mar * 2.0)
+	var ox: float = (vp.x - pw) * 0.5
+	var oy: float = (vp.y - ph) * 0.5
+	panel.position = Vector2(ox, oy)
+	panel.size = Vector2(pw, ph)
+	vb.position = Vector2(ox + mar, oy + mar)
+	vb.size = Vector2(pw - mar * 2.0, ph - mar * 2.0)
 	_draft_root.visible = true
 
 func pick(i: int) -> void:      # headless bot entry point
@@ -190,3 +464,22 @@ func pick(i: int) -> void:      # headless bot entry point
 func _pick(i: int) -> void:
 	_draft_root.visible = false
 	card_picked.emit(i)
+
+
+## Anneau du stick tactile. Le testeur « nouveau joueur » notait qu'aucun stick n'etait
+## dessine : au doigt, rien ne confirme que le glissement est pris en compte.
+class StickRing extends Control:
+	var hud: HUD
+	func _draw() -> void:
+		if hud == null or hud.player == null or not is_instance_valid(hud.player):
+			return
+		var p: Player = hud.player
+		if p._stick_id == -1:
+			return
+		var o: Vector2 = p._stick_origin
+		var v: Vector2 = p._stick_vec
+		var r: float = 80.0
+		draw_circle(o, r, Color(0.5, 0.8, 1.0, 0.10))
+		draw_arc(o, r, 0.0, TAU, 48, Color(0.55, 0.85, 1.0, 0.55), 3.0, true)
+		draw_circle(o + v * r, r * 0.36, Color(0.65, 0.9, 1.0, 0.40))
+		draw_arc(o + v * r, r * 0.36, 0.0, TAU, 32, Color(0.8, 0.95, 1.0, 0.85), 3.0, true)

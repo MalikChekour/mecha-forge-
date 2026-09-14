@@ -19,9 +19,31 @@ var _dmg_active: int = 0
 var _headless: bool = false
 var _biome: int = 0
 const CAM_OFFSET: Vector2 = Vector2(0.0, -84.0)   # view pushed up -> player ~60% down-screen
+
+# ARENA MODE. BOUNDED = walled arena (clamp + border ring + fixed decor). !BOUNDED = the original
+# INFINITE streaming map (no wall, decor streams around the player). Reverted to infinite per the
+# patron: fleeing is possible again, mitigated only by the spawn-ahead rule. The bounded code is
+# kept intact behind this switch, so flipping it back is one line.
+const BOUNDED: bool = false
+const ARENA_HALF: float = 3000.0        # only used when BOUNDED
+const ARENA_WALL_IN: float = 190.0      # clamp inset -> you stop AT the visible wall face
+const ARENA_CLAMP: float = ARENA_HALF - ARENA_WALL_IN
 var _hitstop: bool = false
 # 8 biome maps (Gemini-generated ground textures in assets/decor/ground_<name>.png)
-const BIOMES: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp", "ruines"]
+# NOTE: "ruines" (ville detruite) is PARKED — the art didn't hold up, we'll revisit it later.
+# Its ground texture, decor and BIOME_DECOR entry all stay on disk: re-adding it here is enough.
+const BIOMES: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp"]
+# PROGRESSION façon Survivor.io : 5 chapitres qui se débloquent en chaîne. Chaque chapitre = un
+# biome fixe + un palier de difficulté + un palier de puissance conseillé (gate). Battre le boss
+# final d'un chapitre (mode campagne) débloque le suivant + donne une récompense de 1er clear.
+const CHAPTERS: Array = [
+	{"name": "L'Usine",          "sub": "Le Reveil",       "biome": "tech",     "diff": 0, "gate": 1000},
+	{"name": "Terres Calcinees", "sub": "La Traversee",    "biome": "desert",   "diff": 1, "gate": 2500},
+	{"name": "La Ruine Verte",   "sub": "L'Enlisement",    "biome": "jungle",   "diff": 1, "gate": 5000},
+	{"name": "La Forge",         "sub": "Le Coeur Ardent", "biome": "volcanic", "diff": 2, "gate": 9000},
+	{"name": "La Cite Dechue",   "sub": "Le Souverain",    "biome": "swamp",    "diff": 3, "gate": 15000},
+]
+var _chapter: int = 1   # chapitre campagne en cours (1-based)
 # Each biome is GAMEPLAY, not just cosmetic: speed/spawn modifiers + optional ground hazard.
 const BIOME_MODS: Dictionary = {
 	"tech":      {"label": "SECTEUR TECH"},
@@ -34,13 +56,36 @@ const BIOME_MODS: Dictionary = {
 	"swamp":     {"label": "MARAIS  —  tout est englue", "enemy_speed_mult": 0.85, "player_speed_mult": 0.9},
 	"ruines":    {"label": "VILLE EN RUINES  —  champ de bataille robotique"},
 }
+## Flavour lines for the per-map intro/outro cutscenes (see _map_intro / _map_outro). One short
+## line each; the intro title is the biome label, the outro title is a generic victory banner.
+const CUT_LINES: Dictionary = {
+	"tech":      {"in": "La cite-machine est tombee. Quelque chose bouge encore dans les neons.", "out": "Le silence revient sur les tours mortes."},
+	"earth":     {"in": "La nature a repris la ruine. Les charognards aussi.", "out": "La friche respire de nouveau."},
+	"spaceship": {"in": "Gravite defaillante. L'epave derive, et elle n'est pas vide.", "out": "L'epave se tait. Cap sur les etoiles."},
+	"volcanic":  {"in": "La fournaise ne pardonne pas. Eux non plus.", "out": "Les flammes retombent. Tu tiens encore debout."},
+	"desert":    {"in": "Rien ne survit ici, sauf ce qui te chasse.", "out": "La tempete est passee. Toi aussi."},
+	"ice":       {"in": "Le gel ralentit tout. Ne baisse pas ta garde.", "out": "Le blizzard s'apaise. Ton coeur brule encore."},
+	"jungle":    {"in": "La jungle grouille. Ils sont partout.", "out": "La canopee s'illumine, paisible enfin."},
+	"swamp":     {"in": "Tout englue. Chaque pas est un combat.", "out": "La brume se leve sur la vase."},
+}
 var _mods: Dictionary = {}
+var _cut_seen: Dictionary = {}   # per-run guard: a biome's intro/outro panel shows once per run
 var _hazard: String = ""
 var _hazard_t: float = 0.0
 var _proj_pool: Array = []      # recycled Projectile nodes (no queue_free in the hot loop)
+var _enemy_proj_pool: Array = []   # balles ennemies recyclees (fix latence : plus de new/queue_free en boucle)
 var _pickup_pool: Array = []    # recycled Pickup nodes (xp/scrap/bonus)
 var _revived: bool = false      # one watch-ad revive per run
 var _banked: bool = false       # run scrap banked into meta wallet exactly once
+var last_crystals: int = 0      # cristaux earned by the run just ended (shown on the results screen)
+var last_sp: int = 0            # skill points earned by the run just ended (shown on results)
+## Headless smoke normally ends at frame 1400 (a short vertical slice). The SANS FIN regression
+## (`-- --fast-bosses`) needs a long soak so waves can actually accumulate.
+@onready var _headless_frames: int = 30000 if OS.get_cmdline_user_args().has("--fast-bosses") else 1400
+## `-- --perf` prints live node/object counts. FX allocation is this game's dominant cost, so a
+## number beats an intention — every optimisation claim should be checked against this.
+@onready var _perf: bool = OS.get_cmdline_user_args().has("--perf")
+var _perf_last_obj: int = 0
 var _maps_cleared: int = 0       # zones cleared (each = a permanent difficulty step up)
 var _bot: bool = false
 var _frames: int = 0
@@ -58,6 +103,11 @@ const EVO_RULES: Dictionary = {
 	"missilepod": {"passive": "crit", "evo": "hydra", "name": "EVOLUTION : Hydra (essaim)"},
 	"railgun": {"passive": "dmg", "evo": "annihilator", "name": "EVOLUTION : Annihilateur"},
 	"plasma": {"passive": "magnet", "evo": "singularity", "name": "EVOLUTION : Singularite"},
+	"sabre": {"passive": "spd", "evo": "tempest", "name": "EVOLUTION : Tempete (360)"},
+	"disperseur": {"passive": "ammo", "evo": "deflagrateur", "name": "EVOLUTION : Deflagrateur"},
+	"ricochet": {"passive": "spd", "evo": "carambole", "name": "EVOLUTION : Carambole"},
+	"disque": {"passive": "he_fuel", "evo": "guillotine", "name": "EVOLUTION : Guillotine"},
+	"faisceau": {"passive": "haste", "evo": "rayon_spectre", "name": "EVOLUTION : Rayon Spectre"},
 }
 
 const UPGRADES: Array = [
@@ -67,23 +117,46 @@ const UPGRADES: Array = [
 	{"id": "haste", "name": "+12% Cadence de tir"},
 	{"id": "crit", "name": "+8% Chance de critique"},
 	{"id": "armor", "name": "+8% Armure"},
-	{"id": "magnet", "name": "+25% Aimant a XP"},
+	{"id": "magnet", "name": "Aimant a XP  (+portee)"},
+	{"id": "he_fuel", "name": "Carburant HE  (+taille & portee)"},   # HE Fuel : projectiles+effets plus gros
+	{"id": "ammo", "name": "Propulseur de munitions  (+vitesse tirs)"},  # Ammo Thruster
+	{"id": "regen", "name": "Regeneration  (+PV / s)"},                # Energy Drink
+	{"id": "xpgain", "name": "Parchemin ninja  (+15% EXP)"},           # Koga Ninja Scroll
+	{"id": "goldgain", "name": "Liaison a huile  (+20% Or)"},          # Oil Bond
 	{"id": "w_missile", "name": "Arme : Missiles chercheurs"},
 	{"id": "w_railgun", "name": "Arme : Railgun percant"},
 	{"id": "w_plasma", "name": "Arme : Plasma (zone)"},
+	{"id": "w_sabre", "name": "Arme : Sabre (melee, arc)"},
+	{"id": "w_disperseur", "name": "Arme : Disperseur (gerbe)"},
+	{"id": "w_ricochet", "name": "Arme : Ricochet (rebonds)"},
+	{"id": "w_disque", "name": "Arme : Disque (aller-retour)"},
+	{"id": "w_faisceau", "name": "Arme : Faisceau (rayon)"},
 	{"id": "aura", "name": "Bouclier a impulsions (+rayon)"},   # damaging ring, grows each pick
 	{"id": "drone", "name": "Drone de combat (+1)"},            # stackable orbiting auto-turret
+	{"id": "blade", "name": "Lame orbitale (+1)"},              # spinning contact-damage blade
+	{"id": "orb", "name": "Orbe plasma - charge/decharge (+1)"},# orbiting AoE burst
+	{"id": "arc", "name": "Arc Tesla  (eclair en chaine)"},     # chain lightning (role Lightning, maison)
+	{"id": "pool", "name": "Brasier plasma  (mare au sol)"},    # burning ground pool (role Molotov, maison)
 ]
 # maps a weapon draft-card id -> its WeaponSystem id (for showing the current level on the card)
-const _WEAPON_CARD: Dictionary = {"w_missile": "missilepod", "w_railgun": "railgun", "w_plasma": "plasma"}
+const _WEAPON_CARD: Dictionary = {"w_missile": "missilepod", "w_railgun": "railgun", "w_plasma": "plasma",
+	"w_sabre": "sabre", "w_disperseur": "disperseur", "w_ricochet": "ricochet",
+	"w_disque": "disque", "w_faisceau": "faisceau"}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # keep orchestrating (bot/draft) while the tree is paused
+	EnemyProjectile._smoke_active = 0   # reset des compteurs statiques (sinon ils fuient entre runs)
+	EnemyProjectile._active_missiles = 0
+	Enemy._bulls_charging = 0
 	randomize()   # vary the biome (and other RNG) per run
 	RenderingServer.set_default_clear_color(Palette.ARENA_BG)
 	GameState.reset()
+	Protocols.roll()   # roll this run's combat modifiers (freshness engine) — before player/enemies spawn
 	_headless = DisplayServer.get_name() == "headless"
 	_bot = _headless or OS.get_cmdline_user_args().has("--autoplay")
+
+	Audio.apply_settings()                                   # music/sfx mute from saved settings
+	_apply_orientation(String(SaveManager.setting("orientation", "auto")))
 
 	_build_environment()
 	enemy_layer = _mk_layer()
@@ -96,6 +169,11 @@ func _ready() -> void:
 	# layers PAUSABLE so a real pause actually stops the action (overlays stay ALWAYS to stay live).
 	enemy_layer.process_mode = Node.PROCESS_MODE_PAUSABLE
 	projectile_layer.process_mode = Node.PROCESS_MODE_PAUSABLE
+	# The layers are plain siblings, so they draw in tree order and `player` is added AFTER
+	# fx_layer -> every VFX (saber slash, muzzle flash, the impact when the player is hit) was
+	# painted UNDER the mech and vanished behind it. Lift the FX above the actors so they read
+	# ON the sprite. Stays below the overdrive beam (60) and the point lights (100).
+	fx_layer.z_index = 40
 
 	player = Player.new()
 	player.game = self
@@ -105,9 +183,18 @@ func _ready() -> void:
 	player.collision_mask = 8   # collide with cover props (StaticBody layer 8)
 
 	cam = Camera2D.new()
-	cam.position_smoothing_enabled = true
+	# The camera is a CHILD of the player, so it already follows exactly. Smoothing on a child
+	# camera makes it lag/rubber-band behind, which reads as the whole world (decor) DRIFTING
+	# while you move. Off = the scenery stays rock-solid under the mech.
+	cam.position_smoothing_enabled = false
 	cam.offset = CAM_OFFSET   # push the view up so the player sits ~60% down (thumb clears the south)
+	if BOUNDED:
+		# Stop the view at the walls (global-space limits work even on a player-child camera).
+		var lim: int = int(ARENA_HALF + 170.0)
+		cam.limit_left = -lim; cam.limit_top = -lim; cam.limit_right = lim; cam.limit_bottom = lim
 	player.add_child(cam)
+	if BOUNDED:
+		player.arena_half = ARENA_CLAMP   # hard clamp: the player cannot pass the wall
 
 	var amb: Ambient = Ambient.new()
 	add_child(amb)
@@ -116,8 +203,12 @@ func _ready() -> void:
 	spawner = EnemySpawner.new()
 	spawner.game = self
 	spawner.player = player
+	if BOUNDED:
+		spawner.arena_half = ARENA_CLAMP   # enemies pile up at the wall instead of spawning past it
 	spawner.speed_mult = float(_mods.get("enemy_speed_mult", 1.0))
 	spawner.spawn_mult = float(_mods.get("enemy_spawn_mult", 1.0))
+	spawner.current_biome = BIOMES[clampi(_biome, 0, BIOMES.size() - 1)]   # pool d'ennemis du biome
+	spawner.enemy_tint = EnemySpawner.BIOME_TINT.get(spawner.current_biome, Color(1, 1, 1))  # corruption
 	add_child(spawner)
 	spawner.process_mode = Node.PROCESS_MODE_PAUSABLE   # no spawns behind the menu / during drafts
 	player.move_mult = float(_mods.get("player_speed_mult", 1.0))
@@ -125,6 +216,7 @@ func _ready() -> void:
 	hud = HUD.new()
 	add_child(hud)
 	hud.setup(player)
+	hud.visible = _bot   # hidden on the HOME hub / difficulty screen; shown when the run begins
 	hud.card_picked.connect(_on_card_picked)
 	hud.reroll_requested.connect(_reroll_draft)
 	hud.banish_requested.connect(_on_banish)
@@ -140,19 +232,142 @@ func _ready() -> void:
 		Events.player_transformed.connect(func(on: bool) -> void: print("[game] TRANSFORM ", on))
 		Events.run_won.connect(func() -> void: print("[game] VICTORY"))
 
-	# The player picks a difficulty before the fight begins (bot/headless -> saved default).
-	if _bot:
+	# Flow: bot -> straight into a run. Player -> HOME hub (play / meta) -> difficulty -> run.
+	# REJOUER sets skip_hub so a retry is ONE tap: reload (clean state, no manual teardown of
+	# enemies/projectiles/props) then drop straight back in at the same difficulty.
+	if _bot or GameState.skip_hub:
+		GameState.skip_hub = false
 		_begin_run()
 	else:
-		_show_difficulty_select()
+		_show_home()
+
+## Called by the results screen's REJOUER. The reload is what guarantees a clean run; skip_hub is
+## what makes it feel instant.
+func restart_run() -> void:
+	GameState.skip_hub = true
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+## The launch hub (title, currencies, meta systems, JOUER). Reused MetaScreen in "home" mode so
+## the between-runs shop/garage/gear live in one place. JOUER -> difficulty select -> run.
+func _show_home() -> void:
+	# 🚨 AUCUNE musique ne jouait dans les menus ni dans la cinematique (B11) : Audio.music()
+	# n'etait appele que par _biome_music(), donc uniquement une fois la partie lancee.
+	# On pose la piste du secteur TECH des le hub : c'est aussi celle du chapitre 1, donc
+	# l'enchainement menu -> partie est continu (music() ne fait rien si la piste est la meme).
+	Audio.music("tech")
+	# First launch ever: play the 6-panel origin story once, THEN reveal the menu.
+	if not _bot and not bool(SaveManager.data.get("seen_intro", false)):
+		SaveManager.data["seen_intro"] = true
+		SaveManager.save_data()
+		await _play_opening()
+	var hs: MetaScreen = MetaScreen.new()
+	add_child(hs)
+	hs.setup_home(self)
+
+## HISTOIRE depuis le hub : rejouer la cinematique d'ouverture PUIS revenir au menu.
+## Sans ce retour on restait sur le decor de jeu, sans menu ni HUD, et il fallait
+## recharger la page : le hub etait libere avant de lancer la cinematique et rien ne
+## le recreait. On attend donc la fin des panneaux avant de rouvrir l'accueil.
+func play_story_then_home() -> void:
+	await _play_opening()
+	_show_home()
+
+## ---- in-engine map cutscenes (Survivor.io-style panels; see Cutscene.gd) ----
+## Missing art or a bot/headless run -> silent no-op, so this is safe to call unconditionally and the
+## smoke soak never stalls. Art lives in res://assets/cutscenes/<biome>_intro.png / _outro.png.
+## 🚨 res://assets/cutscenes/ N'EXISTE PAS (verifie) : le repli affichait `hero_bg.png`,
+## c'est-a-dire que le panneau « SECTEUR TECH » montrait litteralement LE FOND D'ECRAN DU MENU,
+## identique pour les huit biomes (chasseur de bugs, B8). Nouveau repli, par ordre de verite :
+##   1. l'illustration dediee si elle existe un jour ;
+##   2. sinon le SOL reel du biome (assets/decor/ground_<biome>.png) — c'est vraiment ce secteur,
+##      et chaque biome a donc enfin sa propre image ;
+##   3. sinon RIEN : on saute la sequence. Mieux vaut pas de cinematique qu'une fausse.
+func _load_cut(fname: String) -> Texture2D:
+	var p: String = "res://assets/cutscenes/%s.png" % fname
+	if ResourceLoader.exists(p):
+		return load(p) as Texture2D
+	var biome: String = fname.replace("_intro", "").replace("_outro", "")
+	var g: String = "res://assets/decor/ground_%s.png" % biome
+	if ResourceLoader.exists(g):
+		return load(g) as Texture2D
+	return null
+
+func _run_cutscene(panels: Array) -> void:
+	var cut: Cutscene = Cutscene.new()
+	add_child(cut)
+	cut.play(panels)
+	await cut.finished
+
+func _map_intro(biome: String) -> void:
+	if _bot or _cut_seen.get("in_" + biome, false):
+		return
+	var tex: Texture2D = _load_cut(biome + "_intro")
+	if tex == null:
+		return
+	_cut_seen["in_" + biome] = true
+	var lbl: String = String(BIOME_MODS.get(biome, {}).get("label", biome.to_upper()))
+	var line: String = String(CUT_LINES.get(biome, {}).get("in", ""))
+	await _run_cutscene([{"tex": tex, "title": lbl, "text": line, "ken": "in"}])
+
+func _map_outro(biome: String) -> void:
+	if _bot or _cut_seen.get("out_" + biome, false):
+		return
+	var tex: Texture2D = _load_cut(biome + "_outro")
+	if tex == null:
+		return
+	_cut_seen["out_" + biome] = true
+	var line: String = String(CUT_LINES.get(biome, {}).get("out", ""))
+	await _run_cutscene([{"tex": tex, "title": "SECTEUR PURGE", "text": line, "ken": "out"}])
+
+func _load_menu(fname: String) -> Texture2D:
+	var p: String = "res://assets/menu/%s.png" % fname
+	return load(p) if ResourceLoader.exists(p) else null
+
+## The 6-panel origin story (res://assets/menu/cine1..6.png), shown once on first launch.
+func _play_opening() -> void:
+	var caps: Array = [
+		["UN MONDE EN CENDRES", "Les machines ont submerge le monde des hommes."],
+		["LA FORGE OUBLIEE", "Dans les ruines dort un dernier geant d'acier."],
+		["LE DERNIER PILOTE", "Un survivant tend la main vers son coeur eteint."],
+		["LE REVEIL DU NOYAU", "Une etincelle cyan. Le geant ouvre les yeux."],
+		["SEUL CONTRE LA HORDE", "Debout, encercle. Il ne reculera pas."],
+		["MECHA-FORGE", "Survis. Forge ta legende."],
+	]
+	var kens: Array = ["in", "left", "in", "out", "right", "in"]
+	var panels: Array = []
+	for i in range(caps.size()):
+		var tex: Texture2D = _load_menu("cine%d" % (i + 1))
+		if tex != null:
+			panels.append({"tex": tex, "title": caps[i][0], "text": caps[i][1], "ken": kens[i]})
+	if not panels.is_empty():
+		await _run_cutscene(panels)
 
 # Kick off the actual run (biome banner + music). Called after the difficulty is chosen.
 func _begin_run() -> void:
+	if not _bot:
+		await _map_intro(BIOMES[clampi(_biome, 0, BIOMES.size() - 1)])   # arrival panel for map 1
+	if hud != null:
+		hud.visible = true   # reveal the in-run HUD now that the fight starts
 	var dname: String = String(GameState.diff().get("name", "NORMAL"))
 	var lbl: String = String(_mods.get("label", ""))
 	show_banner((lbl + "   [" + dname + "]") if lbl != "" else dname)
-	Audio.music("battle")
+	_announce_protocols()   # sequenced AFTER the sector title (fire-and-forget coroutine)
+	_biome_music()
 	_play_intro()
+
+## Announce this run's PROTOCOLES with the same banner system as the sector title, but sequenced
+## after it so the two never share the screen. Not awaited — it must not delay _play_intro.
+func _announce_protocols() -> void:
+	if _bot or Protocols.active.size() == 0:
+		return
+	await get_tree().create_timer(3.5).timeout   # let the sector-title banner finish (~3.4s)
+	if not is_inside_tree():
+		return
+	var pcol: Color = Color(Protocols.active[0].get("color", Color(0.95, 0.78, 0.4)))
+	# 🚨 le glyphe ◈ (U+25C8) est absent de Rajdhani : il s'affichait en carre vide avec son
+	# code hexa, en plein ecran, a chaque annonce de protocole. Remplace par « • » (present).
+	show_banner("• " + Protocols.banner_text(), pcol)
 
 # Run-start TELEPORT-IN: a light beam slams down, the mech materialises from an over-bright
 # flash with a ground shockwave, brief invuln + a spawn hold so the entrance reads clean.
@@ -210,48 +425,355 @@ func _show_difficulty_select() -> void:
 	bg.color = Color(0.03, 0.03, 0.06, 0.92)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cl.add_child(bg)
+	# CenterContainer sizes the menu to its content and centres it on ANY screen aspect
+	# (portrait phone included) — no fixed offsets that pushed buttons off-screen before.
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.theme = Palette.ui_theme()   # meme langage que les menus hors partie
+	cl.add_child(center)
 	var box: VBoxContainer = VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 14)
-	box.offset_left = -260.0
-	box.offset_right = 260.0
-	box.offset_top = -220.0
-	box.offset_bottom = 220.0
-	cl.add_child(box)
+	box.add_theme_constant_override("separation", 12)
+	center.add_child(box)
 	var title: Label = Label.new()
 	title.text = "CHOISIS TA DIFFICULTE"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_font_size_override("font_size", Palette.fs(32))
 	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
 	box.add_child(title)
+	# --- MODE: campagne (boss final = victoire) vs sans fin (vagues infinies) ---
+	var mode_btn: Button = Button.new()
+	mode_btn.add_theme_font_size_override("font_size", Palette.fs(20))
+	mode_btn.custom_minimum_size = Vector2(460, 50)
+	var mode_desc: Label = Label.new()
+	mode_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mode_desc.add_theme_font_size_override("font_size", Palette.fs(15))
+	mode_desc.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
+	var paint_mode: Callable = func() -> void:
+		var on: bool = bool(SaveManager.setting("endless", false))
+		mode_btn.text = "MODE : SANS FIN" if on else "MODE : CAMPAGNE"
+		mode_btn.add_theme_color_override("font_color",
+			Color(1.0, 0.85, 0.3) if on else Color(0.6, 0.9, 1.0))
+		mode_desc.text = ("Vagues infinies — chaque boss durcit la suite" if on
+			else "15 min, boss final = victoire")
+	paint_mode.call()
+	mode_btn.pressed.connect(func() -> void:
+		SaveManager.set_setting("endless", not bool(SaveManager.setting("endless", false)))
+		paint_mode.call())
+	box.add_child(mode_btn)
+	box.add_child(mode_desc)
 	var descs: Array = [
 		"Foes plus faibles - pour decouvrir",
 		"L'experience equilibree",
-		"Foes coriaces, plus nombreux - recompenses +30%",
-		"Brutal. Reserve aux pilotes d'elite - score x2.4",
+		"Foes coriaces, +30% recompenses",
+		"Brutal - score x2.4",
 	]
 	var cur: int = SaveManager.get_difficulty()
 	for i in GameState.DIFFICULTY.size():
 		var d: Dictionary = GameState.DIFFICULTY[i]
 		var b: Button = Button.new()
-		b.text = "%s        %s" % [String(d["name"]), String(descs[i])]
-		b.add_theme_font_size_override("font_size", 22)
-		b.custom_minimum_size = Vector2(520, 62)
+		b.text = "%s   —   %s" % [String(d["name"]), String(descs[i])]
+		b.add_theme_font_size_override("font_size", Palette.fs(20))
+		b.custom_minimum_size = Vector2(480, 64)
 		if i == cur:
 			b.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 		b.pressed.connect(_on_difficulty_chosen.bind(i, cl))
 		box.add_child(b)
+	# --- OPTIONS: a 2x2 grid of BIG touch toggles (fits portrait, comfortably tappable) ---
+	var oh: Label = Label.new()
+	oh.text = "— OPTIONS —"
+	oh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	oh.add_theme_font_size_override("font_size", Palette.fs(16))
+	oh.add_theme_color_override("font_color", Color(0.55, 0.62, 0.72))
+	box.add_child(oh)
+	var grid: GridContainer = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(grid)
+	_add_toggle(grid, "music", "MUSIQUE", true)
+	_add_toggle(grid, "sfx", "BRUITAGES", true)
+	_add_toggle(grid, "auto_aim", "AUTO-VISEE", true)
+	_add_orient_toggle(grid)
+	# Way out. Without it this screen was a dead end: _on_play() already freed the hub, so a
+	# mis-tap on JOUER trapped the player into either a 15-minute run or killing the app.
+	var back: Button = Button.new()
+	back.text = "RETOUR"
+	back.add_theme_font_size_override("font_size", Palette.fs(20))
+	back.custom_minimum_size = Vector2(460, 50)
+	back.pressed.connect(func() -> void:
+		Audio.sfx("click")
+		if is_instance_valid(cl):
+			cl.queue_free()
+		_show_home())
+	box.add_child(back)
 	# (headless/bot never reaches here: _ready calls _begin_run() directly for _bot)
+
+## In-run settings panel (opened by the HUD's OPTIONS button). Pauses the game and reuses the
+## same toggles as the start menu — they apply live (auto-aim updates the active player, music/sfx
+## mute buses, orientation re-locks).
+var _settings_open: bool = false
+## from_home = true : ouvert depuis le hub, pas en pleine partie.
+## 🚨 Les reglages n'etaient joignables QUE par _show_difficulty_select(), or _on_play() appelle
+## toujours _show_chapter_select() : cette branche n'etait JAMAIS executee. Consequence mesuree
+## par le chasseur de bugs : impossible de couper la musique sans lancer une partie d'abord, et
+## tout le mode SANS FIN etait du code mort. Le hub a maintenant son propre bouton REGLAGES.
+func show_settings(from_home: bool = false) -> void:
+	if _headless or _settings_open:
+		return
+	_settings_open = true
+	get_tree().paused = true
+	var cl: CanvasLayer = CanvasLayer.new()
+	cl.layer = 45
+	cl.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(cl)
+	var bg: ColorRect = ColorRect.new()
+	bg.color = Color(0.03, 0.03, 0.06, 0.9)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cl.add_child(bg)
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.theme = Palette.ui_theme()   # meme langage que les menus hors partie
+	cl.add_child(center)
+	var box: VBoxContainer = VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 14)
+	center.add_child(box)
+	var title: Label = Label.new()
+	title.text = "REGLAGES"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", Palette.fs(32))
+	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
+	box.add_child(title)
+	var grid: GridContainer = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(grid)
+	_add_toggle(grid, "music", "MUSIQUE", true)
+	_add_toggle(grid, "sfx", "BRUITAGES", true)
+	_add_toggle(grid, "auto_aim", "AUTO-VISEE", true)
+	_add_orient_toggle(grid)
+	_add_toggle(grid, "shake", "SECOUSSES", true)
+	_add_toggle(grid, "damage_numbers", "DEGATS CHIFFRES", true)
+	# MODE DE JEU : seul endroit ou SANS FIN etait reglable, dans un ecran inatteignable.
+	# On le remonte ici pour que le mode existe reellement. Hors partie uniquement : changer
+	# de mode au milieu d'un run n'aurait aucun sens.
+	if from_home:
+		var mode_btn: Button = Button.new()
+		mode_btn.add_theme_font_size_override("font_size", Palette.fs(19))
+		mode_btn.custom_minimum_size = Vector2(460, 56)
+		var paint_mode: Callable = func() -> void:
+			var on: bool = bool(SaveManager.setting("endless", false))
+			mode_btn.text = ("MODE : SANS FIN  —  vagues infinies" if on
+				else "MODE : CAMPAGNE  —  boss final = victoire")
+			mode_btn.add_theme_color_override("font_color",
+				Color(1.0, 0.85, 0.3) if on else Color(0.6, 0.9, 1.0))
+		paint_mode.call()
+		mode_btn.pressed.connect(func() -> void:
+			SaveManager.set_setting("endless", not bool(SaveManager.setting("endless", false)))
+			Audio.sfx("click")
+			paint_mode.call())
+		box.add_child(mode_btn)
+	var resume: Button = Button.new()
+	resume.text = "RETOUR" if from_home else "REPRENDRE"
+	resume.add_theme_font_size_override("font_size", Palette.fs(22))
+	resume.custom_minimum_size = Vector2(460, 58)
+	resume.pressed.connect(func() -> void:
+		Audio.sfx("click")
+		_settings_open = false
+		if is_instance_valid(cl):
+			cl.queue_free()
+		if from_home:
+			_show_home()     # on revient au hub, qui se remet en pause tout seul
+		else:
+			get_tree().paused = false)
+	box.add_child(resume)
+	if from_home:
+		return   # pas d'« ABANDONNER » hors partie
+	# Way out of a run: settle what was earned, then reload into the HUB (not straight back into a
+	# run). Without this the pause screen could only RESUME — no way home mid-run.
+	var to_menu: Button = Button.new()
+	to_menu.text = "ABANDONNER  —  menu principal"
+	to_menu.add_theme_font_size_override("font_size", Palette.fs(20))
+	to_menu.custom_minimum_size = Vector2(460, 50)
+	to_menu.pressed.connect(func() -> void:
+		Audio.sfx("click")
+		ensure_banked()               # keep the crystals/points earned so far (SP still gated at 60s)
+		GameState.skip_hub = false    # land on the hub, not a fresh run
+		_settings_open = false
+		get_tree().paused = false
+		get_tree().reload_current_scene())
+	box.add_child(to_menu)
+
+## One ON/OFF settings button that persists + applies live.
+func _add_toggle(parent: Node, key: String, label: String, default_on: bool) -> void:
+	var b: Button = Button.new()
+	b.add_theme_font_size_override("font_size", Palette.fs(17))
+	b.custom_minimum_size = Vector2(240, 62)
+	var paint: Callable = func(on: bool) -> void:
+		b.text = "%s\n%s" % [label, "ON" if on else "OFF"]
+		b.add_theme_color_override("font_color", Color(0.45, 1.0, 0.55) if on else Color(0.7, 0.72, 0.78))
+	paint.call(bool(SaveManager.setting(key, default_on)))
+	b.pressed.connect(func() -> void:
+		var nv: bool = not bool(SaveManager.setting(key, default_on))
+		SaveManager.set_setting(key, nv)
+		paint.call(nv)
+		match key:
+			"music": Audio.set_music_enabled(nv)
+			"sfx": Audio.set_sfx_enabled(nv)
+			"auto_aim":
+				if player != null and is_instance_valid(player):
+					player.auto_aim = nv
+		Audio.sfx("click"))
+	parent.add_child(b)
+
+## Orientation cycles Auto -> Portrait -> Paysage (web: best-effort lock; native APK: full).
+func _add_orient_toggle(parent: Node) -> void:
+	var modes: Array = ["auto", "portrait", "landscape"]
+	var labels: Dictionary = {"auto": "AUTO", "portrait": "PORTRAIT", "landscape": "PAYSAGE"}
+	var b: Button = Button.new()
+	b.add_theme_font_size_override("font_size", Palette.fs(17))
+	b.custom_minimum_size = Vector2(240, 62)
+	b.text = "ECRAN\n%s" % labels[String(SaveManager.setting("orientation", "auto"))]
+	b.pressed.connect(func() -> void:
+		var cur: String = String(SaveManager.setting("orientation", "auto"))
+		var nm: String = String(modes[(modes.find(cur) + 1) % modes.size()])
+		SaveManager.set_setting("orientation", nm)
+		b.text = "ECRAN\n%s" % labels[nm]
+		_apply_orientation(nm)
+		Audio.sfx("click"))
+	parent.add_child(b)
+
+## Best-effort orientation control. On the web the lock only fully takes on some browsers and
+## needs fullscreen (we request it); the game itself already renders correctly in any aspect.
+## On the native Android build the manifest orientation governs; this is a no-op there.
+func _apply_orientation(mode: String) -> void:
+	if OS.has_feature("web"):
+		var js: String = ""
+		if mode == "portrait":
+			js = "(function(){try{var e=document.documentElement;if(e.requestFullscreen)e.requestFullscreen();if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('portrait');}catch(x){}})()"
+		elif mode == "landscape":
+			js = "(function(){try{var e=document.documentElement;if(e.requestFullscreen)e.requestFullscreen();if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape');}catch(x){}})()"
+		else:
+			js = "(function(){try{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();}catch(x){}})()"
+		JavaScriptBridge.eval(js, true)
+		return
+	# NATIVE (Android): actually lock the device orientation — this is where the toggle fully works.
+	var o: int = DisplayServer.SCREEN_SENSOR
+	if mode == "portrait":
+		o = DisplayServer.SCREEN_PORTRAIT
+	elif mode == "landscape":
+		o = DisplayServer.SCREEN_LANDSCAPE
+	DisplayServer.screen_set_orientation(o)
 
 func _on_difficulty_chosen(idx: int, overlay: CanvasLayer) -> void:
 	GameState.difficulty = clampi(idx, 0, GameState.DIFFICULTY.size() - 1)
 	SaveManager.set_difficulty(GameState.difficulty)
+	# Re-read the mode HERE: GameState.reset() only runs on scene load, so the MODE toggle on this
+	# very screen would otherwise apply to the NEXT run and the player would get a campaign after
+	# asking for SANS FIN.
+	GameState.endless = bool(SaveManager.setting("endless", false))
 	Audio.sfx("click")
 	if is_instance_valid(overlay):
 		overlay.queue_free()
 	get_tree().paused = false
 	_begin_run()
+
+## SELECTION DE CHAPITRE (remplace le choix de difficulté). Liste les 5 chapitres ; les
+## verrouillés sont grisés (🔒). Choisir un chapitre débloqué lance ce biome en mode campagne.
+func _show_chapter_select() -> void:
+	get_tree().paused = true
+	var cl: CanvasLayer = CanvasLayer.new()
+	cl.layer = 40
+	cl.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(cl)
+	var bg: ColorRect = ColorRect.new()
+	bg.color = Color(0.03, 0.03, 0.06, 0.94)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cl.add_child(bg)
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.theme = Palette.ui_theme()   # meme langage que les menus hors partie
+	cl.add_child(center)
+	var box: VBoxContainer = VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 10)
+	center.add_child(box)
+	var title: Label = Label.new()
+	title.text = "CHOISIS UN CHAPITRE"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", Palette.fs(32))
+	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
+	box.add_child(title)
+	var cleared: int = SaveManager.chapters_cleared_count()
+	for i in CHAPTERS.size():
+		var ch: Dictionary = CHAPTERS[i]
+		var n: int = i + 1
+		var b: Button = Button.new()
+		b.add_theme_font_size_override("font_size", Palette.fs(20))
+		b.custom_minimum_size = Vector2(520, 56)
+		if SaveManager.chapter_unlocked(n):
+			var dn: String = String(GameState.DIFFICULTY[clampi(int(ch["diff"]), 0, GameState.DIFFICULTY.size() - 1)].get("name", ""))
+			var done: String = "  (battu)" if cleared >= n else ""
+			# 🚨 « Palier 1000 » etait INERTE (B10) : la valeur `gate` n'est lue NULLE PART, le
+			# deverrouillage ne depend que du chapitre precedent battu. Un chiffre presente
+			# comme une condition alors qu'il n'en est pas une, c'est pire que rien. On
+			# affiche a la place le sous-titre du chapitre, qui lui est vrai.
+			b.text = "%d.  %s  —  %s      %s%s" % [n, String(ch["name"]), String(ch["sub"]), dn, done]
+			if cleared >= n:
+				b.add_theme_color_override("font_color", Color(0.5, 0.85, 0.6))   # déjà battu
+			b.pressed.connect(_on_chapter_chosen.bind(i, cl))
+		else:
+			b.text = "VERROUILLE      %d.  ? ? ?" % n
+			b.disabled = true
+			b.add_theme_color_override("font_color_disabled", Color(0.45, 0.45, 0.52))
+		box.add_child(b)
+	var back: Button = Button.new()
+	back.text = "RETOUR"
+	back.add_theme_font_size_override("font_size", Palette.fs(20))
+	back.custom_minimum_size = Vector2(520, 48)
+	back.pressed.connect(func() -> void:
+		Audio.sfx("click")
+		if is_instance_valid(cl):
+			cl.queue_free()
+		_show_home())
+	box.add_child(back)
+
+
+func _on_chapter_chosen(idx: int, overlay: CanvasLayer) -> void:
+	var ch: Dictionary = CHAPTERS[idx]
+	_chapter = idx + 1
+	GameState.difficulty = clampi(int(ch["diff"]), 0, GameState.DIFFICULTY.size() - 1)
+	SaveManager.set_difficulty(GameState.difficulty)
+	GameState.endless = false   # chapitre = campagne (boss final = clear + déblocage)
+	Audio.sfx("click")
+	if is_instance_valid(overlay):
+		overlay.queue_free()
+	get_tree().paused = false
+	_apply_chapter_biome(String(ch["biome"]))
+	_begin_run()
+
+
+## Force le biome d'un chapitre (sol + décor + pool d'ennemis + musique) — même logique que
+## next_map() mais sans incrémenter les zones (on démarre pile sur ce biome).
+func _apply_chapter_biome(biome_name: String) -> void:
+	_biome = BIOMES.find(biome_name)
+	if _biome < 0:
+		_biome = 0
+	_mods = BIOME_MODS.get(biome_name, {})
+	_hazard = String(_mods.get("hazard", ""))
+	if _floor_mat != null:
+		_apply_biome_floor(biome_name)
+	_scatter_decor(biome_name)
+	if spawner != null:
+		spawner.speed_mult = float(_mods.get("enemy_speed_mult", 1.0))
+		spawner.spawn_mult = float(_mods.get("enemy_spawn_mult", 1.0))
+		spawner.current_biome = biome_name
+		spawner.enemy_tint = EnemySpawner.BIOME_TINT.get(biome_name, Color(1, 1, 1))
+	if player != null:
+		player.move_mult = float(_mods.get("player_speed_mult", 1.0))
+
 
 func _mk_layer() -> Node2D:
 	var n: Node2D = Node2D.new()
@@ -306,6 +828,34 @@ func spawn_skill(pos: Vector2) -> void:
 	# dropped by a broken skill-crate: grants a random competence when collected
 	_spawn_pickup(pos, "skill", 1)
 
+func spawn_heal(pos: Vector2) -> void:
+	# pure med-pack out of a smashed crate
+	_spawn_pickup(pos, "heal", 1)
+
+func spawn_od(pos: Vector2) -> void:
+	# energy cell: tops the Overdrive gauge straight up
+	_spawn_pickup(pos, "od", 1)
+
+# --- Emoji pop: a smashed crate sometimes just makes you laugh. Zero gameplay weight, pure joy.
+# Real colour emoji baked from the system emoji font into assets/emoji/e*.png.
+const EMOJI_COUNT: int = 10
+func spawn_emoji(pos: Vector2) -> void:
+	var p: String = "res://assets/emoji/e%d.png" % (randi() % EMOJI_COUNT)
+	if not ResourceLoader.exists(p):
+		return
+	var s: Sprite2D = Sprite2D.new()
+	s.texture = load(p)
+	s.position = pos
+	s.scale = Vector2.ZERO
+	s.z_index = 30
+	fx_layer.add_child(s)
+	var tw: Tween = create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(s, "scale", Vector2.ONE * 0.85, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(s, "position", pos + Vector2(randf_range(-24.0, 24.0), -104.0), 1.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(s, "modulate:a", 0.0, 0.35)
+	tw.chain().tween_callback(s.queue_free)
+
 # Grant a random permanent competence (a free draft pick), called when a "skill" pickup is vacuumed.
 const _SKILL_POOL: Array = ["dmg", "spd", "hp", "haste", "crit", "armor", "magnet", "aura", "drone"]
 const _SKILL_NAME: Dictionary = {
@@ -318,57 +868,152 @@ func grant_skill() -> void:
 	Audio.sfx("levelup")
 	show_banner("COMPETENCE : %s" % String(_SKILL_NAME.get(id, id)), Palette.BONUS)
 
-func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25)) -> void:
-	var b: EnemyProjectile = EnemyProjectile.new()
+func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false) -> void:
+	var b: EnemyProjectile
+	if _enemy_proj_pool.is_empty():
+		b = EnemyProjectile.new()
+		b.game = self
+		projectile_layer.add_child(b)
+	else:
+		b = _enemy_proj_pool.pop_back()   # RECYCLE : pas de new/queue_free dans la boucle chaude
 	b.tint = color
-	projectile_layer.add_child(b)
-	b.setup(pos, dir, dmg)
+	b.size = bolt_size
+	b.missile = is_missile               # tirs lourds = missile (sprite ogive + trainee)
+	b.setup(pos, dir, dmg, bolt_speed)
+
+func recycle_enemy_bolt(b: EnemyProjectile) -> void:
+	_enemy_proj_pool.append(b)
+
+## Zone AoE telegraphiee au sol (boss a ogives) : cercle rouge -> delai -> explosion.
+func spawn_ground_zone(pos: Vector2, radius: float, delay: float, dmg: float, color: Color = Color(1.0, 0.45, 0.12)) -> void:
+	var z: GroundZone = GroundZone.new()
+	z.radius = radius; z.delay = delay; z.damage = dmg; z.color = color
+	z.game = self; z.player = player
+	enemy_layer.add_child(z)   # meme espace-monde que les ennemis ; z_index -2 = au sol
+	z.global_position = pos
 
 # Weapon-signature impact FX: every family hits with a DISTINCT, readable look so the
 # arsenal never feels samey. Explosive = fireball+smoke, piercing = sharp lance, energy =
 # crackling arcs, kinetic = quick spark, drone = small blue pop. Evolved weapons are amplified.
-func impact_fx(pos: Vector2, color: Color, kind: String, dir: Vector2 = Vector2.ZERO) -> void:
+func impact_fx(pos: Vector2, color: Color, kind: String, dir: Vector2 = Vector2.ZERO, scale: float = 1.0) -> void:
+	# SPECTACULAR = a COMPOSITE, not one sprite: bloomed accent sprite + core flash + expanding
+	# ring(s) + radial sparks + a DYNAMIC light pop (lights up the floor = the "premium" tell) +
+	# scaled shake. Each weapon keeps its single vivid accent colour.
+	# `scale` grows the WHOLE burst with the weapon's level, so a maxed weapon reads as far more
+	# powerful than a level-1 one — the visual reward for investing in it.
 	match kind:
-		"missilepod", "hydra":   # EXPLOSIVE: hot fireball + smoke + shake
-			var big: float = 1.35 if kind == "hydra" else 1.0
-			var fire: Color = Color(1.0, 0.55, 0.2)
-			_flash_sprite(pos, fire, 118.0 * big, 0.18)
-			_ring(pos, fire, 12.0, 104.0 * big, 0.30)
-			_debris(pos, Color(1.0, 0.72, 0.3), int(12 * big), 0.44, 130.0, 360.0)
+		"missilepod", "hydra":   # EXPLOSIVE -> FIRE
+			var big: float = (1.4 if kind == "hydra" else 1.0) * scale
+			var fire: Color = Color(1.0, 0.5, 0.15)
+			spawn_vfx("aaa_explosion", pos, 0.0, 0.62 * big, Color.WHITE)   # native fireball
+			_flash_sprite(pos, fire.lerp(Color.WHITE, 0.6), 104.0 * big, 0.13)
+			_ring(pos, fire, 12.0, 120.0 * big, 0.32)
+			_debris(pos, Color(1.0, 0.7, 0.3), int(12 * big), 0.46, 150.0, 400.0)
 			_smoke(pos, int(6 * big))
-			_light_pop(pos, fire, 2.6, 0.26, 1.4 * big)
-			Events.screen_shake.emit(3.5 * big)
+			_light_pop(pos, fire, 3.4 * big, 0.30, 1.7 * big)
+			Events.screen_shake.emit(4.2 * big)
 			Audio.sfx("explosion", 0.1)
-		"railgun", "annihilator":   # PIERCING: a bright lance along travel, minimal debris
-			var big2: float = 1.4 if kind == "annihilator" else 1.0
-			var beam: Color = color.lerp(Color.WHITE, 0.35)
-			_streak(pos, dir, beam, 210.0 * big2, 7.0 * big2, 0.13)
-			_flash_sprite(pos, beam, 60.0 * big2, 0.10)
-			_ring(pos, beam, 4.0, 40.0 * big2, 0.12)
-			_light_pop(pos, beam, 1.8 * big2, 0.12, 1.0 * big2)
+		"railgun", "annihilator":   # PIERCING -> ELECTRIC lance
+			var big2: float = (1.45 if kind == "annihilator" else 1.0) * scale
+			var beam: Color = color.lerp(Color.WHITE, 0.3)
+			_streak(pos, dir, beam, 260.0 * big2, 9.0 * big2, 0.15)     # bright piercing lance
+			spawn_vfx("aaa_beam", pos, dir.angle(), 0.34 * big2, color)   # crackling energy discharge
+			spawn_vfx("aaa_shockwave", pos, 0.0, 0.30 * big2, beam)       # pierce shock ring
+			_flash_sprite(pos, beam, 66.0 * big2, 0.10)
+			_light_pop(pos, beam, 2.4 * big2, 0.15, 1.2 * big2)
+			_debris(pos, color, int(5 * big2), 0.30, 140.0, 340.0)
 			if kind == "annihilator":
-				Events.screen_shake.emit(3.0)
+				Events.screen_shake.emit(3.2)
 			Audio.sfx("hit", 0.15)
-		"plasma", "singularity":   # ENERGY AoE: crackling burst, electric arcs, double ring
-			var big3: float = 1.4 if kind == "singularity" else 1.0
-			var en: Color = color.lerp(Color(0.75, 0.9, 1.0), 0.3)
-			_flash_sprite(pos, en, 96.0 * big3, 0.16)
-			_ring(pos, en, 8.0, 78.0 * big3, 0.24)
-			_ring(pos, Color.WHITE, 4.0, 48.0 * big3, 0.14)
-			_arcs(pos, en, int(5 * big3), 70.0 * big3)
-			_light_pop(pos, en, 2.2 * big3, 0.22, 1.2 * big3)
+		"plasma", "singularity":   # ENERGY -> violet dome
+			var big3: float = (1.45 if kind == "singularity" else 1.0) * scale
+			var en: Color = color
+			spawn_vfx("aaa_aoe", pos, 0.0, 0.6 * big3, Color.WHITE)       # native plasma dome + arcs
+			_flash_sprite(pos, en.lerp(Color.WHITE, 0.4), 90.0 * big3, 0.15)
+			_ring(pos, en, 8.0, 92.0 * big3, 0.26)
+			_arcs(pos, en, int(5 * big3), 76.0 * big3)
+			_light_pop(pos, en, 2.8 * big3, 0.25, 1.5 * big3)
 			if kind == "singularity":
-				Events.screen_shake.emit(2.5)
+				Events.screen_shake.emit(2.8)
 			Audio.sfx("explosion" if kind == "singularity" else "hit", 0.12)
-		"drone":   # friendly drone bolt: small light-blue pop
-			var dc: Color = Color(0.6, 0.95, 1.0)
-			_flash_sprite(pos, dc, 40.0, 0.10)
-			_ring(pos, dc, 4.0, 30.0, 0.12)
-		_:   # KINETIC rapid (autocannon / vulcan): quick punchy spark
-			var big4: float = 1.25 if kind == "vulcan" else 1.0
-			_flash_sprite(pos, color.lerp(Color.WHITE, 0.4), 44.0 * big4, 0.09)
-			_debris(pos, color, int(4 * big4), 0.26, 90.0, 220.0)
+		"drone":   # friendly drone bolt: compact cyan pop
+			var dc: Color = Color(0.5, 0.95, 1.0)
+			spawn_vfx("aaa_impact", pos, 0.0, 0.26 * scale, dc)
+			_flash_sprite(pos, dc, 48.0 * scale, 0.11)
+			_light_pop(pos, dc, 1.3, 0.12, 0.7 * scale)
+			_debris(pos, dc, 3, 0.24, 90.0, 210.0)
+		"disperseur", "deflagrateur":   # GERBE -> souffle court + pluie d'eclats
+			var bg: float = (1.35 if kind == "deflagrateur" else 1.0) * scale
+			var sc: Color = color.lerp(Color.WHITE, 0.35)
+			spawn_vfx("dp_blast", pos, dir.angle(), 0.34 * bg, color)
+			_flash_sprite(pos, sc, 62.0 * bg, 0.09)
+			_ring(pos, color, 8.0, 74.0 * bg, 0.20)
+			_debris(pos, color, int(9 * bg), 0.28, 170.0, 420.0)   # la gerbe projette
+			_light_pop(pos, sc, 1.8 * bg, 0.13, 1.0 * bg)
+			Audio.sfx("hit", 0.12)
+		"ricochet", "carambole":   # REBOND -> flash net + anneau qui repart
+			var rb: float = (1.3 if kind == "carambole" else 1.0) * scale
+			var rc: Color = color.lerp(Color.WHITE, 0.4)
+			spawn_vfx("aaa_impact", pos, 0.0, 0.40 * rb, color)
+			spawn_vfx("shockwave", pos, 0.0, 0.26 * rb, rc)        # l'onde du rebond
+			_flash_sprite(pos, rc, 58.0 * rb, 0.10)
+			_arcs(pos, color, int(3 * rb), 54.0 * rb)
+			_light_pop(pos, rc, 1.7 * rb, 0.14, 0.9 * rb)
+			Audio.sfx("hit", 0.13)
+		"disque", "guillotine":   # TRANCHANT -> entaille lumineuse + etincelles
+			var dg: float = (1.4 if kind == "guillotine" else 1.0) * scale
+			var dc2: Color = color.lerp(Color.WHITE, 0.45)
+			spawn_vfx("aaa_sabre", pos, dir.angle(), 0.40 * dg, color)   # arc tranchant
+			_streak(pos, dir, dc2, 150.0 * dg, 7.0 * dg, 0.13)
+			_flash_sprite(pos, dc2, 60.0 * dg, 0.10)
+			_debris(pos, color, int(6 * dg), 0.26, 150.0, 360.0)
+			_light_pop(pos, dc2, 2.0 * dg, 0.15, 1.1 * dg)
+			Audio.sfx("hit", 0.14)
+		_:   # KINETIC rapid (autocannon / vulcan)
+			# 🚨 « l'impact de l'autocanon est un dessin au trait : une gerbe de fines lignes
+			# dorees en fil de fer avec un anneau. Ca ne claque pas, ca ressemble a un croquis. »
+			# On applique la regle maison (halo + coeur + lisere) : coeur blanc sur-expose,
+			# anneau de souffle, gerbe d'eclats plus fournie et projetee plus loin.
+			var big4: float = (1.3 if kind == "vulcan" else 1.0) * scale
+			var acc: Color = color
+			var hot: Color = acc.lerp(Color.WHITE, 0.72)
+			spawn_vfx("aaa_impact", pos, 0.0, 0.68 * big4, acc)          # bloomed accent burst + sparks
+			_flash_sprite(pos, hot, 96.0 * big4, 0.12)                    # COEUR blanc, franc
+			_ring(pos, acc, 9.0, 78.0 * big4, 0.22)                       # LISERE : onde de souffle
+			_debris(pos, acc, int(9 * big4), 0.32, 190.0, 430.0)
+			_light_pop(pos, hot, 2.3 * big4, 0.14, 1.25 * big4)
 			Audio.sfx("hit", 0.15)
+
+# A forked lightning bolt between two points (arc pylon zapping an enemy). Jagged additive line
+# that flashes and fades — cheap, no per-frame cost after it fires.
+func spawn_arc(a: Vector2, b: Vector2, color: Color) -> void:
+	if _headless:
+		return
+	var l: Line2D = Line2D.new()
+	l.top_level = true
+	l.material = Tex.add_mat()
+	l.width = 4.0
+	l.default_color = Color(color.r, color.g, color.b, 0.95)
+	var n: int = 6
+	var pts: PackedVector2Array = PackedVector2Array()
+	var perp: Vector2 = (b - a).orthogonal().normalized()
+	for i in n + 1:
+		var base: Vector2 = a.lerp(b, float(i) / n)
+		var j: float = 0.0 if (i == 0 or i == n) else randf_range(-18.0, 18.0)
+		pts.append(base + perp * j)
+	l.points = pts
+	fx_layer.add_child(l)
+	var tw: Tween = create_tween()
+	tw.tween_property(l, "modulate:a", 0.0, 0.18)
+	tw.tween_callback(l.queue_free)
+
+# The shield bubble releasing its pulse: an expanding shockwave from the mech out to the shield
+# radius + a light flash, so the discharge READS as a release of stored energy, not a blink.
+func aura_discharge_fx(pos: Vector2, radius: float, color: Color) -> void:
+	if _headless:
+		return
+	_ring(pos, color, radius * 0.35, radius * 1.12, 0.30)
+	_light_pop(pos, color, 1.5, 0.16, radius / 90.0)
 
 # Energy-shield hit ripple (used by shielded enemies and the player's guard).
 func shield_ripple(pos: Vector2, radius: float, color: Color) -> void:
@@ -383,18 +1028,15 @@ func shield_break(pos: Vector2, radius: float, color: Color) -> void:
 
 # ---- FX ----
 func _muzzle_flash(pos: Vector2, dir: Vector2, color: Color = Palette.CYAN) -> void:
-	var bright: Color = color.lerp(Color.WHITE, 0.5)
-	_flash_sprite(pos, bright, 96.0, 0.11)
-	_ring(pos, color, 10.0, 46.0, 0.16)
-	var l: PointLight2D = PointLight2D.new()
-	l.texture = Tex.glow(color, 160)
-	l.color = color
-	l.energy = 1.9
-	l.position = pos + dir * 6.0
-	fx_layer.add_child(l)
-	var tw: Tween = create_tween()
-	tw.tween_property(l, "energy", 0.0, 0.12)
-	tw.tween_callback(l.queue_free)
+	# AMORCE : le depart du coup doit exister autant que l'impact (regle maison).
+	var bright: Color = color.lerp(Color.WHITE, 0.62)
+	_flash_sprite(pos, bright, 132.0, 0.12)
+	_ring(pos, color, 10.0, 64.0, 0.18)
+	# 🚨 PAS de _streak ici : l'amorce part a CHAQUE tir (40-85/s en fin de partie) et chaque
+	# _streak alloue un Line2D + un Tween. Le flash elargi + l'anneau suffisent a corriger
+	# l'« eclair de bouche de ~30 px » du rapport, sans ajouter un noeud par coup.
+	# muzzle glow: additive sprite, not a Light2D — this fires on EVERY shot (40-85/s late game)
+	_light_pop(pos + dir * 6.0, color, 1.9, 0.12, 1.1)
 
 func _damage_number(pos: Vector2, amt: int, crit: bool) -> void:
 	if crit:
@@ -403,12 +1045,18 @@ func _damage_number(pos: Vector2, amt: int, crit: bool) -> void:
 		return
 	if _dmg_active > 26:
 		return
+	# 🚨 « le 14 est un chiffre blanc sur cercle blanc au milieu de lignes dorees ; le 28 est
+	# dore dans un anneau dore. On les lit mal. » Trois corrections : un CONTOUR noir epais,
+	# une teinte froide qui tranche avec la gerbe (chaude), et un decalage lateral aleatoire
+	# pour ne plus empiler le chiffre pile sur le coeur de l'explosion.
 	var l: Label = Label.new()
 	l.text = str(amt)
-	l.position = pos + Vector2(-8, -18)
+	l.position = pos + Vector2(randf_range(-34.0, 18.0), -30.0)
 	l.z_index = 100
-	l.add_theme_font_size_override("font_size", 28 if crit else 20)
-	l.add_theme_color_override("font_color", Color(1, 0.8, 0.2) if crit else Color(1, 1, 1))
+	l.add_theme_font_size_override("font_size", 30 if crit else 23)
+	l.add_theme_color_override("font_color", Color(1.0, 0.86, 0.28) if crit else Color(0.80, 0.95, 1.0))
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.92))
+	l.add_theme_constant_override("outline_size", 7 if crit else 6)
 	fx_layer.add_child(l)
 	_dmg_active += 1
 	var tw: Tween = create_tween()
@@ -420,8 +1068,22 @@ func _damage_number(pos: Vector2, amt: int, crit: bool) -> void:
 		l.queue_free()
 		_dmg_active -= 1)
 
+# --- HIT SPARKS: the single biggest allocation source in the game ---
+# Every damage tick used to build 6 nodes INCLUDING a CPUParticles2D, unpooled and unthrottled.
+# An AoE hit on 25 foes made 150 nodes in one frame, and the Overdrive beam — which calls
+# take_damage on every enemy in range EVERY physics frame — reached ~5400 objects/second. That is
+# the stutter reported on mid-range Android.
+# Fix: no particle system here (6 specks are invisible in a swarm anyway), and a token bucket so
+# bursts still read punchy while sustained output is hard-capped. Big one-off events (deaths,
+# explosions) keep their full debris — they are rare.
+const SPARK_RATE: float = 26.0     # sustained sparks per second
+const SPARK_BURST: float = 14.0    # instantaneous allowance
+var _spark_tokens: float = SPARK_BURST
+
 func _on_hit_spark(pos: Vector2, color: Color) -> void:
-	_debris(pos, color, 6, 0.35, 90.0, 230.0)
+	if _headless or _spark_tokens < 1.0:
+		return
+	_spark_tokens -= 1.0
 	_flash_sprite(pos, color, 48.0, 0.12)
 
 # --- Animated VFX (baked Kenney-particle spritesheets, ADDITIVE, pooled) ---
@@ -438,6 +1100,33 @@ const VFX_DEF: Dictionary = {
 	"heal":      {"frames": 16, "fps": 24},
 	"portal":    {"frames": 16, "fps": 26},
 	"pickup":    {"frames": 9,  "fps": 30},
+	# --- STYLE "Dark contrast premium" (Agent 9) + saveurs feu/électrique, baked from the VFX
+	# workflow. Additive, one vivid bloomed accent per effect on deep black. ---
+	"dp_muzzle": {"frames": 16, "fps": 34},
+	"dp_tracer": {"frames": 24, "fps": 30},
+	"dp_blast":  {"frames": 24, "fps": 30},
+	"dp_beam":   {"frames": 18, "fps": 28},
+	"dp_aoe":    {"frames": 24, "fps": 26},
+	"dp_sabre":  {"frames": 24, "fps": 30},
+	"fire_blast":{"frames": 24, "fps": 30},
+	"elec_beam": {"frames": 24, "fps": 28},
+	# HQ pipeline (my own HDR+bloom, Agent-9 aesthetic but punchy) — used for the weapon casts/impacts
+	"hq_muzzle":   {"frames": 28, "fps": 40},
+	"hq_impact":   {"frames": 28, "fps": 40},
+	"hq_explosion":{"frames": 28, "fps": 32},
+	"hq_beam":     {"frames": 28, "fps": 30},
+	"hq_aoe":      {"frames": 28, "fps": 28},
+	"hq_sabre":    {"frames": 28, "fps": 32},
+	# AAA pipeline (256px HDR multi-scale bloom + ACES, dark-premium) — the spectacular cores.
+	# White-hot sheets tint to each weapon's accent; explosion/aoe keep their native fire/plasma hue.
+	"aaa_muzzle":    {"frames": 28, "fps": 68},
+	"aaa_impact":    {"frames": 28, "fps": 72},
+	"aaa_explosion": {"frames": 30, "fps": 58},
+	"aaa_beam":      {"frames": 26, "fps": 62},
+	"aaa_aoe":       {"frames": 28, "fps": 54},
+	"aaa_sabre":     {"frames": 26, "fps": 58},
+	"aaa_shockwave": {"frames": 26, "fps": 62},
+	"aaa_charge":    {"frames": 28, "fps": 46},
 }
 var _vfx_pool: Array = []
 var _vfx_tex: Dictionary = {}   # id -> Texture2D (cached load)
@@ -446,7 +1135,8 @@ var _scatter: Node2D            # current PropScatter — rebuilt per biome on n
 
 ## Play a one-shot animated effect. pos=anchor, rot(rad)=orientation, scl scales the 160px cell,
 ## col tints it (sheets are neutral white on black). Pooled -> no alloc in the hot loop.
-func spawn_vfx(id: String, pos: Vector2, rot: float = 0.0, scl: float = 1.0, col: Color = Color.WHITE) -> void:
+func spawn_vfx(id: String, pos: Vector2, rot: float = 0.0, scl: float = 1.0, col: Color = Color.WHITE,
+		stretch: Vector2 = Vector2.ONE) -> void:
 	var d: Dictionary = VFX_DEF.get(id, {})
 	if d.is_empty() or fx_layer == null:
 		return
@@ -463,7 +1153,7 @@ func spawn_vfx(id: String, pos: Vector2, rot: float = 0.0, scl: float = 1.0, col
 		fx_layer.add_child(v)
 	else:
 		v = _vfx_pool.pop_back()
-	v.play(tex, int(d["frames"]), float(d["fps"]), pos, rot, scl, col)
+	v.play(tex, int(d["frames"]), float(d["fps"]), pos, rot, scl, col, stretch)
 
 func reclaim_vfx(v: VfxSprite) -> void:
 	if _vfx_pool.size() < 40:
@@ -471,24 +1161,65 @@ func reclaim_vfx(v: VfxSprite) -> void:
 	else:
 		v.queue_free()
 
-func death_fx(pos: Vector2, rank: int) -> void:
-	spawn_vfx("explosion", pos, 0.0, 0.8 + rank * 0.38)   # animated fireball, bigger for tougher foes
+func death_fx(pos: Vector2, rank: int, flash: bool = true) -> void:
 	if rank >= 2:
 		hit_stop(0.05)   # punchy freeze on heavy/elite kills
 	var col: Color = Color(1.0, 0.72, 0.32)
-	_flash_sprite(pos, col, 118.0 + rank * 80.0, 0.20)
-	_ring(pos, col, 14.0, 96.0 + rank * 90.0, 0.34)
 	_debris(pos, col, 12 + rank * 12, 0.5, 130.0, 360.0)
-	var l: PointLight2D = PointLight2D.new()
-	l.texture = Tex.glow(col, 240)
-	l.color = col
-	l.energy = 2.3 + float(rank)
-	l.position = pos
-	fx_layer.add_child(l)
-	var tw: Tween = create_tween()
-	tw.tween_property(l, "energy", 0.0, 0.28)
-	tw.tween_callback(l.queue_free)
-	Events.screen_shake.emit(5.0 + rank * 6.0)
+	# 'flash' = the full destruction burst. The "explosion" sheet is literally a LIGHTNING bolt,
+	# and enemies die non-stop in the swarm -> they pass flash=false and get a soft shockwave
+	# puff instead. Crates/props and the endboss (rare events) keep the full lightning burst.
+	if flash:
+		spawn_vfx("aaa_explosion", pos, 0.0, 0.72 + rank * 0.5)   # AAA fireball on crates/boss deaths
+		_flash_sprite(pos, col, 118.0 + rank * 80.0, 0.20)
+		_ring(pos, col, 14.0, 96.0 + rank * 90.0, 0.34)
+		_smoke(pos, 4 + rank * 3)
+	else:
+		spawn_vfx("shockwave", pos, 0.0, 0.5 + rank * 0.22, Color(1.0, 0.62, 0.34))
+		# death glow: additive sprite (capped by _light_pop) — one per kill, so it scaled with the horde
+		_light_pop(pos, col, 2.3 + float(rank), 0.28, 1.5 + rank * 0.4)
+	Events.screen_shake.emit((5.0 + rank * 6.0) if flash else (2.0 + rank * 3.0))
+
+## A broken robot carcass frees the guardian dormant inside it. Two-beat transition so the
+## reveal reads: (1) the wreck discharges energy + a warning ring, (2) ~0.45s later a portal
+## tears open and the big sentinel steps out. Never blocks: if anything is missing we just
+## spawn the foe.
+## A beacon structure emits an enemy near itself. Small hatch flash so the source is readable —
+## the player should learn "that thing keeps making enemies, kill it".
+func beacon_spawn(pos: Vector2, kind: String) -> void:
+	if spawner == null or not is_instance_valid(spawner):
+		return
+	var at: Vector2 = pos + Vector2(randf_range(-70.0, 70.0), randf_range(30.0, 90.0))
+	if not _headless:
+		_ring(at, Color(1.0, 0.4, 0.25), 8.0, 70.0, 0.3)
+	spawner.spawn_at(at, kind)
+	if OS.get_cmdline_user_args().has("--perf"):
+		print("[beacon] emission %s @ %s" % [kind, at.round()])
+
+func awaken_enemy(pos: Vector2, kind: String) -> void:
+	var col: Color = Color(1.0, 0.45, 0.25)
+	# beat 1 — the wreck wakes up
+	spawn_vfx("energy", pos, 0.0, 2.0, col)
+	_ring(pos, col, 20.0, 240.0, 0.45)
+	_debris(pos, col, 16, 0.5, 90.0, 260.0)
+	Events.screen_shake.emit(7.0)
+	Audio.sfx("boss", 0.0)
+	if _headless:
+		_awaken_spawn(pos, kind, col)   # tests must not depend on a timer
+		return
+	var t: SceneTreeTimer = get_tree().create_timer(0.45)
+	t.timeout.connect(_awaken_spawn.bind(pos, kind, col))
+
+func _awaken_spawn(pos: Vector2, kind: String, col: Color) -> void:
+	if not GameState.alive or spawner == null or not is_instance_valid(spawner):
+		return
+	# beat 2 — the portal tears open and the guardian is there
+	spawn_vfx("portal", pos, 0.0, 2.6, col)
+	_flash_sprite(pos, col, 260.0, 0.24)
+	Events.screen_shake.emit(11.0)
+	var e: Enemy = spawner.spawn_kind_at(kind, pos)
+	if e != null:
+		show_banner("!  GARDIEN REVEILLE  !", col)
 
 ## Brief real-time freeze for weighty impacts (crits / heavy deaths). Uses an
 ## ignore-time-scale timer so it self-restores even while the game is slowed.
@@ -533,7 +1264,7 @@ func show_banner(text: String, color: Color = Color(1.0, 0.92, 0.7)) -> void:
 	add_child(cl)
 	var lb: Label = Label.new()
 	lb.text = text
-	lb.add_theme_font_size_override("font_size", 32)
+	lb.add_theme_font_size_override("font_size", Palette.fs(32))
 	lb.add_theme_color_override("font_color", color)
 	lb.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	lb.add_theme_constant_override("outline_size", 6)
@@ -611,25 +1342,40 @@ func transform_fx(pos: Vector2, into: bool) -> void:
 	_debris(pos, col, 24, 0.6, 170.0, 440.0)
 	Events.screen_shake.emit(13.0 if into else 6.0)
 
+## ONE shared additive material for every FX node. It used to return a fresh CanvasItemMaterial per
+## node — and two nodes with distinct material instances can never batch, so a busy frame produced
+## 800-1000+ draw calls where a mid-range Adreno holds 300-600 at 60 fps. Nothing mutates it, so
+## sharing is safe.
 func _add_mat() -> CanvasItemMaterial:
-	var m: CanvasItemMaterial = CanvasItemMaterial.new()
-	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	return m
+	return Tex.add_mat()
 
 # short-lived coloured light burst (adds punch to explosions / energy hits)
+var _lightpop_active: int = 0
+## A soft glow flash at an impact. Was a real PointLight2D per hit — devastating on mobile,
+## since every dynamic light forces a canvas re-render, and a bullet-heaven spawns dozens per
+## second. Now a cheap ADDITIVE sprite (no re-render) with a hard cap so a big crowd can't
+## flood the frame. The floor no longer lights up, but the bloom-flash reads the same.
 func _light_pop(pos: Vector2, color: Color, energy: float, dur: float, scale: float) -> void:
-	if _headless:
+	if _headless or _lightpop_active > 14:   # cap: never let flashes alone tank the framerate
 		return
-	var l: PointLight2D = PointLight2D.new()
-	l.texture = Tex.glow(color, 160)
-	l.color = color
-	l.energy = energy
-	l.texture_scale = scale
-	l.position = pos
-	fx_layer.add_child(l)
+	_lightpop_active += 1
+	var s: Sprite2D = Sprite2D.new()
+	s.texture = Tex.glow(color, 128)
+	var m: CanvasItemMaterial = CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	s.material = m
+	s.position = pos
+	s.scale = Vector2.ONE * scale * 1.5
+	s.modulate = Color(color.r, color.g, color.b, clampf(energy * 0.4, 0.0, 1.0))
+	s.z_index = 41
+	fx_layer.add_child(s)
 	var tw: Tween = create_tween()
-	tw.tween_property(l, "energy", 0.0, dur)
-	tw.tween_callback(l.queue_free)
+	tw.set_parallel(true)
+	tw.tween_property(s, "modulate:a", 0.0, dur)
+	tw.tween_property(s, "scale", s.scale * 1.35, dur)
+	tw.chain().tween_callback(func() -> void:
+		_lightpop_active -= 1
+		s.queue_free())
 
 # a bright thin lance along the shot direction (railgun/annihilator signature)
 func _streak(pos: Vector2, dir: Vector2, color: Color, length: float, width: float, dur: float) -> void:
@@ -740,9 +1486,19 @@ func _scatter_decor(biome_name: String) -> void:
 	s.game = self
 	s.biome = biome_name
 	s.z_index = -1        # world-space, behind the actors, above the floor CanvasLayer
+	if BOUNDED:
+		s.arena_half = ARENA_HALF   # fixed decor across the whole bounded arena (no streaming)
 	add_child(s)
-	s.populate(28)
+	s.populate(28)                  # arena_half=0 -> legacy infinite streaming (decor follows player)
+	if BOUNDED:
+		s.build_border(ARENA_HALF)  # the ring of indestructible natural elements walling the arena
 	_scatter = s
+
+## Each map has its OWN ambience (assets/audio/music/<biome>.ogg), themed to the biome and
+## deliberately calm — never aggressive. Audio.music() no-ops on a missing track and crossfades
+## over 1s, so this is safe even if a biome has no bespoke piece yet.
+func _biome_music() -> void:
+	Audio.music(BIOMES[clampi(_biome, 0, BIOMES.size() - 1)])
 
 func _apply_biome_floor(biome_name: String) -> void:
 	# Point the (persistent) floor material at this biome's ground. Used at build time
@@ -760,6 +1516,8 @@ func _apply_biome_floor(biome_name: String) -> void:
 # A major threat down -> advance to a NEW zone. Difficulty is NEVER reset: run_time keeps
 # climbing AND each cleared map adds a permanent escalation (tougher foes on every new map).
 func next_map() -> void:
+	if not _bot:
+		await _map_outro(BIOMES[clampi(_biome, 0, BIOMES.size() - 1)])   # victory panel: sector cleared
 	_maps_cleared += 1
 	_biome = (_biome + 1) % BIOMES.size()
 	var biome_name: String = BIOMES[_biome]
@@ -771,7 +1529,11 @@ func next_map() -> void:
 	if spawner != null:
 		spawner.speed_mult = float(_mods.get("enemy_speed_mult", 1.0))
 		spawner.spawn_mult = float(_mods.get("enemy_spawn_mult", 1.0))
-		spawner.difficulty_bonus = float(_maps_cleared) * 0.18   # +18% enemy HP/dmg per zone cleared
+		spawner.current_biome = biome_name                                  # nouveau pool d'ennemis
+		spawner.enemy_tint = EnemySpawner.BIOME_TINT.get(biome_name, Color(1, 1, 1))  # nouvelle corruption
+		# Single source of truth: recomputed on every zone change, so the SANS FIN ratchet can't be
+		# wiped by a later next_map() (it would be, if the wave bonus were added with += elsewhere).
+		spawner.difficulty_bonus = float(_maps_cleared) * 0.18 + float(GameState.endless_wave) * 0.25
 	if player != null:
 		player.move_mult = float(_mods.get("player_speed_mult", 1.0))
 		if player.has_method("grant_invuln"):
@@ -780,7 +1542,9 @@ func next_map() -> void:
 	Events.screen_shake.emit(6.0)
 	show_banner("ZONE %d  —  %s" % [_maps_cleared + 1, String(_mods.get("label", biome_name.to_upper()))],
 		Color(0.55, 0.95, 1.0))
-	Audio.music("battle")
+	_biome_music()   # the new zone brings its own ambience (crossfades over 1s)
+	if not _bot:
+		await _map_intro(biome_name)   # arrival panel for the new sector
 
 # damaging-aura pulse ring (fires each aura tick; cheap, skipped when headless)
 func aura_pulse_fx(pos: Vector2, radius: float) -> void:
@@ -807,6 +1571,12 @@ func _draw_cards() -> void:
 			pool.append(u)
 	pool.shuffle()
 	_cards = pool.slice(0, 3)
+	# DIVERSITE legere : eviter 3 cartes de la meme categorie (actives vs passifs) -> build plus riche
+	if _cards.size() == 3 and _card_cat(_cards[0]) == _card_cat(_cards[1]) and _card_cat(_cards[1]) == _card_cat(_cards[2]):
+		var want_cat: String = "act" if _card_cat(_cards[0]) == "pas" else "pas"
+		for u2: Dictionary in pool.slice(3, pool.size()):
+			if _card_cat(u2) == want_cat:
+				_cards[2] = u2; break
 	# guarantee-offer any eligible weapon EVOLUTION (base at MAX + required passive owned)
 	var evos: Array = _eligible_evolutions()
 	if not evos.is_empty():
@@ -824,6 +1594,13 @@ func _draw_cards() -> void:
 						var c: Dictionary = (_cards[i] as Dictionary).duplicate()
 						c["name"] = "%s  (Niv.%d)" % [String(c["name"]), lv]
 						_cards[i] = c
+
+## Categorie d'une carte : "act" = arme/competence active, "pas" = passif/stat. Sert a diversifier le draft.
+func _card_cat(c: Dictionary) -> String:
+	var id: String = String(c.get("id", ""))
+	if id.begins_with("w_") or id in ["aura", "drone", "blade", "orb", "arc", "pool"]:
+		return "act"
+	return "pas"
 
 func _eligible_evolutions() -> Array:
 	var out: Array = []
@@ -888,23 +1665,95 @@ func _apply_upgrade(id: String) -> void:
 		"haste": player.cooldown_mult = maxf(0.35, player.cooldown_mult * 0.88)
 		"crit": player.crit_chance = minf(0.75, player.crit_chance + 0.08)
 		"armor": player.armor = minf(0.6, player.armor + 0.08)
-		"magnet": player.magnet_range += 90.0
+		"magnet": player.magnet_range += 105.0   # base is tiny now -> each pick is a real jump in reach
+		"he_fuel": player.size_mult = minf(1.7, player.size_mult + 0.15)
+		"ammo": player.proj_speed_mult = minf(1.6, player.proj_speed_mult + 0.12)
+		"regen": player.hp_regen += 1.5
+		"xpgain": GameState.run_xp_mult += 0.15
+		"goldgain": GameState.run_scrap_mult += 0.20
 		"w_missile": player.add_weapon("missilepod")
 		"w_railgun": player.add_weapon("railgun")
+		"w_disperseur": player.add_weapon("disperseur")
+		"w_ricochet": player.add_weapon("ricochet")
+		"w_disque": player.add_weapon("disque")
+		"w_faisceau": player.add_weapon("faisceau")
 		"w_plasma": player.add_weapon("plasma")
+		"w_sabre": player.add_weapon("sabre")
 		"aura":
 			player.add_aura()
 			show_banner("BOUCLIER A IMPULSIONS  niv.%d" % player.aura_level, Color(0.5, 0.95, 1.0))
 		"drone":
 			player.add_drone()
 			show_banner("DRONE DE COMBAT  x%d" % player._drones.size(), Color(0.5, 0.95, 1.0))
+		"blade":
+			player.add_blade()
+			show_banner("LAME ORBITALE  x%d" % player._blades.size(), Color(0.5, 0.95, 1.0))
+		"orb":
+			player.add_orb()
+			show_banner("ORBE PLASMA  x%d" % player._orbs.size(), Color(0.5, 0.95, 1.0))
+		"arc":
+			player.add_arc()
+			show_banner("ARC TESLA  niv.%d" % player._arc_lv, Color(0.6, 0.95, 1.0))
+		"pool":
+			player.add_pool()
+			show_banner("BRASIER PLASMA  niv.%d" % player._pool_lv, Color(0.5, 0.95, 1.0))
 
-func ensure_banked() -> void:
-	# bank the run's scrap into the persistent meta wallet exactly once
+## Bank an in-progress run when the app leaves the foreground. A mobile session normally ends by
+## a call, an app switch or a swipe-away — none of which reach the death/victory screen, so every
+## bit of scrap, crystals and quest progress used to be lost. Godot delivers these notifications
+## even while the tree is paused.
+func _notification(what: int) -> void:
+	# Godot 4 names: APPLICATION_PAUSED fires when Android backgrounds the app, FOCUS_OUT covers
+	# an app switch, CLOSE_REQUEST a deliberate quit. (NOTIFICATION_WM_GO_BACKGROUND is Godot 3.)
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT \
+			or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if GameState.alive and not _headless:
+			ensure_banked(false)   # grind only: the run is not over, so no crystals and no run count
+
+## Amounts already written to the save, so banking can happen MORE THAN ONCE per run (an app
+## switch flushes mid-run, then death flushes only what came after). Without this a background
+## save would consume the once-only guard and everything earned afterwards would be lost.
+var _flushed_scrap: int = 0
+var _flushed_kills: int = 0
+var _flushed_props: int = 0
+var _flushed_min: int = 0
+
+## final = true only on death/victory: that is when the run counts as "played" and when the score
+## is settled enough to pay crystals. A mid-run flush banks the grind, never the run itself.
+func ensure_banked(final: bool = true) -> void:
 	if _banked:
 		return
-	_banked = true
-	SaveManager.bank_scrap(GameState.scrap)
+	var d_scrap: int = GameState.scrap - _flushed_scrap
+	if d_scrap > 0:
+		SaveManager.bank_scrap(d_scrap)
+		_flushed_scrap = GameState.scrap
+	# Daily quests: contribute in deltas, in ONE write (never per kill — that would be a disk
+	# write per enemy).
+	var d_kills: int = GameState.kills - _flushed_kills
+	var d_props: int = GameState.props_destroyed - _flushed_props
+	var d_min: int = int(GameState.run_time / 60.0) - _flushed_min
+	if d_kills > 0:
+		SaveManager.quest_add("kills", d_kills); _flushed_kills = GameState.kills
+	if d_props > 0:
+		SaveManager.quest_add("props", d_props); _flushed_props = GameState.props_destroyed
+	if d_min > 0:
+		SaveManager.quest_add("time", d_min); _flushed_min = int(GameState.run_time / 60.0)
+	if final:
+		_banked = true   # from here the run is settled; a revive cannot double-count it
+		last_crystals = SaveManager.bank_crystals_for_run(GameState.score, GameState.run_time)
+		last_sp = _run_sp_reward()
+		if last_sp > 0:
+			SaveManager.add_sp(last_sp)   # RPG loadout progression, scaled by difficulty
+		SaveManager.quest_add("runs", 1)
+	SaveManager.quest_commit()
+
+## Skill points earned this run: (1 + zones cleared + endless waves) scaled by the difficulty reward.
+## Gated on a real run (>=60s) so instant-death restarts can't farm points.
+func _run_sp_reward() -> int:
+	if GameState.run_time < 60.0:
+		return 0
+	var base: int = 1 + _maps_cleared + GameState.endless_wave * 2
+	return int(ceil(base * float(GameState.diff().get("reward", 1.0))))
 
 func _on_player_died() -> void:
 	if _headless:
@@ -914,11 +1763,29 @@ func _on_player_died() -> void:
 	add_child(ms)
 	ms.setup(self, true, not _revived)
 
+## SANS FIN: an endboss went down but the run continues. Each wave banks score, grants a short
+## breather heal, then rolls into a fresh zone — next_map() picks up the escalation.
+func endless_boss_down() -> void:
+	GameState.endless_wave += 1
+	GameState.score += 2000 * GameState.endless_wave
+	if player != null:
+		player.hp = minf(player.max_hp, player.hp + player.max_hp * 0.35)
+	show_banner("VAGUE %d SURVECUE" % GameState.endless_wave, Color(1.0, 0.85, 0.3))
+	Audio.sfx("victory")
+	next_map()
+
 func _on_run_won() -> void:
 	if not GameState.alive:
 		return
 	GameState.alive = false   # stop spawns/movement, freeze the run on the win
 	ensure_banked()
+	# PROGRESSION : battre le boss final d'un chapitre (campagne) débloque le suivant.
+	if not GameState.endless:
+		var first_clear: bool = SaveManager.clear_chapter(_chapter)
+		if first_clear:
+			SaveManager.data["crystals"] = int(SaveManager.data.get("crystals", 0)) + 20
+			SaveManager.bank_scrap(150)   # sauvegarde cristaux + ferraille
+			show_banner("CHAPITRE %d TERMINE  —  +20 cristaux, +150 ferraille" % _chapter, Color(1.0, 0.85, 0.3))
 	if _headless:
 		return
 	var ms: MetaScreen = MetaScreen.new()
@@ -928,6 +1795,11 @@ func _on_run_won() -> void:
 func revive_player() -> void:
 	_revived = true
 	GameState.alive = true
+	# 🚨 le HUD se masque a la mort (il restait affiche PAR-DESSUS l'ecran de fin, B6) :
+	# il faut donc le REMONTRER ici, sinon une seconde chance repartait sans barres de vie,
+	# sans horloge et sans bouton SURCHARGE.
+	if hud != null and is_instance_valid(hud):
+		hud.visible = true
 	player.hp = player.max_hp * 0.5
 	if player.mecha != null:
 		player.mecha.play("idle")   # get up: the death anim left the mech on the ground
@@ -944,6 +1816,15 @@ func revive_player() -> void:
 # ---- main loop + headless bot ----
 func _process(delta: float) -> void:
 	_frames += 1
+	_spark_tokens = minf(SPARK_BURST, _spark_tokens + SPARK_RATE * delta)
+	if _perf and _frames % 60 == 0:
+		var obj: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+		print("[perf] t=%3.0fs ennemis=%3d fx=%4d nodes=%4d objets=%5d  delta_obj/s=%+d" % [
+			GameState.run_time, get_tree().get_nodes_in_group("enemies").size(),
+			fx_layer.get_child_count() if fx_layer != null else 0,
+			int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)), obj,
+			obj - _perf_last_obj])
+		_perf_last_obj = obj
 	if _floor_mat != null and player != null:
 		_floor_mat.set_shader_parameter("world_offset", player.global_position)
 		_floor_mat.set_shader_parameter("vp_size", get_viewport_rect().size)
@@ -969,7 +1850,7 @@ func _process(delta: float) -> void:
 				_frames, GameState.run_time, GameState.level, GameState.xp, GameState.xp_to_next,
 				GameState.kills, player.hp, get_tree().get_nodes_in_group("enemies").size(),
 				get_tree().get_nodes_in_group("pickups").size()])
-		if _headless and _frames >= 1400:
+		if _headless and _frames >= _headless_frames:
 			_finish_headless()
 
 func _drive_bot() -> void:
@@ -1006,6 +1887,13 @@ func _pick_biome() -> int:
 		var v = JavaScriptBridge.eval("location.hash.length>1 ? ((parseInt(location.hash.slice(1))||0)+1) : 0", true)
 		if v != null and int(v) > 0:
 			return clampi(int(v) - 1, 0, BIOMES.size() - 1)
+	# headless test hook: `-- --biome=tech` forces a biome so a smoke can exercise its props
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--biome="):
+			var want: String = a.substr(8)
+			var idx: int = BIOMES.find(want)
+			if idx >= 0:
+				return idx
 	return randi() % BIOMES.size()
 
 func _nearest_pickup() -> Node2D:
@@ -1023,8 +1911,15 @@ func _finish_headless() -> void:
 	# require a real vertical slice: kills + XP + at least one level-up/draft resolved
 	var ok: bool = GameState.kills > 0 and GameState.level >= 2 and player.get_layer_ok()
 	if ok:
-		print("[game] SMOKE PASS — kills=%d level=%d scrap=%d (draft exercised), 0 errors" % [
-			GameState.kills, GameState.level, GameState.scrap])
+		# pv/dmg exposed so mech + meta-talent + GEAR stat plumbing is checkable from the smoke run
+		# od = Overdrive uptime: the player is INVINCIBLE while transformed, so a high percentage
+		# means the run is unloseable. Anything approaching 100% is a balance failure, not a stat.
+		var od_pct: float = 0.0
+		if GameState.run_time > 0.0:
+			od_pct = GameState.overdrive_time / GameState.run_time * 100.0
+		print("[game] SMOKE PASS — kills=%d level=%d scrap=%d pv=%d dmg=%.2f endless=%s vague=%d od=%dx/%.0f%% (draft exercised), 0 errors" % [
+			GameState.kills, GameState.level, GameState.scrap, int(player.max_hp), player.damage,
+			str(GameState.endless), GameState.endless_wave, GameState.overdrive_count, od_pct])
 		get_tree().quit(0)
 	else:
 		print("[game] SMOKE FAIL — kills=%d level=%d (level-up/draft not reached)" % [
