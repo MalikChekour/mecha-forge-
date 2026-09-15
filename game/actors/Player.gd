@@ -176,8 +176,15 @@ func _ready() -> void:
 	_weapons = WeaponSystem.new()
 	add_child(_weapons)
 	# Starting weapon is the player's CHOICE (hub arsenal), overriding the mech's default loadout.
+	# ARME DE DEPART : le choix du joueur (ecran ARSENAL) n'est retenu que s'il appartient a la
+	# gamme du chassis equipe. Sinon on retombe sur la SIGNATURE du chassis — sans quoi on
+	# pourrait demarrer avec une arme que ce mecha ne sait pas manier, et qu'il ne booste pas.
+	var sig: String = GameState.mech_signature(SaveManager.equipped_mech())
+	var gamme: Array = GameState.mech_arsenal(SaveManager.equipped_mech())
 	var start_w: String = SaveManager.start_weapon()
-	var loadout: Array = [start_w] if SaveManager.weapon_unlocked(start_w) else mech.get("weapons", ["autocannon"])
+	if not (SaveManager.weapon_unlocked(start_w) and gamme.has(start_w)):
+		start_w = sig
+	var loadout: Array = [start_w]
 	_weapons.setup(self, loadout)   # chosen starter weapon
 	_weapons.visuals_hidden = true   # NO held-gun sprite (it read as badly grafted on the body). The mech
 	# AIMS with its arm and fires a beam/muzzle from the hand toward the target ("Buzz Lightyear" style):

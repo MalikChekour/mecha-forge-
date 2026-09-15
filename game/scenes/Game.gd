@@ -1719,12 +1719,20 @@ func _slots_used(cat: String) -> int:
 func _draw_cards() -> void:
 	var act_plein: bool = _slots_used("act") >= MAX_ACTIFS
 	var pas_plein: bool = _slots_used("pas") >= MAX_PASSIFS
+	# ARSENAL DU CHASSIS : une carte d'arme n'est proposee que si l'arme appartient a la gamme
+	# du mecha equipe (GameState.mech_arsenal). Avant, le pool etait GLOBAL : les deux chassis
+	# piochaient dans les 9 memes armes et finissaient par se ressembler. Les cartes qui ne
+	# sont pas des armes (passifs, systemes d'aide) restent communes a tous.
+	var gamme: Array = GameState.mech_arsenal(SaveManager.equipped_mech())
 	var pool: Array = []
 	var replis: Array = []      # cartes ecartees par le plafond : filet si le pool est trop maigre
 	for u: Dictionary in UPGRADES:
 		if _banished.has(u["id"]):
 			continue
 		var uid: String = String(u["id"])
+		var warme: String = String(_WEAPON_CARD.get(uid, ""))
+		if warme != "" and not gamme.has(warme):
+			continue                     # arme hors de la gamme de ce chassis
 		var neuve: bool = not _passives.has(uid)
 		var bloquee: bool = neuve and ((_card_cat(u) == "act" and act_plein) or (_card_cat(u) == "pas" and pas_plein))
 		if bloquee:

@@ -762,18 +762,36 @@ func _build_arsenal() -> void:
 	var v: VBoxContainer = _scaffold(640.0)
 	_title(v, "ARSENAL", Color(0.7, 0.9, 1.0))
 	_title(v, "Arme de depart      • %d points" % SaveManager.sp(), Color(1.0, 0.85, 0.35), 22)
+	# 🚨 L'ARSENAL est desormais PROPRE AU CHASSIS : chaque mecha a sa gamme de 5 armes et une
+	# signature qu'il est le seul a booster. Lister les 9 armes ici laissait acheter une arme
+	# que le mecha equipe ne sait pas manier — et qui serait silencieusement remplacee au
+	# lancement de la partie. On n'affiche donc que sa gamme, et on dit laquelle est la sienne.
+	var mid: String = SaveManager.equipped_mech()
+	var mdef: Dictionary = GameState.mech_def(mid)
+	var gamme: Array = GameState.mech_arsenal(mid)
+	var sig: String = GameState.mech_signature(mid)
+	_title(v, "%s   —   %s" % [String(mdef.get("name", mid)), String(mdef.get("ligne", ""))],
+		Color(mdef.get("accent", Color(0.7, 0.9, 1.0))), 17)
 	var cur: String = SaveManager.start_weapon()
+	if not gamme.has(cur):
+		cur = sig
 	for w: Dictionary in GameState.WEAPONS:
 		var id: String = String(w["id"])
+		if not gamme.has(id):
+			continue
 		var unlocked: bool = SaveManager.weapon_unlocked(id)
 		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var name_l: Label = Label.new()
-		name_l.text = "%s   -   %s" % [String(w["name"]), String(w["desc"])]
+		var marque: String = "   ★ SIGNATURE  (+35% dégâts, tir plus rapide)" if id == sig else ""
+		marque = marque.replace("★ ", "")   # l'etoile n'existe pas dans Rajdhani (carre vide)
+		name_l.text = "%s   -   %s%s" % [String(w["name"]), String(w["desc"]), marque]
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_l.add_theme_font_size_override("font_size", Palette.fs(17))
-		if id == cur:
+		if id == sig:
+			name_l.add_theme_color_override("font_color", Color(mdef.get("accent", Color(1.0, 0.9, 0.4))))
+		elif id == cur:
 			name_l.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 		row.add_child(name_l)
 		var b: Button = Button.new()
@@ -876,7 +894,17 @@ func _build_garage() -> void:
 		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var name_l: Label = Label.new()
-		name_l.text = "%s   -   %s" % [String(mech["name"]), String(mech["desc"])]
+		# on annonce ce qui distingue REELLEMENT les chassis : leur gamme d'armes et leur signature
+		var noms: Array = []
+		for wid in GameState.mech_arsenal(id):
+			for wd in GameState.WEAPONS:
+				if String(wd["id"]) == String(wid):
+					noms.append(String(wd["name"])); break
+		name_l.text = "%s   —   %s
+%s
+Armes : %s   ·   signature : %s" % [
+			String(mech["name"]), String(mech.get("ligne", "")), String(mech["desc"]),
+			", ".join(noms), GameState.mech_signature(id)]
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_l.add_theme_font_size_override("font_size", Palette.fs(17))

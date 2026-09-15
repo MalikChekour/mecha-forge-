@@ -114,10 +114,60 @@ var meta_od: float = 0.0
 ##                   => le chassis est toujours bien pose, jamais bras en arriere.      => OK
 ##   • george / mecha_joueur / darkstar / new_mecha -> bakes rates (mecha effondre de
 ##                   profil, poses incoherentes, art minuscule)                 => ecartes
+## ARSENAL PAR CHASSIS.
+## 🚨 Consigne patron : « chaque mecha doit avoir sa gamme d'armes specifique et son arme
+## boostee specifique ; ils doivent avoir le MEME NOMBRE d'armes, avec des effets speciaux
+## distingues et particuliers pour chacun. »
+## Avant, le pool d'armes etait GLOBAL : les deux chassis tiraient dans les 9 memes armes et
+## le champ "weapons" ne servait qu'a fixer l'arme de depart. Deux chassis, un seul ressenti.
+##
+## Chaque chassis a donc :
+##   • arsenal  : les 5 SEULES armes qu'il peut piocher (signature comprise) — 5 pour tous,
+##                a parite stricte. Les 9 armes sont reparties 5/5, « plasma » etant la seule
+##                partagee (c'est le pivot neutre : degats de zone, sans famille).
+##   • signature: son arme de depart, et la SEULE qu'il BOOSTE (voir WeaponSystem.SIG_DMG).
+##   • accent   : la couleur qui repeint sa signature — projectile, amorce, impact. C'est ce
+##                qui fait qu'un autocanon de VORTEX ne ressemble a rien d'autre dans le jeu.
+##   • sig_muzzle : l'effet de bouche propre a sa signature. L'impact, lui, herite de
+##                l'accent (la couleur voyage avec le projectile) et d'une gerbe 25 % plus
+##                large — voir WeaponSystem.SIG_FX.
+##
+## Ajouter un chassis = une ligne ici. Le plafond d'emplacements (Game.MAX_ACTIFS) reste le
+## garde-fou commun ; l'arsenal decide QUOI peut entrer dans ces emplacements.
 const MECHS: Array = [
-	{"id": "vortex",     "name": "VORTEX",     "cost": 0,    "weapons": ["autocannon"], "hp": 20.0, "dmg": 1.20, "speed": 1.05, "crit": 0.08, "desc": "Prototype VORTEX — armure noire, néon cyan, cœur orange, visée 360°"},
-	{"id": "bluestrike", "name": "BLUESTRIKE", "cost": 1400, "weapons": ["disperseur"], "hp": 6.0,  "dmg": 1.05, "speed": 1.24, "crit": 0.15, "desc": "Eclaireur BLUESTRIKE — blindage leger, tres rapide, gerbe a courte portee. Frappe et se replie."},
+	{"id": "vortex", "name": "VORTEX", "cost": 0,
+		"weapons": ["autocannon"], "hp": 20.0, "dmg": 1.20, "speed": 1.05, "crit": 0.08,
+		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
+		"signature": "autocannon",
+		"accent": Color(0.38, 0.92, 1.00),          # cyan electrique, coeur blanc
+		"sig_muzzle": ["aaa_beam", 0.46],           # trait d'energie dans l'axe, pas une boule
+		"ligne": "ÉNERGIE DIRIGÉE — perce, traverse, aligne.",
+		"desc": "Prototype VORTEX — armure noire, néon cyan, cœur orange, visée 360°"},
+	{"id": "bluestrike", "name": "BLUESTRIKE", "cost": 1400,
+		"weapons": ["disperseur"], "hp": 6.0, "dmg": 1.05, "speed": 1.24, "crit": 0.15,
+		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
+		"signature": "disperseur",
+		"accent": Color(1.00, 0.54, 0.16),          # ambre-braise
+		"sig_muzzle": ["fire_blast", 0.40],         # souffle de feu evase, a bout portant
+		"ligne": "SOUFFLE RAPPROCHÉ — sature, disloque, se replie.",
+		"desc": "Eclaireur BLUESTRIKE — blindage leger, tres rapide, gerbe a courte portee. Frappe et se replie."},
 ]
+
+## Les 5 armes que ce chassis peut piocher. Repli : tout l'arsenal historique, pour qu'un
+## chassis ajoute sans champ « arsenal » reste jouable au lieu de n'avoir aucune arme.
+static func mech_arsenal(id: String) -> Array:
+	var a: Array = mech_def(id).get("arsenal", [])
+	if a.is_empty():
+		var tous: Array = []
+		for w in WEAPONS:
+			tous.append(String(w["id"]))
+		return tous
+	return a
+
+## L'arme signature du chassis : son arme de depart, et la seule qu'il booste.
+static func mech_signature(id: String) -> String:
+	var d: Dictionary = mech_def(id)
+	return String(d.get("signature", String((d.get("weapons", ["autocannon"]) as Array)[0])))
 
 static func mech_def(id: String) -> Dictionary:
 	for m in MECHS:
