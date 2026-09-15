@@ -775,28 +775,41 @@ func _build_arsenal() -> void:
 	var cur: String = SaveManager.start_weapon()
 	if not gamme.has(cur):
 		cur = sig
+	# 🚨 Les armes HORS GAMME etaient simplement masquees. Consequence relevee a l'audit
+	# economie : un joueur qui a depense des points sur le Faisceau, puis achete BLUESTRIKE
+	# (1400 ferraille, la depense la plus lourde du jeu), voit son achat DISPARAITRE sans un
+	# mot — et sa partie suivante demarre avec une arme qu'il n'a pas choisie. Rien n'est
+	# perdu (les deblocages sont globaux, ils reviennent avec le chassis), mais on ne le lui
+	# disait pas. On les affiche donc, grisees, avec la raison.
 	for w: Dictionary in GameState.WEAPONS:
 		var id: String = String(w["id"])
-		if not gamme.has(id):
-			continue
+		var hors_gamme: bool = not gamme.has(id)
+		if hors_gamme and not SaveManager.weapon_unlocked(id):
+			continue      # ni debloquee ni utilisable ici : inutile de l'afficher
 		var unlocked: bool = SaveManager.weapon_unlocked(id)
 		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var name_l: Label = Label.new()
-		var marque: String = "   ★ SIGNATURE  (+35% dégâts, tir plus rapide)" if id == sig else ""
-		marque = marque.replace("★ ", "")   # l'etoile n'existe pas dans Rajdhani (carre vide)
+		var marque: String = "   SIGNATURE  (+35% dégâts, tir plus rapide)" if id == sig else ""
+		if hors_gamme:
+			marque = "   —   hors de la gamme de %s (revient avec le châssis qui la porte)" % String(mdef.get("name", mid))
 		name_l.text = "%s   -   %s%s" % [String(w["name"]), String(w["desc"]), marque]
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_l.add_theme_font_size_override("font_size", Palette.fs(17))
-		if id == sig:
+		if hors_gamme:
+			name_l.add_theme_color_override("font_color", Color(0.48, 0.52, 0.58))   # grisee
+		elif id == sig:
 			name_l.add_theme_color_override("font_color", Color(mdef.get("accent", Color(1.0, 0.9, 0.4))))
 		elif id == cur:
 			name_l.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 		row.add_child(name_l)
 		var b: Button = Button.new()
 		b.custom_minimum_size = Vector2(172, 52)
-		if id == cur:
+		if hors_gamme:
+			b.text = "AUTRE CHÂSSIS"
+			b.disabled = true
+		elif id == cur:
 			b.text = "EQUIPEE"
 			b.disabled = true
 		elif unlocked:

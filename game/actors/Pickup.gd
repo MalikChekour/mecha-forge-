@@ -10,7 +10,7 @@ var player: Node2D
 var game: Node
 
 var _spr: Sprite2D
-var _light: PointLight2D
+var _light: Sprite2D          # additive glow, not a dynamic light (see _ready)
 var _t: float = 0.0
 var _base_y: float = 0.0
 var _homing: bool = false
@@ -31,7 +31,12 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 	if _spr == null:
 		_spr = Sprite2D.new()
 		add_child(_spr)
-		_light = PointLight2D.new()
+		# Additive glow sprite, NOT a PointLight2D. Pickups are unbounded (every kill drops one) and
+		# in gl_compatibility each dynamic light pulls its lit items out of the batch and is tested
+		# against them every frame — dozens of gems on screen was a constant mobile tax.
+		_light = Sprite2D.new()
+		_light.material = Tex.add_mat()
+		_light.z_index = -1
 		add_child(_light)
 	# refresh appearance every time (a pooled xp gem may be reused as scrap/bonus)
 	# XP gems are colour-tiered by value so the player reads a swarm-drop vs an elite-drop at a glance
@@ -41,9 +46,17 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 	elif k == "bonus":
 		col = Palette.BONUS
 	elif k == "skill":
-		col = Color(0.78, 0.52, 1.0)          # violet competence orb (from a broken skill-crate)
+		# 🚨 DALTONISME. Mesure (matrices Machado, severite 1.0, distance RGB sur 441) :
+		# l'ancien violet (0.78,0.52,1.0) et la gemme d'XP bleue etaient separes de 3 SEULEMENT
+		# en deuteranopie — la forme la plus frequente, ~5 % des hommes. Autrement dit :
+		# indiscernables. Idem pour l'ancien vert de soin (0.4,1.0,0.5) et la gemme verte,
+		# separes de 13 en deuteranopie... et de 18 en vision NORMALE, donc confus pour tout
+		# le monde. Les deux valeurs ci-dessous ont ete CHOISIES en maximisant la pire
+		# separation sur les quatre visions (normale, protan, deutan, tritan) : elle passe de
+		# 3 a 57. Toute retouche de ces teintes doit refaire ce calcul.
+		col = Color(0.85, 0.2, 0.95)          # magenta franc : orbe de competence
 	elif k == "heal":
-		col = Color(0.4, 1.0, 0.5)            # green med-pack
+		col = Color(0.85, 1.0, 0.92)          # vert presque blanc : trousse de soin
 	elif k == "od":
 		col = Color(1.0, 0.62, 0.2)           # amber energy cell -> Overdrive gauge
 	elif k == "scrap":
@@ -52,13 +65,15 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 		col = Palette.CYAN
 	var big: bool = k == "bonus" or k == "skill" or k == "heal" or k == "od"
 	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 24)
-	_spr.modulate = col if (k == "xp" or k == "heal" or k == "od") else Color.WHITE
+	# `skill` rejoint les teintes appliquees : sans ca, seul son halo prenait la couleur et la
+	# correction daltonisme ci-dessus n'aurait porte que sur la lueur, pas sur l'objet.
+	_spr.modulate = col if (k == "xp" or k == "heal" or k == "od" or k == "skill") else Color.WHITE
 	var th: float = float(_spr.texture.get_height())
 	if th > 0.0:
 		_spr.scale = Vector2.ONE * ((28.0 if big else 18.0) / th)
-	_light.color = col
-	_light.energy = 1.1 if big else 0.5
-	_light.texture = _spr.texture
+	_light.texture = Tex.glow(col, 64)
+	_light.modulate = Color(col.r, col.g, col.b, 0.5 if big else 0.28)
+	_light.scale = Vector2.ONE * ((2.6 if big else 1.7) * 28.0 / 64.0)
 
 func _physics_process(delta: float) -> void:
 	_t += delta

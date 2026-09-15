@@ -472,7 +472,7 @@ func _show_difficulty_select() -> void:
 	# --- MODE: campagne (boss final = victoire) vs sans fin (vagues infinies) ---
 	var mode_btn: Button = Button.new()
 	mode_btn.add_theme_font_size_override("font_size", Palette.fs(20))
-	mode_btn.custom_minimum_size = Vector2(460, 50)
+	mode_btn.custom_minimum_size = Vector2(_panel_w(460.0), 50)
 	var mode_desc: Label = Label.new()
 	mode_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mode_desc.add_theme_font_size_override("font_size", Palette.fs(15))
@@ -502,7 +502,7 @@ func _show_difficulty_select() -> void:
 		var b: Button = Button.new()
 		b.text = "%s   —   %s" % [String(d["name"]), String(descs[i])]
 		b.add_theme_font_size_override("font_size", Palette.fs(20))
-		b.custom_minimum_size = Vector2(480, 64)
+		b.custom_minimum_size = Vector2(_panel_w(480.0), 64)
 		if i == cur:
 			b.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 		b.pressed.connect(_on_difficulty_chosen.bind(i, cl))
@@ -528,7 +528,7 @@ func _show_difficulty_select() -> void:
 	var back: Button = Button.new()
 	back.text = "RETOUR"
 	back.add_theme_font_size_override("font_size", Palette.fs(20))
-	back.custom_minimum_size = Vector2(460, 50)
+	back.custom_minimum_size = Vector2(_panel_w(460.0), 50)
 	back.pressed.connect(func() -> void:
 		Audio.sfx("click")
 		if is_instance_valid(cl):
@@ -541,6 +541,18 @@ func _show_difficulty_select() -> void:
 ## same toggles as the start menu — they apply live (auto-aim updates the active player, music/sfx
 ## mute buses, orientation re-locks).
 var _settings_open: bool = false
+
+## Largeur utile d'un panneau plein ecran (reglages, choix de difficulte, choix de chapitre).
+## 🚨 Ces ecrans etaient les SEULS du jeu a garder des largeurs EN DUR (460, 480, 520 px, et
+## une grille de 2x240+10 = 490). Sur un telephone etroit ils sont plus larges que l'ecran :
+## a 360 px de large, un bouton de 460 px deborde de 50 px de chaque cote — et CenterContainer
+## centre sans redimensionner, donc le texte sort du cadre des deux cotes. Audit d'ergonomie :
+## « le seul ecran du jeu qui n'utilise pas le facteur d'echelle ». Tout passe desormais par
+## cette fonction, bornee a la largeur reelle moins une marge.
+func _panel_w(voulu: float = 460.0) -> float:
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var k: float = clampf(minf(vp.x, vp.y) / 720.0, 0.62, 1.75)
+	return minf(voulu * k, vp.x - 32.0)
 ## from_home = true : ouvert depuis le hub, pas en pleine partie.
 ## 🚨 Les reglages n'etaient joignables QUE par _show_difficulty_select(), or _on_play() appelle
 ## toujours _show_chapter_select() : cette branche n'etait JAMAIS executee. Consequence mesuree
@@ -590,7 +602,7 @@ func show_settings(from_home: bool = false) -> void:
 	if from_home:
 		var mode_btn: Button = Button.new()
 		mode_btn.add_theme_font_size_override("font_size", Palette.fs(19))
-		mode_btn.custom_minimum_size = Vector2(460, 56)
+		mode_btn.custom_minimum_size = Vector2(_panel_w(460.0), 56)
 		var paint_mode: Callable = func() -> void:
 			var on: bool = bool(SaveManager.setting("endless", false))
 			mode_btn.text = ("MODE : SANS FIN  —  vagues infinies" if on
@@ -606,7 +618,7 @@ func show_settings(from_home: bool = false) -> void:
 	var resume: Button = Button.new()
 	resume.text = "RETOUR" if from_home else "REPRENDRE"
 	resume.add_theme_font_size_override("font_size", Palette.fs(22))
-	resume.custom_minimum_size = Vector2(460, 58)
+	resume.custom_minimum_size = Vector2(_panel_w(460.0), 58)
 	resume.pressed.connect(func() -> void:
 		Audio.sfx("click")
 		_settings_open = false
@@ -624,7 +636,7 @@ func show_settings(from_home: bool = false) -> void:
 	var to_menu: Button = Button.new()
 	to_menu.text = "ABANDONNER  —  menu principal"
 	to_menu.add_theme_font_size_override("font_size", Palette.fs(20))
-	to_menu.custom_minimum_size = Vector2(460, 50)
+	to_menu.custom_minimum_size = Vector2(_panel_w(460.0), 50)
 	to_menu.pressed.connect(func() -> void:
 		Audio.sfx("click")
 		ensure_banked()               # keep the crystals/points earned so far (SP still gated at 60s)
@@ -638,7 +650,7 @@ func show_settings(from_home: bool = false) -> void:
 func _add_toggle(parent: Node, key: String, label: String, default_on: bool) -> void:
 	var b: Button = Button.new()
 	b.add_theme_font_size_override("font_size", Palette.fs(17))
-	b.custom_minimum_size = Vector2(240, 62)
+	b.custom_minimum_size = Vector2(_panel_w(460.0) * 0.5 - 6.0, 62)
 	var paint: Callable = func(on: bool) -> void:
 		b.text = "%s\n%s" % [label, "ON" if on else "OFF"]
 		b.add_theme_color_override("font_color", Color(0.45, 1.0, 0.55) if on else Color(0.7, 0.72, 0.78))
@@ -662,7 +674,7 @@ func _add_orient_toggle(parent: Node) -> void:
 	var labels: Dictionary = {"auto": "AUTO", "portrait": "PORTRAIT", "landscape": "PAYSAGE"}
 	var b: Button = Button.new()
 	b.add_theme_font_size_override("font_size", Palette.fs(17))
-	b.custom_minimum_size = Vector2(240, 62)
+	b.custom_minimum_size = Vector2(_panel_w(460.0) * 0.5 - 6.0, 62)
 	b.text = "ECRAN\n%s" % labels[String(SaveManager.setting("orientation", "auto"))]
 	b.pressed.connect(func() -> void:
 		var cur: String = String(SaveManager.setting("orientation", "auto"))
@@ -740,7 +752,7 @@ func _show_chapter_select() -> void:
 		var n: int = i + 1
 		var b: Button = Button.new()
 		b.add_theme_font_size_override("font_size", Palette.fs(20))
-		b.custom_minimum_size = Vector2(520, 56)
+		b.custom_minimum_size = Vector2(_panel_w(520.0), 56)
 		if SaveManager.chapter_unlocked(n):
 			var dn: String = String(GameState.DIFFICULTY[clampi(int(ch["diff"]), 0, GameState.DIFFICULTY.size() - 1)].get("name", ""))
 			var done: String = "  (battu)" if cleared >= n else ""
@@ -760,7 +772,7 @@ func _show_chapter_select() -> void:
 	var back: Button = Button.new()
 	back.text = "RETOUR"
 	back.add_theme_font_size_override("font_size", Palette.fs(20))
-	back.custom_minimum_size = Vector2(520, 48)
+	back.custom_minimum_size = Vector2(_panel_w(520.0), 48)
 	back.pressed.connect(func() -> void:
 		Audio.sfx("click")
 		if is_instance_valid(cl):
@@ -1984,9 +1996,17 @@ func ensure_banked(final: bool = true) -> void:
 	SaveManager.quest_commit()
 
 ## Skill points earned this run: (1 + zones cleared + endless waves) scaled by the difficulty reward.
-## Gated on a real run (>=60s) so instant-death restarts can't farm points.
+## Le seuil empeche de farmer en mourant volontairement pour relancer.
+## 🚨 MESURE (banc : 8 parties par difficulte, biome unique, protocoles neutralises) — duree
+## MEDIANE d'une partie : FACILE 124 s, NORMAL 63 s, DIFFICILE 81 s, VETERAN 82 s. Le seuil
+## de 60 s, cale a l'epoque sur une partie censee durer 15 minutes, tombait donc en plein
+## dans la distribution : 25 a 38 % des parties au-dessus de FACILE ne rapportaient AUCUN
+## point. Un joueur qui perd n'a alors plus rien a montrer de sa partie. A 30 s, la garde
+## anti-farm tient toujours (une mort volontaire est bien plus rapide) et une partie jouee
+## rapporte quelque chose meme quand elle tourne mal.
+const SP_MIN_RUN: float = 30.0
 func _run_sp_reward() -> int:
-	if GameState.run_time < 60.0:
+	if GameState.run_time < SP_MIN_RUN:
 		return 0
 	var base: int = 1 + _maps_cleared + GameState.endless_wave * 2
 	return int(ceil(base * float(GameState.diff().get("reward", 1.0))))
