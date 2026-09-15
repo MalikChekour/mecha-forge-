@@ -818,6 +818,12 @@ func _die() -> void:
 	if _dying:
 		return
 	_dying = true
+	# 🚨 FUITE DU TELEGRAPHE : `warn` (la teinte ROUGE d'attaque imminente) n'est remis a zero
+	# que par les deux sorties NORMALES de telegraphie. Un ennemi tue PENDANT sa charge
+	# (fonceur en phase d'elan, canon lourd en train de charger) gardait donc sa silhouette
+	# rouge pleine pendant toute son animation de mort (~0,7 s) au lieu de la jouer.
+	if _mat != null and _mat.shader != null:
+		_mat.set_shader_parameter("warn", 0.0)
 	if _bull_counted:                 # relache le slot de charge si l'ennemi meurt en pleine charge
 		_bull_counted = false; _bulls_charging = maxi(0, _bulls_charging - 1)
 	alive = false

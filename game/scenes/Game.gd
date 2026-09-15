@@ -81,7 +81,19 @@ var last_crystals: int = 0      # cristaux earned by the run just ended (shown o
 var last_sp: int = 0            # skill points earned by the run just ended (shown on results)
 ## Headless smoke normally ends at frame 1400 (a short vertical slice). The SANS FIN regression
 ## (`-- --fast-bosses`) needs a long soak so waves can actually accumulate.
-@onready var _headless_frames: int = 30000 if OS.get_cmdline_user_args().has("--fast-bosses") else 1400
+## La variable d'environnement MF_FRAMES permet une partie LONGUE *sans* compresser l'horloge
+## des boss : c'est ce qu'il faut pour mesurer une vraie courbe de difficulte (1400 images =
+## 12 s de jeu, beaucoup trop court pour juger quoi que ce soit).
+## 🚨 parse defensif : `int("abc")` rend 0 en GDScript, ce qui terminerait la partie a l'image 0.
+@onready var _headless_frames: int = _frames_budget()
+
+func _frames_budget() -> int:
+	if OS.get_cmdline_user_args().has("--fast-bosses"):
+		return 30000
+	var mf: String = OS.get_environment("MF_FRAMES")
+	if mf.is_valid_int() and int(mf) > 0:
+		return int(mf)
+	return 1400
 ## `-- --perf` prints live node/object counts. FX allocation is this game's dominant cost, so a
 ## number beats an intention — every optimisation claim should be checked against this.
 @onready var _perf: bool = OS.get_cmdline_user_args().has("--perf")
@@ -228,9 +240,17 @@ func _ready() -> void:
 	Events.level_up.connect(func(_l: int) -> void: _level_fx())
 	Events.player_died.connect(_on_player_died)
 	Events.run_won.connect(_on_run_won)
+	Events.overdrive_changed.connect(_on_overdrive_hint)   # explique la SURCHARGE la 1re fois
 	if _headless:
 		Events.player_transformed.connect(func(on: bool) -> void: print("[game] TRANSFORM ", on))
 		Events.run_won.connect(func() -> void: print("[game] VICTORY"))
+		var _pn: Array = []
+		for _p in Protocols.active:
+			_pn.append(String(_p.get("name", "?")))
+		print("[game] PROTOCOLES %s | spawn=%.2f hp=%.2f dmg=%.2f spd=%.2f reward=%.2f pspeed=%.2f | diff=%s" % [
+			", ".join(_pn), Protocols.spawn_rate, Protocols.enemy_hp, Protocols.enemy_dmg,
+			Protocols.enemy_speed, Protocols.reward, Protocols.player_speed,
+			String(GameState.diff().get("name", "?"))])
 
 	# Flow: bot -> straight into a run. Player -> HOME hub (play / meta) -> difficulty -> run.
 	# REJOUER sets skip_hub so a retry is ONE tap: reload (clean state, no manual teardown of
@@ -353,6 +373,7 @@ func _begin_run() -> void:
 	var lbl: String = String(_mods.get("label", ""))
 	show_banner((lbl + "   [" + dname + "]") if lbl != "" else dname)
 	_announce_protocols()   # sequenced AFTER the sector title (fire-and-forget coroutine)
+	_first_run_hints()      # FTUE minimale, une seule fois dans la vie du joueur
 	_biome_music()
 	_play_intro()
 
@@ -368,6 +389,11 @@ func _announce_protocols() -> void:
 	# 🚨 le glyphe ◈ (U+25C8) est absent de Rajdhani : il s'affichait en carre vide avec son
 	# code hexa, en plein ecran, a chaque annonce de protocole. Remplace par « • » (present).
 	show_banner("• " + Protocols.banner_text(), pcol)
+	# ... et ce qu'ils FONT : le nom seul ne disait rien d'un modificateur qui peut doubler
+	# le nombre d'ennemis. Le detail passe par show_hint (il fait des phrases, pas des titres).
+	await get_tree().create_timer(3.5).timeout   # la banniere du nom a fini, l'indice de
+	if is_inside_tree():                         # deplacement aussi (il se termine a 5,8 s)
+		show_hint(Protocols.desc_text(), pcol, 4.0)
 
 # Run-start TELEPORT-IN: a light beam slams down, the mech materialises from an over-bright
 # flash with a ground shockwave, brief invuln + a spawn hold so the entrance reads clean.
@@ -1280,6 +1306,108 @@ func show_banner(text: String, color: Color = Color(1.0, 0.92, 0.7)) -> void:
 	tw.tween_property(lb, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(cl.queue_free)
 
+## INDICE d'apprentissage : une PHRASE, pas un titre.
+## show_banner() est calibre pour deux mots (police 32, pas de retour a la ligne, ancre en
+## haut a 74 px) : une phrase y deborderait horizontalement sur ecran etroit et viendrait se
+## poser sur le bandeau du HUD, qui descend jusqu'a ~137 px en portrait. Les indices vivent
+## donc EN BAS, au-dessus du bouton SURCHARGE, avec retour a la ligne et un fond lisible.
+func show_hint(text: String, color: Color = Color(0.72, 0.92, 1.0), duree: float = 4.5) -> void:
+	if text == "" or _headless:
+		return
+	# 🚨 un indice ne doit jamais apparaitre alors que la partie est finie : l'ecran de
+	# resultats est au calque 40, l'indice au 22 — il serait invisible, mais surtout il
+	# parlerait dans le vide. Mesure : immobile, le joueur meurt en ~14 s, soit AVANT la
+	# fin de la sequence d'accueil.
+	if not GameState.alive:
+		return
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var k: float = clampf(minf(vp.x, vp.y) / 720.0, 0.62, 1.75)
+	var cl: CanvasLayer = CanvasLayer.new()
+	cl.layer = 22
+	add_child(cl)
+	var pc: PanelContainer = PanelContainer.new()
+	pc.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	pc.offset_left = 24.0 * k
+	pc.offset_right = -24.0 * k
+	pc.offset_top = -(196.0 * k)
+	pc.offset_bottom = -(122.0 * k)
+	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.02, 0.04, 0.07, 0.80)
+	sb.border_color = Color(color.r, color.g, color.b, 0.55)
+	sb.set_border_width_all(maxi(1, int(2.0 * k)))
+	sb.set_corner_radius_all(int(8.0 * k))
+	sb.content_margin_left = 16.0 * k
+	sb.content_margin_right = 16.0 * k
+	sb.content_margin_top = 10.0 * k
+	sb.content_margin_bottom = 10.0 * k
+	pc.add_theme_stylebox_override("panel", sb)
+	cl.add_child(pc)
+	var lb: Label = Label.new()
+	lb.text = text
+	lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lb.add_theme_font_size_override("font_size", Palette.fs(17))
+	lb.add_theme_color_override("font_color", color)
+	lb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	lb.add_theme_constant_override("outline_size", 4)
+	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pc.add_child(lb)
+	pc.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.tween_property(pc, "modulate:a", 1.0, 0.35)
+	tw.tween_interval(duree)
+	tw.tween_property(pc, "modulate:a", 0.0, 0.6)
+	tw.tween_callback(cl.queue_free)
+
+## PREMIERE PARTIE : le jeu n'expliquait AUCUNE de ses quatre mecaniques de base (deplacement,
+## tir automatique, SURCHARGE, gemmes) et ne contient aucun tutoriel — verifie : zero occurrence
+## de « tutoriel » dans tout le code. Trois jeux de reference sur quatre enseignent au moins leur
+## regle centrale ; le seul qui n'explique rien (Vampire Survivors) n'a QU'UN seul verbe, alors
+## qu'ici il y en a deux (se deplacer + declencher la SURCHARGE). D'ou ces deux phrases, montrees
+## une seule fois dans la vie du joueur.
+func _first_run_hints() -> void:
+	if _bot or _headless:
+		return
+	if not bool(SaveManager.data.get("first_run", true)):
+		return
+	# 🚨 le drapeau n'est consomme qu'une fois la sequence TERMINEE. Consomme des l'entree,
+	# il grillait les indices d'une partie ou le joueur meurt avant la fin : or immobile on
+	# meurt en ~14 s, et le dernier indice tombe a 12 s. Le mauvais cote de l'erreur est de
+	# revoir un indice une fois de trop, pas de ne jamais le voir.
+	# SEQUENCEMENT. Cinq messages se bousculaient dans les 15 premieres secondes (titre de
+	# secteur, nom du protocole, description du protocole, et les deux indices) alors qu'un
+	# joueur immobile meurt en ~14 s. Le plus utile passe donc en PREMIER, tout de suite :
+	#   t=1,2 s  deplacement + tir auto  (indice, en bas)
+	#   t=3,5 s  nom du protocole        (banniere, en haut — voir _announce_protocols)
+	#   t=7,0 s  effet du protocole      (indice, en bas)
+	#   t=12 s   gemmes                  (indice, en bas)
+	await get_tree().create_timer(1.2).timeout
+	if not is_inside_tree():
+		return
+	show_hint("Déplacez-vous avec les FLÈCHES ou le stick  —  le tir est AUTOMATIQUE.", Color(0.66, 0.95, 1.0), 4.6)
+	await get_tree().create_timer(10.8).timeout
+	if not is_inside_tree():
+		return
+	show_hint("Ramassez les gemmes laissées par les ennemis : elles font monter de niveau.", Color(0.6, 1.0, 0.78), 4.6)
+	SaveManager.data["first_run"] = false        # sequence allee au bout : on ne la rejoue plus
+	SaveManager.save_data()
+
+## La SURCHARGE est la SEULE action manuelle du jeu, et son effet est enorme — 8 s
+## d'invincibilite, vitesse doublee, aimant a XP global et rayon d'energie continu — mais rien
+## a l'ecran ne le disait : le bouton affiche juste « SURCHARGE ». Explique une fois, la
+## premiere fois que la jauge se remplit.
+func _on_overdrive_hint(v: float) -> void:
+	if _bot or _headless or v < 1.0:
+		return
+	if bool(SaveManager.data.get("seen_od_hint", false)):
+		return
+	SaveManager.data["seen_od_hint"] = true
+	SaveManager.save_data()
+	show_hint("SURCHARGE prête : appuyez pour 8 s d'invincibilité, vitesse doublée et aimant total.",
+		Color(1.0, 0.82, 0.32), 5.5)
+
 func _flash_sprite(pos: Vector2, color: Color, size: float, dur: float) -> void:
 	var s: Sprite2D = Sprite2D.new()
 	s.texture = Tex.glow(color, 64)
@@ -1562,13 +1690,52 @@ func _open_draft() -> void:
 	get_tree().paused = true
 	hud.show_draft(_cards, _rerolls, _banishes)
 	if _headless:
-		print("[game] DRAFT opened (level %d) — 3 cards" % GameState.level)
+		var noms: Array = []
+		for c in _cards:
+			noms.append(String(c.get("name", "?")))
+		print("[game] DRAFT opened (level %d) — %s" % [GameState.level, " | ".join(noms)])
+
+## Nombre d'emplacements, comme les references du genre : Vampire Survivors plafonne
+## strictement a 6 armes + 6 objets passifs, Survivor.io a ~5-6 + 6. MECHA-FORGE n'avait
+## AUCUN plafond : on pouvait tout accumuler (9 armes + les 6 systemes d'aide + tous les
+## passifs). Or si l'on peut tout prendre, choisir n'engage plus rien — et le tirage de
+## cartes est le coeur du genre. Une fois un emplacement plein, les cartes qui ouvriraient
+## une NOUVELLE ligne disparaissent du tirage ; celles qui font MONTER ce qu'on possede
+## deja restent, ainsi que les evolutions (qui remplacent une arme, sans en ajouter).
+const MAX_ACTIFS: int = 6     # armes + systemes d'aide (aura, drone, lame, orbe, arc, brasier)
+const MAX_PASSIFS: int = 6    # lignes de bonus distinctes (degats, vitesse, PV, ...)
+
+## Emplacements occupes par categorie. L'arme de depart compte : elle occupe un actif sans
+## avoir jamais ete tiree comme carte.
+func _slots_used(cat: String) -> int:
+	var n: int = 0
+	for id: String in _passives:
+		if _card_cat({"id": id}) == cat:
+			n += 1
+	if cat == "act":
+		n += 1
+	return n
 
 func _draw_cards() -> void:
+	var act_plein: bool = _slots_used("act") >= MAX_ACTIFS
+	var pas_plein: bool = _slots_used("pas") >= MAX_PASSIFS
 	var pool: Array = []
+	var replis: Array = []      # cartes ecartees par le plafond : filet si le pool est trop maigre
 	for u: Dictionary in UPGRADES:
-		if not _banished.has(u["id"]):
+		if _banished.has(u["id"]):
+			continue
+		var uid: String = String(u["id"])
+		var neuve: bool = not _passives.has(uid)
+		var bloquee: bool = neuve and ((_card_cat(u) == "act" and act_plein) or (_card_cat(u) == "pas" and pas_plein))
+		if bloquee:
+			replis.append(u)
+		else:
 			pool.append(u)
+	# Filet de securite : si tout est plafonne ou banni, on ne doit JAMAIS afficher un draft
+	# vide — le joueur resterait bloque sur un panneau sans carte, jeu en pause.
+	if pool.size() < 3:
+		replis.shuffle()
+		pool += replis
 	pool.shuffle()
 	_cards = pool.slice(0, 3)
 	# DIVERSITE legere : eviter 3 cartes de la meme categorie (actives vs passifs) -> build plus riche

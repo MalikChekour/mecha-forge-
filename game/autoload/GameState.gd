@@ -98,15 +98,25 @@ var meta_od: float = 0.0
 ## d'equipement — pourtant entierement code — ne servait a rien.
 ## Les planches d'animation d'autres chassis EXISTENT dans assets/mecha/. Verification faite
 ## image par image (4 directions x idle/walk/attack/die) avant d'en ajouter :
-##   • bluestrike  -> 24/24 planches, propre dans les 4 directions  => AJOUTE
-##   • george      -> 24/24 mais les vues de PROFIL sont ratees (mecha effondre)  => ecarte
-##   • darkstar    -> art minuscule et duplique dans sa cellule                   => ecarte
-##   • new_mecha   -> art minuscule                                              => ecarte
-## Les trois ecartes redeviendront jouables des que leurs bakes seront refaits : il n'y a
-## qu'une ligne a ajouter ici, le reste du garage marche deja.
+## CHASSIS JOUABLES. Verification faite CADRE PAR CADRE, en grand, sur les 8 images de
+## chaque animation et les 4 directions — et NON sur la premiere vignette, ce qui m'avait
+## fait conclure a tort qu'une planche etait bonne.
+##   • vortex     -> 24/24 planches propres                                   => OK
+##   • bluestrike -> le bake JOUEUR avait les bras vers l'ARRIERE en vue de face (releve par
+##                   le patron) et un profil recroqueville. Il existe une version CORRIGEE,
+##                   celle dont derivent les ennemis bs_<biome> : bras bas et EN AVANT, arme
+##                   tenue devant. Source : meshy_in/bluestrike_eyebase/walk_<dir>.png, la
+##                   base neutre que tools/recolor_biomes_to_game.py repeint par biome.
+##                   Les 4 planches de MARCHE corrigees ont remplace les anciennes ; les
+##                   autres animations ont ete mises de cote dans
+##                   _backup_bluestrike_bras_arriere/ pour que la chaine de repli de
+##                   DirectionalMecha (voir _paths()) retombe sur la marche corrigee.
+##                   => le chassis est toujours bien pose, jamais bras en arriere.      => OK
+##   • george / mecha_joueur / darkstar / new_mecha -> bakes rates (mecha effondre de
+##                   profil, poses incoherentes, art minuscule)                 => ecartes
 const MECHS: Array = [
 	{"id": "vortex",     "name": "VORTEX",     "cost": 0,    "weapons": ["autocannon"], "hp": 20.0, "dmg": 1.20, "speed": 1.05, "crit": 0.08, "desc": "Prototype VORTEX — armure noire, néon cyan, cœur orange, visée 360°"},
-	{"id": "bluestrike", "name": "BLUESTRIKE", "cost": 1400, "weapons": ["disperseur"], "hp": 6.0,  "dmg": 1.05, "speed": 1.24, "crit": 0.15, "desc": "Eclaireur BLUESTRIKE — blindage leger, tres rapide, gerbe courte portee. Frappe et se replie."},
+	{"id": "bluestrike", "name": "BLUESTRIKE", "cost": 1400, "weapons": ["disperseur"], "hp": 6.0,  "dmg": 1.05, "speed": 1.24, "crit": 0.15, "desc": "Eclaireur BLUESTRIKE — blindage leger, tres rapide, gerbe a courte portee. Frappe et se replie."},
 ]
 
 static func mech_def(id: String) -> Dictionary:
