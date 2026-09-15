@@ -49,7 +49,15 @@ func reset() -> void:
 	active = []
 
 ## Tire des protocoles pour le run. n<0 -> 1-2 aléatoire (majorité de 2), catégories DISTINCTES.
+## 🚨 BANC DE MESURE : `-- --no-protocols` desactive le tirage.
+## Les protocoles multiplient au hasard le nombre d'ennemis (jusqu'a x2,4), leurs PV (x2,1) et
+## leurs degats (x1,6). Sur un echantillon de 3 parties par difficulte, cette variance ECRASE
+## tout effet qu'on cherche a mesurer : c'est ce qui m'a empeche de conclure sur l'esquive.
+## Hors banc (jeu normal) ils restent evidemment actifs : c'est eux qui font varier les parties.
 func roll(n: int = -1) -> void:
+	if OS.get_cmdline_user_args().has("--no-protocols"):
+		reset()     # remet TOUS les multiplicateurs a 1.0 et vide la liste active
+		return
 	reset()
 	var pool: Array = CATALOG.duplicate()
 	pool.shuffle()

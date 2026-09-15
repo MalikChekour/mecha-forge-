@@ -94,6 +94,35 @@ var _mark: Sprite2D = null       # anneau au sol « c'est toi » (lisibilite en 
 var _mark_in: Sprite2D = null    # second anneau, plus serre
 var _mark_top: Sprite2D = null   # chevron au-dessus du chassis
 var _hurt_t: float = 0.0         # minuterie du flash rouge quand on encaisse
+
+## --- ESQUIVE ------------------------------------------------------------------------------
+## 🚨 Reproche le plus dur du testeur equilibrage : « une erreur ne se paie pas, elle se
+## punit ». Deux ennemis colles vident la barre en quelques secondes et le joueur n'a AUCUNE
+## sortie — la seule action manuelle du jeu est la SURCHARGE, qui se merite. L'esquive donne
+## une porte de sortie sans toucher aux degats ni aux PV, donc sans regler des nombres a
+## l'aveugle (ce que je refuse de faire depuis une machine sans GPU).
+## Declenchement : un COUP DE POUCE sec sur le stick de deplacement (idee reprise d'un clone
+## Survivor.io) — aucun bouton en plus, ce qui compte sur un ecran deja charge. Au clavier :
+## MAJ. L'origine du glissement est re-ancree en continu tant que le doigt bouge lentement,
+## sinon un long deplacement normal serait pris pour un coup de pouce.
+## 🚨 REGLAGE ISSU DE LA MESURE, pas d'une intuition. Le banc a 3 bras (72 parties) a montre
+## que le COUT de la ruee est le pilotage verrouille : dans un champ dense, plus le bot esquive
+## plus vite il meurt (DIFFICILE, aucun survivant donc aucune censure : 70 s sans esquive,
+## 56 s en reactif, 38 s en anticipe). On raccourcit donc le temps AVEUGLE de 22 % en
+## compensant par la vitesse : distance quasi identique (188 px contre 196), mais on reprend
+## la main plus tot. L'invulnerabilite couvre toujours la ruee entiere plus une marge.
+const DASH_DUR: float = 0.14      # duree de la ruee (etait 0,18 : trop long a l'aveugle)
+const DASH_MULT: float = 4.2      # ~188 px parcourus : de quoi sortir d'un corps a corps
+const DASH_CD: float = 2.2        # temps de rechargement
+const DASH_IFRAME: float = 0.28   # invulnerabilite : la ruee TRAVERSE, sinon elle ne sert a rien
+const FLICK_PX: float = 105.0     # distance minimale du coup de pouce
+const FLICK_MS: int = 260         # ... parcourue en moins de ce temps
+var _dash_t: float = 0.0
+var _dash_cd: float = 0.0
+var _dash_dir: Vector2 = Vector2.ZERO
+var _flick_from: Vector2 = Vector2.ZERO
+var _flick_ms: int = 0
+var _shift_was: bool = false
 ## Le chassis du joueur est legerement SUR-EXPOSE en permanence.
 ## 🚨 « les ennemis sont meme PLUS colores (liseres magenta ou cyan vifs) que le heros
 ## (acier sombre a liseres orange discrets) » — testeur sensations. Un heros plus clair que
@@ -345,9 +374,21 @@ func _physics_process(delta: float) -> void:
 		GameState.tick_overdrive_cd(delta)
 
 	_iframe = maxf(0.0, _iframe - delta)
+	_dash_cd = maxf(0.0, _dash_cd - delta)
 	field_slow = minf(1.0, field_slow + delta * 2.5)   # recover when out of a slow field
+	# MAJ = esquive au clavier (l'espace sert deja a la SURCHARGE)
+	var sh: bool = Input.is_key_pressed(KEY_SHIFT)
+	if sh and not _shift_was:
+		dash(_move_input())
+	_shift_was = sh
 	var mv: Vector2 = _move_input()
-	velocity = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0)   # Overdrive = x2 speed
+	if _dash_t > 0.0:
+		_dash_t -= delta
+		# pendant la ruee on ignore l'entree : la direction est verrouillee au declenchement,
+		# sinon on pourrait s'arreter en plein elan et l'esquive ne vaudrait rien.
+		velocity = _dash_dir * base_speed * DASH_MULT * field_slow
+	else:
+		velocity = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0)   # Overdrive = x2 speed
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
@@ -1010,6 +1051,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			_stick_id = e.index
 			_stick_origin = e.position
 			_stick_vec = Vector2.ZERO
+			_flick_from = e.position
+			_flick_ms = Time.get_ticks_msec()
 		elif e.pressed and _aim_stick_id == -1 and e.position.x >= get_viewport_rect().size.x * 0.55:
 			_aim_stick_id = e.index
 			_aim_stick_origin = e.position
@@ -1022,6 +1065,17 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e is InputEventScreenDrag:
 		if e.index == _stick_id:
 			_stick_vec = (e.position - _stick_origin).limit_length(80.0) / 80.0
+			# COUP DE POUCE : on mesure depuis une origine RE-ANCREE en continu. Sans ce
+			# re-ancrage, n'importe quel deplacement long finirait par depasser le seuil et
+			# declencherait une esquive involontaire.
+			var ms: int = Time.get_ticks_msec()
+			if _flick_from.distance_to(e.position) >= FLICK_PX and (ms - _flick_ms) <= FLICK_MS:
+				dash(e.position - _flick_from)
+				_flick_from = e.position
+				_flick_ms = ms
+			elif (ms - _flick_ms) > FLICK_MS:
+				_flick_from = e.position
+				_flick_ms = ms
 		elif e.index == _aim_stick_id:
 			var d: Vector2 = e.position - _aim_stick_origin
 			if d.length() > 10.0:
@@ -1069,6 +1123,30 @@ func _update_marker(delta: float) -> void:
 		if mecha != null and mecha.has_method("set_tint"):
 			var f: float = _hurt_t / 0.30
 			mecha.set_tint(BASE_TINT.lerp(Color(2.6, 0.48, 0.40), clampf(f, 0.0, 1.0)))
+
+## Ruee dans `dir` (ou dans la visee si le joueur est a l'arret). Invulnerable pendant la
+## ruee : une esquive qui ne traverse pas ne sort de rien.
+func dash(dir: Vector2) -> void:
+	# `-- --no-dash` : banc de mesure uniquement, pour comparer le jeu AVEC et SANS esquive
+	# dans des conditions par ailleurs identiques.
+	if OS.get_cmdline_user_args().has("--no-dash"):
+		return
+	if _dash_cd > 0.0 or _dash_t > 0.0 or not GameState.alive or transformed:
+		return
+	var d: Vector2 = dir
+	if d.length() < 0.15:
+		d = aim_dir if aim_dir != Vector2.ZERO else Vector2.RIGHT
+	_dash_dir = d.normalized()
+	_dash_t = DASH_DUR
+	_dash_cd = DASH_CD
+	grant_invuln(DASH_IFRAME)
+	Audio.sfx("overdrive", 0.18)   # souffle de propulseur : il n'y a pas de son « dash » dedie
+	if mecha != null and mecha.has_method("set_facing_from"):
+		mecha.set_facing_from(_dash_dir)
+	if game != null and game.has_method("spawn_vfx"):
+		game.spawn_vfx("shockwave", global_position, 0.0, 0.5, Color(0.65, 0.95, 1.0))
+	if game != null and game.has_method("dash_trail"):
+		game.dash_trail(global_position, _dash_dir)
 
 func take_damage(amount: float) -> void:
 	if _iframe > 0.0 or not GameState.alive:

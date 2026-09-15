@@ -99,6 +99,7 @@ func _frames_budget() -> int:
 @onready var _perf: bool = OS.get_cmdline_user_args().has("--perf")
 var _perf_last_obj: int = 0
 var _maps_cleared: int = 0       # zones cleared (each = a permanent difficulty step up)
+var _mort_t: float = 0.0         # temps ecoule depuis la mort (arret anticipe du banc headless)
 var _bot: bool = false
 var _frames: int = 0
 var _draft_open: bool = false
@@ -241,6 +242,7 @@ func _ready() -> void:
 	Events.player_died.connect(_on_player_died)
 	Events.run_won.connect(_on_run_won)
 	Events.overdrive_changed.connect(_on_overdrive_hint)   # explique la SURCHARGE la 1re fois
+	Events.player_damaged.connect(_on_damage_hint)         # ... et l'ESQUIVE quand on souffre
 	if _headless:
 		Events.player_transformed.connect(func(on: bool) -> void: print("[game] TRANSFORM ", on))
 		Events.run_won.connect(func() -> void: print("[game] VICTORY"))
@@ -1398,6 +1400,20 @@ func _first_run_hints() -> void:
 ## d'invincibilite, vitesse doublee, aimant a XP global et rayon d'energie continu — mais rien
 ## a l'ecran ne le disait : le bouton affiche juste « SURCHARGE ». Explique une fois, la
 ## premiere fois que la jauge se remplit.
+## L'ESQUIVE s'enseigne au moment ou elle sert : la premiere fois que la vie passe sous la
+## moitie. Un geste (coup de pouce sur le stick) ne se devine pas, et l'annoncer au demarrage
+## avec les autres indices le noierait dans le lot — alors qu'ici le joueur a le probleme
+## sous les yeux.
+func _on_damage_hint(hp: float, mx: float) -> void:
+	if _bot or _headless or mx <= 0.0 or hp / mx > 0.5:
+		return
+	if bool(SaveManager.data.get("seen_dash_hint", false)):
+		return
+	SaveManager.data["seen_dash_hint"] = true
+	SaveManager.save_data()
+	show_hint("Un COUP DE POUCE sec sur le stick (ou MAJ) = ESQUIVE : elle traverse les ennemis.",
+		Color(0.62, 0.95, 1.0), 5.5)
+
 func _on_overdrive_hint(v: float) -> void:
 	if _bot or _headless or v < 1.0:
 		return
@@ -1407,6 +1423,16 @@ func _on_overdrive_hint(v: float) -> void:
 	SaveManager.save_data()
 	show_hint("SURCHARGE prête : appuyez pour 8 s d'invincibilité, vitesse doublée et aimant total.",
 		Color(1.0, 0.82, 0.32), 5.5)
+
+## Sillage de l'esquive : une trainee dans l'axe de la ruee. C'est ce qui rend l'esquive
+## LISIBLE — sans elle on voit juste le mecha se teleporter de 200 px.
+func dash_trail(pos: Vector2, dir: Vector2) -> void:
+	if _headless:
+		return
+	var c: Color = Color(0.62, 0.95, 1.0)
+	_streak(pos, dir, c, 190.0, 26.0, 0.22)
+	_streak(pos, dir, Color(1, 1, 1), 150.0, 9.0, 0.16)   # coeur blanc dans la trainee
+	_ring(pos, c, 12.0, 74.0, 0.24)
 
 func _flash_sprite(pos: Vector2, color: Color, size: float, dur: float) -> void:
 	var s: Sprite2D = Sprite2D.new()
@@ -1716,6 +1742,26 @@ func _slots_used(cat: String) -> int:
 		n += 1
 	return n
 
+## Nom lisible d'une arme (le catalogue GameState.WEAPONS porte les libelles francais).
+func _nom_arme(wid: String) -> String:
+	for w in GameState.WEAPONS:
+		if String(w["id"]) == wid:
+			return String(w["name"])
+	return wid
+
+## Ce que le PROCHAIN niveau de cette arme apporte, calcule depuis les formules reelles.
+## Voir WeaponSystem : degats = BASE_MULT * (1 + (niv-1) * 0.25), recharge *= 0.85 a chaque
+## montee, et le rayon des armes de zone croit de 16 % par niveau.
+func _gain_niveau(wid: String, lv: int) -> String:
+	if lv >= WeaponSystem.MAX_LEVEL:
+		return "NIVEAU MAX"
+	# 🚨 seule la 1re chaine passe par l'operateur % : elle seule doit doubler son signe pour
+	# cent. Les litterales qui suivent s'ecrivent avec UN seul %, sinon on affiche « 15%% ».
+	var bouts: Array = ["Niv.%d : +25%% degats" % (lv + 1), "tir 15% plus rapide"]
+	if WeaponSystem.AOE.has(wid):
+		bouts.append("+16% de rayon")
+	return ", ".join(bouts)
+
 func _draw_cards() -> void:
 	var act_plein: bool = _slots_used("act") >= MAX_ACTIFS
 	var pas_plein: bool = _slots_used("pas") >= MAX_PASSIFS
@@ -1757,18 +1803,33 @@ func _draw_cards() -> void:
 	if not evos.is_empty():
 		evos.shuffle()
 		_cards = (evos.slice(0, mini(evos.size(), 3)) + _cards).slice(0, 3)
-	# annotate weapon cards with the current owned level (duplicate so the const UPGRADES pool is never mutated)
+	# Annoter les cartes d'arme avec CE QUE LE NIVEAU SUIVANT APPORTE.
+	# 🚨 La carte disait seulement « Arme : Railgun percant (Niv.2) » : le joueur ne pouvait pas
+	# savoir ce que monter cette arme lui rapporte, donc pas arbitrer entre monter une arme et en
+	# prendre une neuve. C'est l'archetype du genre (chaque palier a son texte chez les clones de
+	# Vampire Survivors) et c'est aussi ce que la session de test reprochait : 40 % des libelles
+	# etaient opaques.
+	# Le texte est DERIVE DES FORMULES (WeaponSystem : +25 % de degats par niveau, recharge x0,85,
+	# AoE +16 %) et non ecrit a la main : il ne peut donc pas diverger du code si on reequilibre.
 	if player != null and player.has_method("weapons"):
 		var ws2: WeaponSystem = player.weapons()
 		if ws2 != null:
 			for i in _cards.size():
-				var wid: String = String(_WEAPON_CARD.get(String(_cards[i].get("id", "")), ""))
+				var cid: String = String(_cards[i].get("id", ""))
+				var wid: String = String(_WEAPON_CARD.get(cid, ""))
 				if wid != "":
 					var lv: int = ws2.weapon_level(wid)
 					if lv > 0:
 						var c: Dictionary = (_cards[i] as Dictionary).duplicate()
-						c["name"] = "%s  (Niv.%d)" % [String(c["name"]), lv]
+						c["name"] = "%s   —   %s" % [String(c["name"]), _gain_niveau(wid, lv)]
 						_cards[i] = c
+				elif cid.begins_with("evo_"):
+					# Le mot « EVOLUTION » n'etait explique nulle part : on dit ce qu'il fait.
+					var base_id: String = cid.substr(4)
+					var c2: Dictionary = (_cards[i] as Dictionary).duplicate()
+					c2["name"] = "%s   —   remplace %s et demarre au niveau max" % [
+						String(c2["name"]), _nom_arme(base_id)]
+					_cards[i] = c2
 
 ## Categorie d'une carte : "act" = arme/competence active, "pas" = passif/stat. Sert a diversifier le draft.
 func _card_cat(c: Dictionary) -> String:
@@ -2025,6 +2086,15 @@ func _process(delta: float) -> void:
 				_frames, GameState.run_time, GameState.level, GameState.xp, GameState.xp_to_next,
 				GameState.kills, player.hp, get_tree().get_nodes_in_group("enemies").size(),
 				get_tree().get_nodes_in_group("pickups").size()])
+		# 🚨 La partie headless continuait jusqu'au budget d'images MEME APRES LA MORT : sur une
+		# partie ou le bot meurt a 42 s pour un budget de 210 s, on brulait 80 % du temps de
+		# simulation a re-imprimer la meme ligne. Sur un banc de 12 parties c'est plus d'une
+		# heure perdue. On s'arrete 1,5 s apres la mort : la mesure est finie, le reste est du
+		# vide. (Le budget reste la borne haute pour les parties ou le bot survit.)
+		if _headless and not GameState.alive:
+			_mort_t += get_process_delta_time()
+			if _mort_t >= 1.5:
+				_finish_headless()
 		if _headless and _frames >= _headless_frames:
 			_finish_headless()
 
@@ -2039,13 +2109,59 @@ func _drive_bot() -> void:
 		player.bot_move = Vector2.ZERO
 		return
 	var strafe: Vector2 = Vector2(cos(GameState.run_time * 2.0), sin(GameState.run_time * 2.0)) * 0.35
-	# dodge a close enemy; otherwise go collect the nearest XP gem (to exercise level-up)
-	var near: Node2D = player._nearest_enemy()
+	# --- MENACE : on fuit la MASSE, pas le plus proche -------------------------------------
+	# 🚨 Le bot ne regardait QUE l'ennemi le plus proche (< 140 px). Dans une horde, s'ecarter
+	# d'un seul ennemi, c'est foncer dans les autres — et la ruee verrouille la direction
+	# pendant 0,18 s, donc une mauvaise direction coute cher. Mesure : l'ajout de l'esquive
+	# n'avait RIEN ameliore (mediane 38 s -> 34 s sur 12 parties) precisement pour cette
+	# raison ; l'esquive ne vaut que si la direction est CHOISIE.
+	# On calcule donc une repulsion ponderee par l'inverse de la distance sur tous les
+	# ennemis proches : le resultat pointe vers l'espace libre.
+	var pp: Vector2 = player.global_position
+	var repulse: Vector2 = Vector2.ZERO
+	var serres: int = 0
+	var plus_proche: float = 1.0e12
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not (e is Node2D):
+			continue
+		var v: Vector2 = pp - (e as Node2D).global_position
+		var dd: float = v.length()
+		if dd < 260.0 and dd > 1.0:
+			repulse += v / (dd * dd)      # 1/d : les colles pesent bien plus que les lointains
+			plus_proche = minf(plus_proche, dd)
+			if dd < 150.0:
+				serres += 1
 	var danger: Vector2 = Vector2.ZERO
-	if near != null:
-		var v: Vector2 = player.global_position - near.global_position
-		if v.length() < 140.0:
-			danger = v.normalized()
+	if repulse != Vector2.ZERO and plus_proche < 170.0:
+		danger = repulse.normalized()
+	# L'esquive ne se declenche pas par reflexe sur cooldown : seulement quand on est REELLEMENT
+	# pris (plusieurs ennemis serres, ou un contact imminent), et TOUJOURS vers l'espace libre.
+	# Deux politiques d'esquive, pour tester une HYPOTHESE et non pour regler le jeu :
+	#   reactive (defaut) : on esquive une fois PRIS (colle, ou 2 ennemis serres)
+	#   anticipee (`--dash-anticipe`) : on esquive pendant qu'ils CONVERGENT, avant le contact
+	# Hypothese : l'esquive ne rapporte que si la direction est choisie a l'avance. Reactive,
+	# elle achete de la distance mais coute 0,18 s de pilotage — a peu pres un match nul, ce
+	# que l'A/B a effectivement montre. Si l'hypothese tient, la version anticipee doit, elle,
+	# faire une difference nette. Sinon, c'est mon explication qui est fausse.
+	# --- L'ESQUIVE ET LE BOT : resultat mesure, contre-intuitif -----------------------------
+	# 🚨 Le bot du banc N'ESQUIVE PLUS par defaut. Banc a 3 bras, 72 parties, protocoles
+	# neutralises. Cas le plus propre (DIFFICILE, n=6 par bras, AUCUN survivant donc aucune
+	# censure) : mort mediane SANS esquive 70 s, esquive REACTIVE 56 s, esquive ANTICIPEE 38 s
+	# — et niveau atteint 7 / 6 / 4. Ordre MONOTONE : plus le bot esquive, plus vite il meurt.
+	# J'avais fait la prediction inverse (« l'esquive ne paie que si elle est anticipee ») :
+	# elle est refutee. Mecanisme retenu : la ruee verrouille la direction 0,18 s ; dans un
+	# champ dense, ce pilotage perdu coute plus que les ~200 px gagnes, et esquiver plus
+	# souvent aggrave le compte.
+	# Consequence pour la MESURE : un bot qui esquive biaise tous les futurs releves
+	# d'equilibrage vers le bas. Il ne le fait donc que sur demande explicite.
+	# Consequence pour le JEU : rien. Un humain se rue pour franchir un trou, couper une
+	# charge telegraphiee ou aller chercher une grappe de gemmes — trois usages que ce bot
+	# n'a pas. L'esquive reste offerte au joueur ; elle n'est simplement PAS prouvee.
+	if danger != Vector2.ZERO and player.has_method("dash") 			and OS.get_cmdline_user_args().has("--dash-bot"):
+		var anticipe: bool = OS.get_cmdline_user_args().has("--dash-anticipe")
+		var declenche: bool = (serres >= 3 and plus_proche < 230.0) if anticipe 			else (serres >= 2 or plus_proche < 90.0)
+		if declenche:
+			player.dash(danger)
 	var move: Vector2 = danger
 	if danger == Vector2.ZERO:
 		var gem: Node2D = _nearest_pickup()
