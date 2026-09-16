@@ -149,33 +149,20 @@ const MECHS: Array = [
 		"sig_muzzle": ["fire_blast", 0.40],
 		"ligne": "SOUFFLE RAPPROCHÉ — sature, disloque, se replie.",
 		"desc": "Éclaireur léger, très rapide, gerbe à courte portée. Frappe et se replie."},
-	# --- PHASE DE TEST : ces trois chassis sont GRATUITS et possedes d'office ------------
-	# 🚨 Consigne patron : « titan et vanguard 1 et 2 que je dois pouvoir jouer gratuitement
-	# pour la phase de test ». Leur cout est a 0, et SaveManager les accorde automatiquement
-	# (tout chassis a cout 0 est possede — voir _accorde_chassis_gratuits). Remettre un prix
-	# ici suffira a les faire repasser payants, sans autre modification.
-	{"id": "vanguard", "name": "VANGUARD", "cost": 0,
-		"weapons": ["missilepod"], "hp": 28.0, "dmg": 1.10, "speed": 1.00, "crit": 0.09,
-		"arsenal": ["missilepod", "plasma", "ricochet", "disperseur", "autocannon"],
-		"signature": "missilepod", "accent": Color(1.00, 0.38, 0.22),
-		"sig_muzzle": ["fire_blast", 0.48],
-		"ligne": "SATURATION — le ciel retombe sur eux.",
-		"desc": "Plateforme d'appui. Ogives chercheuses en gerbe, dégâts de zone."},
-	{"id": "vanguard2", "name": "VANGUARD II", "cost": 0,
-		"weapons": ["faisceau"], "hp": 16.0, "dmg": 1.28, "speed": 1.10, "crit": 0.12,
-		"arsenal": ["faisceau", "railgun", "plasma", "disque", "autocannon"],
-		"signature": "faisceau", "accent": Color(1.00, 0.35, 0.62),
-		"sig_muzzle": ["aaa_charge", 0.50],
-		"ligne": "RAYON CONTINU — ne vise pas, balaie.",
-		"desc": "Évolution du VANGUARD. Rayon continu : reste aligné et tout fond."},
-	{"id": "titan", "name": "TITAN", "cost": 0,
-		"weapons": ["plasma"], "hp": 52.0, "dmg": 1.05, "speed": 0.86, "crit": 0.06,
-		"arsenal": ["plasma", "missilepod", "sabre", "disperseur", "railgun"],
-		"signature": "plasma", "accent": Color(0.80, 0.34, 1.00),
-		"sig_muzzle": ["aaa_charge", 0.58],
-		"ligne": "MASSE — il encaisse, puis il efface la zone.",
-		"desc": "Le plus lourd du parc. Lent, très résistant, dégâts de zone violets."},
 ]
+
+## 🚨 CHASSIS ECARTES, et pourquoi — a lire avant d'en rajouter un.
+## Le depot contient dix autres mechas. Verification faite CADRE PAR CADRE (8 images x 4
+## directions, en grand — pas sur la premiere vignette, erreur que j'ai deja commise ici) :
+##   • valiant / vanguard / vanguard2 / titan / pilot / mecha_joueur : essayes en jeu, ecartes
+##     par le patron apres examen des planches. Ils ont un rigged.glb dans meshy_in/, donc ils
+##     sont RE-BAKABLES proprement si on veut y revenir (Cycles CPU, ~1 h 30 par chassis ;
+##     le module bpy est installe, aucun GPU n'est necessaire).
+##   • george / darkstar / new_mecha / lourd : AUCUN modele source dans meshy_in. Leurs bakes
+##     rates (mecha effondre de profil, art minuscule) ne sont re-rendables sur AUCUNE machine.
+##     Il faudrait les remodeliser, pas les re-rendre.
+## Ajouter un chassis = une ligne ci-dessus. Ce qui le distingue vraiment, c'est sa SIGNATURE
+## (arme boostee + accent + effet de bouche), pas la liste de sa gamme.
 
 ## Les 5 armes que ce chassis peut piocher. Repli : tout l'arsenal historique, pour qu'un
 ## chassis ajoute sans champ « arsenal » reste jouable au lieu de n'avoir aucune arme.
