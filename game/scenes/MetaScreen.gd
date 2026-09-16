@@ -391,7 +391,10 @@ func _build_home() -> void:
 		["ARSENAL", _build_arsenal, Color(0.55, 0.4, 0.22)],
 		["EQUIPEMENT", _build_gear, Color(0.42, 0.34, 0.6)],
 		["GARAGE", _build_garage, Color(0.24, 0.42, 0.62)],
-		["QUOTIDIEN", _build_daily, Color(0.24, 0.5, 0.37)],
+		# 🚨 une pastille quand une recompense du jour ou une quete terminee attend : sans elle,
+		# le crochet de retention existe dans le code mais aucun joueur ne le voit.
+		["QUOTIDIEN" + ("   •  A RECLAMER" if SaveManager.quotidien_a_reclamer() else ""),
+			_build_daily, Color(0.24, 0.5, 0.37)],
 		["HISTOIRE", _play_story, Color(0.6, 0.3, 0.24)],
 		# 🚨 les reglages (musique, bruitages, auto-visee, ecran, mode SANS FIN) n'etaient
 		# joignables que par un ecran JAMAIS ouvert : couper la musique imposait de lancer
@@ -677,6 +680,7 @@ func _build_shop() -> void:
 	# l'atteindre — testeur « nouveau joueur »). Dans un survivor-like la boucle vit sur la
 	# re-entree immediate : l'action la plus probable passe en TETE, juste sous le score.
 	if not _home:
+		_prochain_objectif(v)
 		_big_button(v, "REJOUER", _replay_now, Color(0.2, 0.6, 0.95))
 		_big_button(v, "MENU PRINCIPAL", _replay, Color(0.4, 0.4, 0.5))
 		var sp0: Control = Control.new()
@@ -725,6 +729,41 @@ func _build_shop() -> void:
 		_big_button(v, "JOUER", _on_play, Color(0.2, 0.7, 0.4))
 	# REJOUER / MENU PRINCIPAL sont desormais places EN HAUT (voir plus haut) : les repeter
 	# ici ferait deux boutons identiques dans le meme ecran.
+
+## OU EN SUIS-JE de mon prochain achat ?
+## 🚨 L'ecran de fin affichait le gain de la partie mais jamais la CIBLE : le joueur ne savait
+## pas s'il etait a 40 ou a 1200 ferraille du prochain chassis, donc relancer n'avait pas
+## d'objectif chiffre. On annonce l'achat atteignable le plus proche, avec ce qui manque.
+func _prochain_objectif(v: VBoxContainer) -> void:
+	var scrap: int = int(SaveManager.data.get("meta_scrap", 0))
+	var sp: int = SaveManager.sp()
+	# 1) un chassis non possede (la depense la plus lourde, donc le meilleur objectif)
+	for m: Dictionary in GameState.MECHS:
+		var mid: String = String(m["id"])
+		var cout: int = int(m["cost"])
+		if cout > 0 and not SaveManager.owns_mech(mid):
+			var reste: int = cout - scrap
+			if reste > 0:
+				_title(v, "Encore %d ferraille pour %s" % [reste, String(m["name"])], Color(1.0, 0.82, 0.35), 18)
+			else:
+				_title(v, "%s est ACHETABLE au GARAGE" % String(m["name"]), Color(0.5, 1.0, 0.6), 18)
+			return
+	# 2) sinon, l'arme la moins chere encore verrouillee dans la gamme du chassis equipe
+	var gamme: Array = GameState.mech_arsenal(SaveManager.equipped_mech())
+	var best: Dictionary = {}
+	for w: Dictionary in GameState.WEAPONS:
+		var wid: String = String(w["id"])
+		if not gamme.has(wid) or SaveManager.weapon_unlocked(wid):
+			continue
+		if best.is_empty() or int(w["cost"]) < int(best["cost"]):
+			best = w
+	if not best.is_empty():
+		var manque: int = int(best["cost"]) - sp
+		if manque > 0:
+			_title(v, "Encore %d point%s pour %s" % [manque, "s" if manque > 1 else "", String(best["name"])],
+				Color(0.55, 0.9, 1.0), 18)
+		else:
+			_title(v, "%s est debloquable a l'ARSENAL" % String(best["name"]), Color(0.5, 1.0, 0.6), 18)
 
 ## Currencies strip: banked ferraille (soft) + crystals/cores (reserved for the gacha & forge).
 func _currency_row(v: VBoxContainer) -> void:

@@ -105,6 +105,9 @@ const _DIRS: Array[String] = ["front", "back", "left", "right"]
 const _ACCEL: float = 700.0
 const _SEP_RADIUS: float = 50.0
 const _SEP_FORCE: float = 200.0
+const _SEP_SCAN: int = 26      # entrees examinees par image (cout borne, meme a 220 ennemis)
+const _SEP_MAX: int = 8        # voisins REELLEMENT proches retenus
+var _sep_cursor: int = 0       # curseur tournant : sur quelques images, tout le voisinage est vu
 const _WANDER_STR: float = 9.0
 
 # Dasher phases
@@ -571,30 +574,46 @@ func _physics_process(delta: float) -> void:
 							_bull_mod0 = self_modulate       # memorise la teinte de base
 							Enemy._bulls_charging += 1
 
+			# --- EVITEMENT ENTRE ENNEMIS ---------------------------------------------------
+			# 🚨 BOGUE MESURE. L'ancienne boucle s'arretait aux 10 PREMIERES ENTREES DU TABLEAU
+			# (`if count >= 10: break`, count incremente meme pour soi-meme et pour les morts).
+			# L'ordre du tableau est l'ordre d'apparition, pas la proximite : avec 46 ennemis a
+			# l'ecran, un ennemi calculait donc son evitement contre dix voisins quelconques,
+			# souvent a l'autre bout de la carte, et ignorait ceux qui le touchaient.
+			# Consequence chiffree (banc, 8 parties/palier) : a 60 s il y a 7 ennemis a l'ecran
+			# en NORMAL contre 46 en VETERAN — et le joueur a PLUS de vie en VETERAN (76 contre
+			# 66 a 30 s). Les ennemis s'empilaient et se bloquaient mutuellement au lieu de
+			# l'atteindre : la difficulte la plus haute etait devenue la plus sure (38 % de
+			# survie a 150 s contre 0 % en NORMAL).
+			# Correctif : on garde un budget borne (le cout doit rester constant a 220 ennemis)
+			# mais on BALAIE a partir d'un curseur tournant, et seuls les voisins REELLEMENT
+			# dans le rayon consomment le budget. En quelques images, chaque ennemi a donc vu
+			# son vrai voisinage.
 			var separation: Vector2 = Vector2.ZERO
-			var count: int = 0
 			var pf: int = Engine.get_physics_frames()
 			if pf != _enemies_frame:
 				_enemies_frame = pf
 				_enemies_cache = get_tree().get_nodes_in_group("enemies")   # one alloc/frame, shared
 			var enemies: Array = _enemies_cache
 			var sep_rad_sq: float = _SEP_RADIUS * _SEP_RADIUS
-			
-			for e: Node in enemies:
-				if count >= 10:
-					break
-				count += 1
-				
-				if e == self or not (e is Enemy) or not e.alive:
-					continue
-				
-				var to_other: Vector2 = global_position - e.global_position
-				var d2: float = to_other.length_squared()
-				
-				if d2 > 0.0 and d2 < sep_rad_sq:
-					var push: Vector2 = to_other.normalized()
-					var weight: float = 1.0 - (d2 / sep_rad_sq)
-					separation += push * weight
+			var nb: int = enemies.size()
+			if nb > 1:
+				var depart: int = _sep_cursor % nb
+				_sep_cursor = (_sep_cursor + 7) % nb   # pas premier : balaie tout le monde
+				var examines: int = 0
+				var retenus: int = 0
+				var i: int = 0
+				while i < nb and examines < _SEP_SCAN and retenus < _SEP_MAX:
+					var e: Node = enemies[(depart + i) % nb]
+					i += 1
+					examines += 1
+					if e == self or not (e is Enemy) or not (e as Enemy).alive:
+						continue
+					var to_other: Vector2 = global_position - (e as Node2D).global_position
+					var d2: float = to_other.length_squared()
+					if d2 > 0.0 and d2 < sep_rad_sq:
+						retenus += 1
+						separation += to_other.normalized() * (1.0 - (d2 / sep_rad_sq))
 			
 			if separation != Vector2.ZERO and _bull_state != 2:   # charge = ligne droite (non deviee)
 				desired_vel += separation * _SEP_FORCE

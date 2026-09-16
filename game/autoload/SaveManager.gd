@@ -185,6 +185,21 @@ func quest_add(id: String, amount: int) -> void:
 func quest_commit() -> void:
 	save_data()
 
+## Y a-t-il quelque chose A RECLAMER, tout de suite ? (recompense du jour ou quete terminee)
+## 🚨 Ces deux crochets de retention etaient entierement codes mais INVISIBLES : rien sur
+## l'accueil ni sur l'ecran de fin n'indiquait qu'une recompense attendait — il fallait ouvrir
+## l'ecran QUOTIDIEN pour le decouvrir. Un crochet qu'on ne voit pas ne ramene personne.
+func quotidien_a_reclamer() -> bool:
+	if daily_claimable():
+		return true
+	for q in quests():
+		if bool(q.get("claimed", false)):
+			continue
+		var def: Dictionary = quest_def(String(q.get("id", "")))
+		if not def.is_empty() and int(q.get("prog", 0)) >= int(def["target"]):
+			return true
+	return false
+
 ## Claim quest i if its target is reached. Returns the quest def (for the reward text) or {}.
 func claim_quest(i: int) -> Dictionary:
 	var qs: Array = quests()
