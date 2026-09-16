@@ -42,6 +42,40 @@ func load_data() -> void:
 			if d is Dictionary:
 				for k in d:
 					data[k] = d[k]
+	_accorde_chassis_gratuits()
+
+## Tout chassis dont le cout vaut 0 est POSSEDE d'office.
+## 🚨 Sans ca, mettre un prix a 0 ne suffirait pas : l'ecran GARAGE afficherait un bouton
+## « 0 » a cliquer, et surtout les sauvegardes DEJA EXISTANTES resteraient bloquees sur leur
+## ancienne liste (celle du patron ne connait que VORTEX). On repasse donc la liste a chaque
+## chargement : c'est ce qui rend les chassis de la phase de test immediatement jouables,
+## y compris sur une partie en cours. Remettre un prix les fait repasser payants sans autre
+## modification — ils ne sont PAS retires de owned_mechs, ce qui est le bon sens : un joueur
+## ne doit pas perdre un chassis qu'il a pu equiper.
+func _accorde_chassis_gratuits() -> void:
+	var owned: Array = data.get("owned_mechs", ["vortex"])
+	var change: bool = false
+	for m: Dictionary in GameState.MECHS:
+		var id: String = String(m["id"])
+		if int(m.get("cost", 0)) == 0 and not owned.has(id):
+			owned.append(id)
+			change = true
+	# 🚨 Si le chassis EQUIPE n'existe plus au catalogue (retire entre deux versions), on
+	# retombe sur VORTEX. Sans ca, mech_def() renverrait silencieusement les stats de VORTEX
+	# tout en affichant les sprites de l'ancien chassis : un mecha qui ne joue pas ce qu'il
+	# montre. Cas reel : trois chassis retires apres la phase d'essai du garage.
+	var eq: String = String(data.get("equipped_mech", "vortex"))
+	var connu: bool = false
+	for m2: Dictionary in GameState.MECHS:
+		if String(m2["id"]) == eq:
+			connu = true
+			break
+	if not connu:
+		data["equipped_mech"] = "vortex"
+		change = true
+	if change:
+		data["owned_mechs"] = owned
+		save_data()
 
 func save_data() -> void:
 	var f: FileAccess = FileAccess.open(PATH, FileAccess.WRITE)
