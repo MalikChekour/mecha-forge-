@@ -952,11 +952,17 @@ func _build_garage() -> void:
 			for wd in GameState.WEAPONS:
 				if String(wd["id"]) == String(wid):
 					noms.append(String(wd["name"])); break
+		# 🚨 Avec 8 chassis, trois lignes chacun rendaient le GARAGE interminable sur telephone
+		# (l'audit ergonomie le signalait deja trop dense a DEUX chassis). On garde ce qui
+		# DISTINGUE — la phrase d'identite et la gamme — et on laisse tomber la description
+		# longue, qui redisait la meme chose en plus de mots.
+		var sig_nom: String = GameState.mech_signature(id)
+		for wd in GameState.WEAPONS:
+			if String(wd["id"]) == sig_nom:
+				sig_nom = String(wd["name"]); break
 		name_l.text = "%s   —   %s
-%s
-Armes : %s   ·   signature : %s" % [
-			String(mech["name"]), String(mech.get("ligne", "")), String(mech["desc"]),
-			", ".join(noms), GameState.mech_signature(id)]
+Armes : %s      signature : %s" % [
+			String(mech["name"]), String(mech.get("ligne", "")), ", ".join(noms), sig_nom]
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_l.add_theme_font_size_override("font_size", Palette.fs(17))

@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 config/name="MECHA-FORGE"
-config/version="11.1"
+config/version="11.2"
 config/description="Fresh mecha survivor-like — 360 aim hardpoint & upright animated mecha"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.3", "Mobile")
