@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/land_tech_1.png-a98af6b89eeae8d6b74fe182f4603
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.92
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

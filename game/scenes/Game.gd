@@ -161,6 +161,18 @@ func _ready() -> void:
 	EnemyProjectile._smoke_active = 0   # reset des compteurs statiques (sinon ils fuient entre runs)
 	EnemyProjectile._active_missiles = 0
 	Enemy._bulls_charging = 0
+	Enemy._arcs_armes = 0
+	Enemy._arcs_pic = 0      # statique : sans remise a zero, le plafond d'arcs se referme d'une partie a l'autre
+	Enemy._palier_max_run = 0   # statique : sans remise a zero, la 2e partie ne tracerait rien
+	# BANC : `-- --arme=N` fige le palier d'arme des ennemis. Sans ca, verifier le palier 3
+	# demanderait de survivre 135 s a chaque essai — donc je ne le verifierais jamais.
+	Enemy._palier_force = -1
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--arme="):
+			var v: String = a.substr(7)
+			if v.is_valid_int():
+				Enemy._palier_force = clampi(int(v), 0, 3)
+				print("[game] ARME FORCEE palier=%d" % Enemy._palier_force)
 	randomize()   # vary the biome (and other RNG) per run
 	RenderingServer.set_default_clear_color(Palette.ARENA_BG)
 	GameState.reset()
@@ -242,7 +254,6 @@ func _ready() -> void:
 	Events.player_died.connect(_on_player_died)
 	Events.run_won.connect(_on_run_won)
 	Events.overdrive_changed.connect(_on_overdrive_hint)   # explique la SURCHARGE la 1re fois
-	Events.player_damaged.connect(_on_damage_hint)         # ... et l'ESQUIVE quand on souffre
 	if _headless:
 		Events.player_transformed.connect(func(on: bool) -> void: print("[game] TRANSFORM ", on))
 		Events.run_won.connect(func() -> void: print("[game] VICTORY"))
@@ -908,7 +919,7 @@ func grant_skill() -> void:
 	Audio.sfx("levelup")
 	show_banner("COMPETENCE : %s" % String(_SKILL_NAME.get(id, id)), Palette.BONUS)
 
-func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false) -> void:
+func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false, homing: float = 0.0) -> void:
 	var b: EnemyProjectile
 	if _enemy_proj_pool.is_empty():
 		b = EnemyProjectile.new()
@@ -919,6 +930,7 @@ func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Col
 	b.tint = color
 	b.size = bolt_size
 	b.missile = is_missile               # tirs lourds = missile (sprite ogive + trainee)
+	b.homing = homing                    # > 0 : palier 3 de l'arme ennemie (« TRAQUEUR »)
 	b.setup(pos, dir, dmg, bolt_speed)
 
 func recycle_enemy_bolt(b: EnemyProjectile) -> void:
@@ -1412,20 +1424,6 @@ func _first_run_hints() -> void:
 ## d'invincibilite, vitesse doublee, aimant a XP global et rayon d'energie continu — mais rien
 ## a l'ecran ne le disait : le bouton affiche juste « SURCHARGE ». Explique une fois, la
 ## premiere fois que la jauge se remplit.
-## L'ESQUIVE s'enseigne au moment ou elle sert : la premiere fois que la vie passe sous la
-## moitie. Un geste (coup de pouce sur le stick) ne se devine pas, et l'annoncer au demarrage
-## avec les autres indices le noierait dans le lot — alors qu'ici le joueur a le probleme
-## sous les yeux.
-func _on_damage_hint(hp: float, mx: float) -> void:
-	if _bot or _headless or mx <= 0.0 or hp / mx > 0.5:
-		return
-	if bool(SaveManager.data.get("seen_dash_hint", false)):
-		return
-	SaveManager.data["seen_dash_hint"] = true
-	SaveManager.save_data()
-	show_hint("Un COUP DE POUCE sec sur le stick (ou MAJ) = ESQUIVE : elle traverse les ennemis.",
-		Color(0.62, 0.95, 1.0), 5.5)
-
 func _on_overdrive_hint(v: float) -> void:
 	if _bot or _headless or v < 1.0:
 		return
@@ -1435,16 +1433,6 @@ func _on_overdrive_hint(v: float) -> void:
 	SaveManager.save_data()
 	show_hint("SURCHARGE prête : appuyez pour 8 s d'invincibilité, vitesse doublée et aimant total.",
 		Color(1.0, 0.82, 0.32), 5.5)
-
-## Sillage de l'esquive : une trainee dans l'axe de la ruee. C'est ce qui rend l'esquive
-## LISIBLE — sans elle on voit juste le mecha se teleporter de 200 px.
-func dash_trail(pos: Vector2, dir: Vector2) -> void:
-	if _headless:
-		return
-	var c: Color = Color(0.62, 0.95, 1.0)
-	_streak(pos, dir, c, 190.0, 26.0, 0.22)
-	_streak(pos, dir, Color(1, 1, 1), 150.0, 9.0, 0.16)   # coeur blanc dans la trainee
-	_ring(pos, c, 12.0, 74.0, 0.24)
 
 func _flash_sprite(pos: Vector2, color: Color, size: float, dur: float) -> void:
 	var s: Sprite2D = Sprite2D.new()
@@ -2131,10 +2119,7 @@ func _drive_bot() -> void:
 	var strafe: Vector2 = Vector2(cos(GameState.run_time * 2.0), sin(GameState.run_time * 2.0)) * 0.35
 	# --- MENACE : on fuit la MASSE, pas le plus proche -------------------------------------
 	# 🚨 Le bot ne regardait QUE l'ennemi le plus proche (< 140 px). Dans une horde, s'ecarter
-	# d'un seul ennemi, c'est foncer dans les autres — et la ruee verrouille la direction
-	# pendant 0,18 s, donc une mauvaise direction coute cher. Mesure : l'ajout de l'esquive
-	# n'avait RIEN ameliore (mediane 38 s -> 34 s sur 12 parties) precisement pour cette
-	# raison ; l'esquive ne vaut que si la direction est CHOISIE.
+	# d'un seul ennemi, c'est foncer dans les autres.
 	# On calcule donc une repulsion ponderee par l'inverse de la distance sur tous les
 	# ennemis proches : le resultat pointe vers l'espace libre.
 	var pp: Vector2 = player.global_position
@@ -2154,34 +2139,9 @@ func _drive_bot() -> void:
 	var danger: Vector2 = Vector2.ZERO
 	if repulse != Vector2.ZERO and plus_proche < 170.0:
 		danger = repulse.normalized()
-	# L'esquive ne se declenche pas par reflexe sur cooldown : seulement quand on est REELLEMENT
-	# pris (plusieurs ennemis serres, ou un contact imminent), et TOUJOURS vers l'espace libre.
-	# Deux politiques d'esquive, pour tester une HYPOTHESE et non pour regler le jeu :
-	#   reactive (defaut) : on esquive une fois PRIS (colle, ou 2 ennemis serres)
-	#   anticipee (`--dash-anticipe`) : on esquive pendant qu'ils CONVERGENT, avant le contact
-	# Hypothese : l'esquive ne rapporte que si la direction est choisie a l'avance. Reactive,
-	# elle achete de la distance mais coute 0,18 s de pilotage — a peu pres un match nul, ce
-	# que l'A/B a effectivement montre. Si l'hypothese tient, la version anticipee doit, elle,
-	# faire une difference nette. Sinon, c'est mon explication qui est fausse.
-	# --- L'ESQUIVE ET LE BOT : resultat mesure, contre-intuitif -----------------------------
-	# 🚨 Le bot du banc N'ESQUIVE PLUS par defaut. Banc a 3 bras, 72 parties, protocoles
-	# neutralises. Cas le plus propre (DIFFICILE, n=6 par bras, AUCUN survivant donc aucune
-	# censure) : mort mediane SANS esquive 70 s, esquive REACTIVE 56 s, esquive ANTICIPEE 38 s
-	# — et niveau atteint 7 / 6 / 4. Ordre MONOTONE : plus le bot esquive, plus vite il meurt.
-	# J'avais fait la prediction inverse (« l'esquive ne paie que si elle est anticipee ») :
-	# elle est refutee. Mecanisme retenu : la ruee verrouille la direction 0,18 s ; dans un
-	# champ dense, ce pilotage perdu coute plus que les ~200 px gagnes, et esquiver plus
-	# souvent aggrave le compte.
-	# Consequence pour la MESURE : un bot qui esquive biaise tous les futurs releves
-	# d'equilibrage vers le bas. Il ne le fait donc que sur demande explicite.
-	# Consequence pour le JEU : rien. Un humain se rue pour franchir un trou, couper une
-	# charge telegraphiee ou aller chercher une grappe de gemmes — trois usages que ce bot
-	# n'a pas. L'esquive reste offerte au joueur ; elle n'est simplement PAS prouvee.
-	if danger != Vector2.ZERO and player.has_method("dash") 			and OS.get_cmdline_user_args().has("--dash-bot"):
-		var anticipe: bool = OS.get_cmdline_user_args().has("--dash-anticipe")
-		var declenche: bool = (serres >= 3 and plus_proche < 230.0) if anticipe 			else (serres >= 2 or plus_proche < 90.0)
-		if declenche:
-			player.dash(danger)
+	# Le bot n'esquive plus : l'esquive a ete RETIREE du jeu (voir Player.gd). Le banc a
+	# 3 bras l'avait de toute facon mesuree nuisible — plus il esquivait, plus vite il
+	# mourait. Il ne reste que la fuite vers l'espace libre, calculee ci-dessus.
 	var move: Vector2 = danger
 	if danger == Vector2.ZERO:
 		var gem: Node2D = _nearest_pickup()
@@ -2228,6 +2188,9 @@ func _finish_headless() -> void:
 		var od_pct: float = 0.0
 		if GameState.run_time > 0.0:
 			od_pct = GameState.overdrive_time / GameState.run_time * 100.0
+		# Pic d'arcs simultanes : sert a savoir si le plafond ARC_CAP a REELLEMENT joue.
+		# Un plafond jamais atteint n'explique rien — autant le savoir.
+		print("[game] ARCS pic=%d/%d palier_max=%d" % [Enemy._arcs_pic, Enemy.ARC_CAP, Enemy._palier_max_run])
 		print("[game] SMOKE PASS — kills=%d level=%d scrap=%d pv=%d dmg=%.2f endless=%s vague=%d od=%dx/%.0f%% (draft exercised), 0 errors" % [
 			GameState.kills, GameState.level, GameState.scrap, int(player.max_hp), player.damage,
 			str(GameState.endless), GameState.endless_wave, GameState.overdrive_count, od_pct])

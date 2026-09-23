@@ -20,7 +20,10 @@ func _ready() -> void:
 	set_process(false)
 
 ## sheet cell is 160px; `scl` scales that (e.g. 1.25 -> ~200px on screen). rot in radians.
-func play(tex: Texture2D, frames: int, fps: float, pos: Vector2, rot: float, scl: float, col: Color) -> void:
+## `stretch` permet d'ETIRER une planche sur un axe : c'est ce qui transforme une
+## planche d'energie en RAYON de la longueur voulue, au lieu d'un trait dessine.
+func play(tex: Texture2D, frames: int, fps: float, pos: Vector2, rot: float, scl: float, col: Color,
+		stretch: Vector2 = Vector2.ONE) -> void:
 	texture = tex
 	hframes = frames
 	vframes = 1
@@ -31,7 +34,7 @@ func play(tex: Texture2D, frames: int, fps: float, pos: Vector2, rot: float, scl
 	_fps = fps
 	global_position = pos
 	rotation = rot
-	scale = Vector2.ONE * scl
+	scale = Vector2(scl, scl) * stretch
 	modulate = col
 	visible = true
 	_playing = true

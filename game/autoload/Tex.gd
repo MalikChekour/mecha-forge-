@@ -6,6 +6,16 @@ extends Node
 var _cache: Dictionary = {}
 var _glow_cache: Dictionary = {}
 
+## THE additive material — one instance for the whole game. Two nodes holding distinct material
+## instances can never batch, so handing out a fresh CanvasItemMaterial per FX node (the old
+## behaviour) turned a busy frame into 800-1000+ draw calls. Nothing mutates it, so it is shared.
+var _add_mat: CanvasItemMaterial = null
+func add_mat() -> CanvasItemMaterial:
+	if _add_mat == null:
+		_add_mat = CanvasItemMaterial.new()
+		_add_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return _add_mat
+
 ## Soft radial glow (bright center -> transparent edge). Use with additive blend
 ## for cheap bloom-like FX on the gl_compatibility renderer (no WorldEnvironment glow).
 func glow(c: Color, size: int = 64) -> Texture2D:
@@ -22,6 +32,28 @@ func glow(c: Color, size: int = 64) -> Texture2D:
 			var d: float = Vector2(x - cx + 0.5, y - cx + 0.5).length() / rad
 			if d < 1.0:
 				img.set_pixel(x, y, Color(c.r, c.g, c.b, pow(1.0 - d, 2.2)))
+	var t: Texture2D = ImageTexture.create_from_image(img)
+	_glow_cache[key] = t
+	return t
+
+## Soft-edged SOLID disc — a proper ground contact shadow (glow() falls off far too fast to
+## read as a shadow). Near-opaque in the middle, feathering to 0 only in the outer rim.
+func shadow(size: int = 96) -> Texture2D:
+	var key: String = "shadow_%d" % size
+	if _glow_cache.has(key):
+		return _glow_cache[key]
+	size = maxi(8, size)
+	var img: Image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var cx: float = size / 2.0
+	var rad: float = size * 0.5
+	for y in size:
+		for x in size:
+			var d: float = Vector2(x - cx + 0.5, y - cx + 0.5).length() / rad
+			if d < 1.0:
+				# solid until 62% of the radius, then a smooth feather to the edge
+				var a: float = clampf((1.0 - d) / 0.38, 0.0, 1.0)
+				img.set_pixel(x, y, Color(0, 0, 0, a * a))
 	var t: Texture2D = ImageTexture.create_from_image(img)
 	_glow_cache[key] = t
 	return t

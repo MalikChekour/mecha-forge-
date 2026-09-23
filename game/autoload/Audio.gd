@@ -7,8 +7,11 @@ extends Node
 const SFX_DIR: String = "res://assets/audio/sfx/"
 const MUSIC_DIR: String = "res://assets/audio/music/"
 const _SFX_NAMES: Array[String] = ["shoot", "hit", "crit", "explosion", "xp", "scrap",
-	"levelup", "hurt", "boss", "overdrive", "click", "victory"]
-const _THROTTLE: Dictionary = {"shoot": 0.11, "hit": 0.08, "xp": 0.05, "scrap": 0.06}
+	"levelup", "hurt", "boss", "overdrive", "click", "victory",
+	"w_autocannon", "w_missile", "w_railgun", "w_plasma", "w_sabre"]
+# Rapid-fire weapons need their own throttle or the pool floods and every shot cancels the last.
+const _THROTTLE: Dictionary = {"shoot": 0.11, "hit": 0.08, "xp": 0.05, "scrap": 0.06,
+	"w_autocannon": 0.07, "w_missile": 0.14, "w_railgun": 0.12, "w_plasma": 0.12, "w_sabre": 0.13}
 
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
@@ -18,6 +21,22 @@ var _music_a: AudioStreamPlayer
 var _music_b: AudioStreamPlayer
 var _music_cur: AudioStreamPlayer
 var _music_track: String = ""
+
+## Mute the Music / SFX buses from the settings menu.
+func set_music_enabled(on: bool) -> void:
+	var i: int = AudioServer.get_bus_index("Music")
+	if i >= 0:
+		AudioServer.set_bus_mute(i, not on)
+
+func set_sfx_enabled(on: bool) -> void:
+	var i: int = AudioServer.get_bus_index("SFX")
+	if i >= 0:
+		AudioServer.set_bus_mute(i, not on)
+
+## Apply the saved audio settings (called once after SaveManager has loaded).
+func apply_settings() -> void:
+	set_music_enabled(bool(SaveManager.setting("music", true)))
+	set_sfx_enabled(bool(SaveManager.setting("sfx", true)))
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS

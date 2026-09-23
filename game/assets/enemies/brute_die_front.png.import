@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/brute_die_front.png-d7d860424d167741b5f6ad22b
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.85
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

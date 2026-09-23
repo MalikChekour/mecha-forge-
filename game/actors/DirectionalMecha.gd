@@ -14,8 +14,8 @@ signal anim_finished(anim: String)
 @export var display_height: float = 150.0
 @export var frame_count: int = 8
 
-const LOOP: Dictionary = {"idle": true, "walk": true, "run": true, "attack": false, "hit": false, "die": false}
-const FPS: Dictionary = {"idle": 10.0, "walk": 16.0, "run": 20.0, "attack": 22.0, "hit": 14.0, "die": 12.0}
+const LOOP: Dictionary = {"idle": true, "walk": true, "run": true, "attack": true, "hit": false, "die": false, "melee": false}
+const FPS: Dictionary = {"idle": 10.0, "walk": 16.0, "run": 20.0, "attack": 18.0, "hit": 14.0, "die": 12.0, "melee": 24.0}
 
 var _spr: Sprite2D
 var _shadow: Sprite2D                 # ground contact shadow so the mech doesn't look airborne
@@ -33,19 +33,24 @@ var _static: bool = false
 var _bob_t: float = 0.0
 var _recoil_t: float = 0.0
 const _DIRVEC: Dictionary = {"front": Vector2(0, 1), "back": Vector2(0, -1), "left": Vector2(-1, 0), "right": Vector2(1, 0)}
+# AIM LEAN: the sprite is baked in 4 cardinal yaws, but the shot follows the exact 360° aim. To keep
+# the cannon pointing where it actually fires (instead of "leaning" off to a cardinal), the whole mech
+# is rotated a little toward the exact aim, clamped so the body never tips over. The gun/head anchors
+# rotate by the same amount so the muzzle flash + eye-laser stay glued to the (now rotated) hardpoints.
+var _lean: float = 0.0
+var _lean_target: float = 0.0
+const LEAN_MAX: float = 0.40   # ~23° cap on the body tilt (enough to track aim without tipping over)
+
+func set_lean_target(rad: float) -> void:
+	_lean_target = clampf(rad, -LEAN_MAX, LEAN_MAX)
 
 func _ready() -> void:
-	# ground contact shadow (behind the mech) so the player doesn't look like it floats
-	_shadow = Sprite2D.new()
-	_shadow.texture = Tex.glow(Color(0, 0, 0, 1), 64)
-	_shadow.modulate = Color(0, 0, 0, 0.55)
-	_shadow.position = Vector2(0.0, display_height * 0.26)   # at George's feet (~0.75 of the frame)
-	_shadow.scale = Vector2(display_height / 64.0 * 0.42, display_height / 64.0 * 0.14)
-	_shadow.z_index = -1
-	add_child(_shadow)
+	# No ground shadow on the player mech: it walks, and the contact shadow on 3/4 walker art read
+	# as pasted/floating however it was placed (patron). Flyers keep theirs (see Enemy.gd).
 	_spr = Sprite2D.new()
 	_spr.centered = true
 	_spr.hframes = frame_count
+	_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # crisp pixel-art sheets (no blur upscaling)
 	add_child(_spr)
 	_static = frame_count <= 1        # a single-frame chassis -> drive it procedurally
 	_apply()
@@ -100,6 +105,12 @@ func grip_anchor() -> Vector2:
 ## blade in the LEFT hand). Anchors are projected from each rig (at display 190) so the game
 ## fires from the cannon hand and places the melee/saber FX on the blade hand, per facing.
 const _GUN_ANCHORS: Dictionary = {
+	"darkstar": {
+		"front": Vector2(-15.0, -26.0), "back": Vector2(15.0, -11.0),
+		"left": Vector2(12.0, -28.0), "right": Vector2(-12.0, -9.0)},
+	"bluestrike": {
+		"front": Vector2(-15.0, -26.0), "back": Vector2(15.0, -11.0),
+		"left": Vector2(12.0, -28.0), "right": Vector2(-12.0, -9.0)},
 	"valiant": {
 		"front": Vector2(-14.8, -33.7), "back": Vector2(14.8, -3.4),
 		"left": Vector2(24.5, -27.7), "right": Vector2(-24.5, -9.4)},
@@ -109,6 +120,19 @@ const _GUN_ANCHORS: Dictionary = {
 	"mecha_joueur": {
 		"front": Vector2(-15.0, -26.0), "back": Vector2(15.0, -11.0),
 		"left": Vector2(12.0, -28.0), "right": Vector2(-12.0, -9.0)},
+	# VORTEX carries an ARM-CANNON baked into every attack frame. These anchors are the
+	# measured barrel-TIP pixel per facing (tools/_muzzle_measure.py, gun rendered alone in
+	# the exact bake framing), so the muzzle flash + laser leave the very end of the barrel.
+	"vortex": {
+		"front": Vector2(-11.7, 6.7), "back": Vector2(8.9, -81.6),
+		"left": Vector2(-67.5, -43.9), "right": Vector2(66.8, -31.9)},
+}
+# Head/eye pixel per facing (measured from the sprite's head mass, tools/head_check2). The red
+# targeting laser is emitted from here — a head-mounted sight, Terminator style.
+const _HEAD_ANCHORS: Dictionary = {
+	"vortex": {
+		"front": Vector2(-0.7, -42.3), "back": Vector2(2.3, -43.8),
+		"left": Vector2(-15.9, -48.2), "right": Vector2(2.2, -43.8)},
 }
 const _BLADE_ANCHORS: Dictionary = {
 	"valiant": {
@@ -125,10 +149,23 @@ const _BLADE_ANCHORS: Dictionary = {
 func has_baked_weapon() -> bool:
 	return _GUN_ANCHORS.has(chassis)
 
+# True when gun_anchor() already points at the barrel TIP (not the hand), so the muzzle
+# needs no extra forward offset. VORTEX's arm-cannon anchors are measured tips.
+func gun_at_tip() -> bool:
+	return chassis == "vortex"
+
 func gun_anchor() -> Vector2:
 	var d: Dictionary = _GUN_ANCHORS.get(chassis, {})
 	var a: Vector2 = d.get(_dir, Vector2(-15.0, -25.0))
-	return a * (display_height / 190.0)
+	return a.rotated(_lean) * (display_height / 190.0)
+
+func has_head_anchor() -> bool:
+	return _HEAD_ANCHORS.has(chassis)
+
+func head_anchor() -> Vector2:
+	var d: Dictionary = _HEAD_ANCHORS.get(chassis, {})
+	var a: Vector2 = d.get(_dir, Vector2(0.0, -44.0))
+	return a.rotated(_lean) * (display_height / 190.0)
 
 func blade_anchor() -> Vector2:
 	var d: Dictionary = _BLADE_ANCHORS.get(chassis, {})
@@ -137,6 +174,9 @@ func blade_anchor() -> Vector2:
 
 func facing() -> String:
 	return _dir
+
+func facing_vec() -> Vector2:
+	return _DIRVEC.get(_dir, Vector2.RIGHT)
 
 ## Tint the sprite (e.g. energized/overdrive glow) without swapping the chassis.
 func set_tint(c: Color) -> void:
@@ -152,8 +192,8 @@ func set_facing_from(v: Vector2) -> void:
 		return
 	var ax: float = absf(v.x)
 	var ay: float = absf(v.y)
-	if maxf(ax, ay) < 1.18 * minf(ax, ay):
-		return   # too diagonal to decide -> hold current facing (no flip-flop)
+	if maxf(ax, ay) < 1.05 * minf(ax, ay):
+		return   # only hold within ~3 deg of a pure 45 diagonal (avoid jitter); else pick the axis
 	var d: String
 	if ax > ay:
 		d = "right" if v.x > 0.0 else "left"
@@ -199,6 +239,8 @@ func _process_static(delta: float) -> void:
 	_recoil_t = maxf(0.0, _recoil_t - delta * 5.5)
 	var kick: Vector2 = (_DIRVEC.get(_dir, Vector2.ZERO) as Vector2) * (-_recoil_t * 13.0)
 	_spr.position = Vector2(kick.x, -bob - bounce + kick.y)
+	_lean = lerp(_lean, _lean_target, minf(1.0, delta * 12.0))
+	_spr.rotation = _lean
 
 ## Swap the whole chassis (e.g. base 'vanguard' <-> transformed 'vanguard2').
 ## Clears the texture cache so the new chassis' sheets load on the next frame.
@@ -226,3 +268,11 @@ func _process(delta: float) -> void:
 				return
 			_frame = 0
 	_spr.frame = _frame
+	# PER-SHOT RECOIL on the ANIMATED mech (previously only static chassis kicked). recoil() /
+	# play("attack") set _recoil_t on every shot, so the body visibly KICKS BACK opposite its facing
+	# with each volley -> the firing reads as SYNCED to the mech instead of muzzle flashes from nowhere.
+	_recoil_t = maxf(0.0, _recoil_t - delta * 8.0)
+	var kick: Vector2 = (_DIRVEC.get(_dir, Vector2.ZERO) as Vector2) * (-_recoil_t * 8.0)
+	_spr.position = kick
+	_lean = lerp(_lean, _lean_target, minf(1.0, delta * 12.0))
+	_spr.rotation = _lean

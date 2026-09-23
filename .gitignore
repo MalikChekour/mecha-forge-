@@ -2,8 +2,12 @@
 game/.godot/
 game/build/
 game/android/
-# Deployed web builds (throwaway, huge wasm/pck — never commit)
+# Deployed web builds (throwaway, huge wasm/pck — never commit).
+# 🚨 build/ SEUL ne suffit pas : les exports jetables se sont multiplies a la racine sous
+# d'autres noms (build_fix/, build_light/...) — motif large pour couvrir toute variante future.
 web/
+build*/
+mecha-forge-web.zip
 # keystores (never commit signing material)
 *.keystore
 *.jks
@@ -12,12 +16,25 @@ __pycache__/
 *.pyc
 # scratch renders
 *.tmp
+# Profils Chrome d'automatisation (Meshy/Mixamo) : 746 Mo, cookies/session possibles, jamais
+# du contenu de projet — a failli partir dans un commit le 23/09 (6973 fichiers indexes au
+# lieu de ~1445, decouvert par la taille anormale du statut avant de committer).
+.chrome_meshy/
+.chrome_mixamo/
+# Materiel de reference/experimentation, jamais charge par le jeu (memes symptomes que
+# meshy_in/ ci-dessous : gros, non source, decouvert le 23/09 en verifiant la taille du
+# commit avant de le passer — cine/ = 1,1 Go d'essais pixel/show non references par le code ;
+# refs/ = 188 Mo de catalogues d'assets de reference).
+cine/
+refs/
 # Meshy source GLBs + secrets (never commit keys)
 meshy_in/
 .meshy_key
 .glm_key
+.itch_key
 .env
 *.key
+*_key
 # transient bake frames
 **/_animframe.png
 **/_tmp/

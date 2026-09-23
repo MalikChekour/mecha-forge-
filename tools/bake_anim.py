@@ -86,6 +86,16 @@ def main():
             if o.parent is None:
                 o.rotation_euler.z += math.radians(YAW)
     sc = bpy.context.scene
+    # FBX import does NOT set the scene frame range -> read it from the imported action(s),
+    # else every sampled frame is the same pose (identical sheet cells = looks frozen in-game).
+    fs, fe = 1e9, -1e9
+    for o in bpy.context.scene.objects:
+        ad = o.animation_data
+        if ad and ad.action:
+            r = ad.action.frame_range
+            fs = min(fs, r[0]); fe = max(fe, r[1])
+    if fe > fs:
+        sc.frame_start = int(round(fs)); sc.frame_end = int(round(fe))
     f0, f1 = sc.frame_start, sc.frame_end
     if f1 <= f0:
         f1 = f0 + 24
