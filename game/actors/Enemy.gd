@@ -1251,6 +1251,11 @@ func _die() -> void:
 			game.spawn_xp(global_position, 1 + rank)
 		if drops_bonus and game.has_method("spawn_bonus"):
 			game.spawn_bonus(global_position)   # intermediate foe -> guaranteed bonus drop (heal/scrap)
+		# BUTIN DE GUERRE (patron, 23/09) : reserve aux BOSS (rank>=3 = midboss/crusherboss/
+		# ogreboss/endboss), pas aux foes intermediaires deja couverts par drops_bonus
+		# ci-dessus — sinon l'emprunt perdrait son cote "tu viens de battre une vraie menace".
+		if rank >= 3 and game.has_method("spawn_weapon_loan"):
+			game.spawn_weapon_loan(global_position)
 	if is_final:
 		# SANS FIN: the endboss is a milestone, not an ending — the run rolls on, harder.
 		if GameState.endless and game != null and game.has_method("endless_boss_down"):

@@ -162,6 +162,8 @@ func _ready() -> void:
 	EnemyProjectile._active_missiles = 0
 	EnemyProjectile._tires_bench = 0    # 🚨 TEMPORAIRE (banc du 23/09), voir declaration
 	PropScatter._detruits_bench = 0     # 🚨 TEMPORAIRE (banc du 23/09), voir declaration
+	Player._emprunts_bench = 0          # 🚨 TEMPORAIRE (banc du 23/09), voir declaration
+	Player._rendus_bench = 0
 	Enemy._bulls_charging = 0
 	Enemy._arcs_armes = 0
 	Enemy._arcs_pic = 0      # statique : sans remise a zero, le plafond d'arcs se referme d'une partie a l'autre
@@ -881,6 +883,11 @@ func spawn_skill(pos: Vector2) -> void:
 	# dropped by a broken skill-crate: grants a random competence when collected
 	_spawn_pickup(pos, "skill", 1)
 
+func spawn_weapon_loan(pos: Vector2) -> void:
+	# BUTIN DE GUERRE (patron, 23/09) : un BOSS tue laisse une arme a emprunter — rare et
+	# guarantie (pas un jet de chance), a la difference du "bonus" des ennemis intermediaires.
+	_spawn_pickup(pos, "arme_volee", 1)
+
 func spawn_heal(pos: Vector2) -> void:
 	# pure med-pack out of a smashed crate
 	_spawn_pickup(pos, "heal", 1)
@@ -1491,12 +1498,24 @@ func _level_fx() -> void:
 func transform_fx(pos: Vector2, into: bool) -> void:
 	if into:
 		spawn_vfx("energy", pos, 0.0, 2.4)   # swirling energy burst on Overdrive transform
+		# 🚨 HABILLAGE "BUTIN DE GUERRE" (patron, 23/09) : la SURCHARGE est deja nommee
+		# "HARVESTER" en interne (_transform_on) — un anneau qui SE REFERME (r0>r1, l'inverse
+		# des anneaux qui s'ouvrent juste en dessous) juste avant l'eclat donne la lecture
+		# "le mecha absorbe la casse du champ de bataille" avant de la relacher. Reutilise
+		# _ring() tel quel, aucune nouvelle primitive, aucun reglage existant touche.
+		_ring(pos, col_absorption(), 480.0, 16.0, 0.22)
 	var col: Color = Palette.CYAN if into else Color(0.6, 0.72, 0.92)
 	_flash_sprite(pos, col, 280.0, 0.38)
 	_ring(pos, col, 20.0, 430.0, 0.55)
 	_ring(pos, col, 12.0, 260.0, 0.4)
 	_debris(pos, col, 24, 0.6, 170.0, 440.0)
 	Events.screen_shake.emit(13.0 if into else 6.0)
+
+## Teinte de l'anneau d'absorption : un cyan legerement plus chaud/dore que celui de
+## l'eclat qui suit, pour que les deux temps (absorption puis relachement) se distinguent
+## a l'oeil au lieu de se confondre en un seul flash.
+func col_absorption() -> Color:
+	return Color(0.85, 0.92, 0.55)
 
 ## ONE shared additive material for every FX node. It used to return a fresh CanvasItemMaterial per
 ## node — and two nodes with distinct material instances can never batch, so a busy frame produced
@@ -2200,10 +2219,11 @@ func _finish_headless() -> void:
 		# le plus rapide des deux) pour savoir combien de couches ont eu une CHANCE de jouer.
 		var iq_final: float = maxf(GameState.run_time / Enemy.IQ_TEMPS,
 			float(GameState.level - 1) / Enemy.IQ_NIVEAU)
-		print("[game] BANC decor_detruits=%d missiles_tires=%d iq_finale=%.2f encerclement=%s patience=%s opportunisme=%s" % [
+		print("[game] BANC decor_detruits=%d missiles_tires=%d iq_finale=%.2f encerclement=%s patience=%s opportunisme=%s emprunts=%d rendus=%d" % [
 			PropScatter._detruits_bench, EnemyProjectile._tires_bench, iq_final,
 			str(GameState.run_time > Enemy.IQ_FLANC_T), str(GameState.run_time > Enemy.IQ_PATIENCE_T),
-			str(GameState.run_time > Enemy.IQ_OPPORTUNISME_T)])
+			str(GameState.run_time > Enemy.IQ_OPPORTUNISME_T),
+			Player._emprunts_bench, Player._rendus_bench])
 		print("[game] SMOKE PASS — kills=%d level=%d scrap=%d pv=%d dmg=%.2f endless=%s vague=%d od=%dx/%.0f%% (draft exercised), 0 errors" % [
 			GameState.kills, GameState.level, GameState.scrap, int(player.max_hp), player.damage,
 			str(GameState.endless), GameState.endless_wave, GameState.overdrive_count, od_pct])

@@ -211,6 +211,44 @@ func replace_weapon(old_id: String, new_id: String) -> void:
 	_install(new_id, slot, is_primary)
 	_weapons[new_id]["level"] = MAX_LEVEL   # an evolved weapon starts strong
 
+## ------- EMPRUNT TEMPORAIRE "BUTIN DE GUERRE" (patron, 23/09) -------------------------------
+## Un boss tue laisse une arme a emprunter quelques secondes, pleine puissance. Reutilise
+## replace_weapon() TEL QUEL — le chemin deja eprouve par l'evolution, aucune nouvelle
+## logique d'installation. On memorise juste l'arme d'ORIGINE (id + niveau) du slot 0 pour la
+## restaurer EXACTEMENT (pas a level 1) quand le pret se termine.
+var _borrow_original_id: String = ""
+var _borrow_original_level: int = 1
+
+func _slot0_id() -> String:
+	for k in _weapons:
+		if int(_weapons[k].get("slot", -1)) == 0:
+			return String(k)
+	return ""
+
+## Rend false si l'emprunt n'a pas eu lieu (deja en cours, id invalide, deja possede).
+func borrow_weapon(id: String) -> bool:
+	if _borrow_original_id != "" or not WEAPON_ORDER.has(id) or _weapons.has(id):
+		return false
+	var cur: String = _slot0_id()
+	if cur == "" or cur == id:
+		return false
+	_borrow_original_id = cur
+	_borrow_original_level = int(_weapons[cur]["level"])
+	replace_weapon(cur, id)
+	return true
+
+func return_borrowed_weapon() -> void:
+	if _borrow_original_id == "":
+		return
+	var cur: String = _slot0_id()
+	if cur != "" and cur != _borrow_original_id and not _weapons.has(_borrow_original_id):
+		replace_weapon(cur, _borrow_original_id)
+		_weapons[_borrow_original_id]["level"] = _borrow_original_level
+	_borrow_original_id = ""
+
+func is_borrowing() -> bool:
+	return _borrow_original_id != ""
+
 func set_active(a: bool) -> void:
 	_active = a
 	visible = a   # hide the held weapon entirely while inactive (e.g. Overdrive beam mode)

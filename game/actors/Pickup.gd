@@ -59,11 +59,16 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 		col = Color(0.85, 1.0, 0.92)          # vert presque blanc : trousse de soin
 	elif k == "od":
 		col = Color(1.0, 0.62, 0.2)           # amber energy cell -> Overdrive gauge
+	elif k == "arme_volee":
+		# 🚨 violet/indigo choisi pour rester loin des signaux deja pris (rouge = degats subis,
+		# or = bonus, ambre = od, magenta = skill) — mais PAS repasse par la mesure Machado
+		# qui a fixe les teintes skill/heal ci-dessus. A refaire si un daltonien le confond.
+		col = Color(0.55, 0.48, 1.0)          # butin de guerre : arme empruntee sur un boss
 	elif k == "scrap":
 		col = Palette.ACCENT
 	else:
 		col = Palette.CYAN
-	var big: bool = k == "bonus" or k == "skill" or k == "heal" or k == "od"
+	var big: bool = k == "bonus" or k == "skill" or k == "heal" or k == "od" or k == "arme_volee"
 	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 24)
 	# `skill` rejoint les teintes appliquees : sans ca, seul son halo prenait la couleur et la
 	# correction daltonisme ci-dessus n'aurait porte que sur la lueur, pas sur l'objet.
@@ -114,6 +119,14 @@ func _physics_process(delta: float) -> void:
 			GameState.add_overdrive(0.30)                                   # a real chunk of the gauge
 			if game != null and game.has_method("spawn_vfx"):
 				game.spawn_vfx("energy", player.global_position, 0.0, 1.0, Color(1.0, 0.7, 0.3))
+		elif kind == "arme_volee":
+			# 🚨 BUTIN DE GUERRE (patron, 23/09) : emprunt temporaire, gere entierement cote
+			# Player (choix de l'arme + minuteur + restauration) pour que Pickup.gd reste ce
+			# qu'il est deja — un simple dispatcher, aucune logique de jeu propre ici.
+			if player.has_method("borrow_weapon"):
+				player.borrow_weapon()
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("energy", player.global_position, 0.0, 1.0, Color(0.55, 0.48, 1.0))
 		else:
 			if game != null and game.has_method("spawn_vfx"):
 				game.spawn_vfx("pickup", global_position, 0.0, 0.42, Color(1.0, 0.85, 0.4))   # small sparkle on scrap

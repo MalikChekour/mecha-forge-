@@ -352,6 +352,7 @@ func _physics_process(delta: float) -> void:
 			_transform_off()
 	else:
 		GameState.tick_overdrive_cd(delta)
+	_tick_borrow(delta)
 
 	_iframe = maxf(0.0, _iframe - delta)
 	field_slow = minf(1.0, field_slow + delta * 2.5)   # recover when out of a slow field
@@ -936,6 +937,51 @@ func _hide_beam() -> void:
 func activate_overdrive() -> void:
 	if not transformed and GameState.alive and GameState.overdrive >= 1.0:
 		_transform_on()
+
+## ------- BUTIN DE GUERRE : arme empruntee sur un boss tue (patron, 23/09) -------------------
+## Appele par Pickup.gd (kind "arme_volee"). Pioche une arme HORS du loadout actuel (sinon
+## emprunter ce qu'on a deja ne changerait rien a voir/jouer), pleine puissance, pour une
+## fenetre courte — puis restaure EXACTEMENT l'arme d'origine (WeaponSystem s'en souvient).
+const _BORROW_DUR: float = 14.0
+var _borrow_t: float = 0.0
+## 🚨 TEMPORAIRE (verif du 23/09) : confirmer que le chemin complet (drop boss -> ramassage ->
+## minuteur -> restauration) s'execute reellement, pas juste qu'il compile. A retirer une fois
+## rejoue en vrai (souris/clavier).
+static var _emprunts_bench: int = 0
+static var _rendus_bench: int = 0
+
+func borrow_weapon() -> void:
+	if _weapons == null or _weapons.is_borrowing():
+		return
+	var pool: Array = []
+	for w in GameState.WEAPONS:
+		var id: String = String(w.get("id", ""))
+		if id != "" and not _weapons.owned_weapons().has(id):
+			pool.append(id)
+	if pool.is_empty():
+		return   # deja tout le pool de base en loadout : rien a emprunter de nouveau
+	var id: String = pool[randi() % pool.size()]
+	if not _weapons.borrow_weapon(id):
+		return
+	_borrow_t = _BORROW_DUR
+	_emprunts_bench += 1
+	var nom: String = id
+	for w in GameState.WEAPONS:
+		if String(w.get("id", "")) == id:
+			nom = String(w.get("name", id))
+			break
+	if game != null and game.has_method("show_banner"):
+		game.show_banner("BUTIN DE GUERRE : " + nom.to_upper(), Color(0.85, 0.92, 0.55))
+
+func _tick_borrow(delta: float) -> void:
+	if _borrow_t <= 0.0:
+		return
+	_borrow_t -= delta
+	if _borrow_t <= 0.0 and _weapons != null:
+		_weapons.return_borrowed_weapon()
+		_rendus_bench += 1
+		if game != null and game.has_method("show_hint"):
+			game.show_hint("Arme empruntee epuisee — retour a l'origine.", Color(0.72, 0.92, 1.0), 3.0)
 
 func _transform_on() -> void:
 	# OVERDRIVE "HARVESTER": invincible + double speed + global XP magnet for TF_DUR seconds,
