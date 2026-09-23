@@ -70,6 +70,14 @@ const DEFS: Dictionary = {
 	"crusherboss": {"name": "Broyeur Titan", "chassis": "crusherboss", "hp": 1500.0, "speed": 190.0, "dmg": 30.0, "radius": 66.0, "size": 340.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "rush", "shield": 380.0, "drops_bonus": true},
 	# ===== MINI-BOSS a OGIVES (chassis ogreboss, Noir+Or) : GROS + boucliers + ogives explosives =====
 	# 5 min : ogive UNIQUE lente + AoE, bouclier standard.  10 min : SALVE 3 + tir RADIAL, bouclier DOUBLE + +PV.
+	# 🚨 CETTE PAIRE N'EST DANS AUCUN BOSS_SCHEDULE (verifie 23/09) : ni la campagne (qui joue
+	# Colosse/Broyeur Titan ci-dessus a 5/10 min), ni le sans-fin (ENDLESS_BOSS_INTERVAL ne tire
+	# que endboss). Entierement statuee (nom, PV, bouclier, comportement) mais jamais rencontree
+	# en jeu. Deux lectures possibles, ni l'une ni l'autre tranchee : (a) un brouillon anterieur a
+	# Colosse/Broyeur Titan, remplace mais jamais retire ; (b) une reserve pour un futur chapitre
+	# (CHAPTERS dans Game.gd en a 5, mais un seul BOSS_SCHEDULE sert tous les biomes pour l'instant
+	# — cette paire Noir+Or pourrait etre le palier d'un chapitre pas encore differencie). Ne pas
+	# la cabler ni la supprimer sans decision produit : c'est un choix d'equilibrage, pas un bug.
 	"midboss_a": {"name": "Le Bombardier", "chassis": "ogreboss", "hp": 900.0, "speed": 150.0, "dmg": 22.0, "radius": 62.0, "size": 340.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 22.0, "attack_cd": 2.2, "prefer_dist": 300.0, "shield": 220.0, "drops_bonus": true},
 	"midboss_b": {"name": "Le Devastateur", "chassis": "ogreboss", "hp": 1450.0, "speed": 160.0, "dmg": 26.0, "radius": 70.0, "size": 380.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "ranged", "heavy": true, "ogive": true, "barrage": true, "attack_dmg": 20.0, "attack_cd": 1.7, "prefer_dist": 300.0, "shield": 450.0, "drops_bonus": true},
 	# SOUVERAIN (15 min, FINAL) : obsidienne. Barrage + ANNEAU AoE (ogive+barrage) + bouclier max.
