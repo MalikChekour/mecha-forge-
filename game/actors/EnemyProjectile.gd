@@ -16,6 +16,9 @@ const SMOKE_CAP: int = 8
 # ne tire pas ce round (cf. Enemy._fire_heavy). Compteur remis a 0 par Game._ready.
 static var _active_missiles: int = 0
 const MISSILE_CAP: int = 10
+## 🚨 TEMPORAIRE (banc du 23/09) : total sur la partie (contrairement a _active_missiles, qui
+## n'est que le nombre EN VOL). A retirer une fois le mode missile rejoue en vrai.
+static var _tires_bench: int = 0
 var _counted_missile: bool = false
 
 var _dir: Vector2 = Vector2.ZERO
@@ -112,7 +115,7 @@ func setup(pos: Vector2, dir: Vector2, dmg: float, speed: float = 300.0) -> void
 	if _counted_missile:                        # libere le compteur missile d'un usage precedent
 		_active_missiles -= 1; _counted_missile = false
 	if missile:
-		_active_missiles += 1; _counted_missile = true
+		_active_missiles += 1; _counted_missile = true; _tires_bench += 1
 		_body.visible = false; _hot.visible = false; _halo.visible = false
 		_missile_spr.visible = true; _flame.visible = true
 		var ms: float = 0.30 * size

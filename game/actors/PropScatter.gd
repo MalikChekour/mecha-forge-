@@ -283,8 +283,14 @@ func _refresh(cell: Vector2i) -> void:
 ## free, uncapped draft upgrade roughly every 15 seconds, forever.
 var _destroyed: Dictionary = {}
 
+## 🚨 TEMPORAIRE (banc du 23/09) : le decor destructible n'avait AUCUNE trace de banc, contrairement
+## a Enemy._palier_max_run pour l'IQ. Impossible de confirmer en headless qu'un rocher a seulement
+## ete detruit une fois. A retirer une fois le systeme rejoue en vrai (souris/clavier).
+static var _detruits_bench: int = 0
+
 func mark_destroyed(pos: Vector2) -> void:
 	_destroyed[Vector2i(pos.round())] = true
+	_detruits_bench += 1
 
 ## Props that actively threaten the player. They are GATED BY RUN TIME so the arena escalates:
 ## the map at minute 12 must not be the map at minute 2. That sameness is the real source of

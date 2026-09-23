@@ -160,6 +160,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # keep orchestrating (bot/draft) while the tree is paused
 	EnemyProjectile._smoke_active = 0   # reset des compteurs statiques (sinon ils fuient entre runs)
 	EnemyProjectile._active_missiles = 0
+	EnemyProjectile._tires_bench = 0    # 🚨 TEMPORAIRE (banc du 23/09), voir declaration
+	PropScatter._detruits_bench = 0     # 🚨 TEMPORAIRE (banc du 23/09), voir declaration
 	Enemy._bulls_charging = 0
 	Enemy._arcs_armes = 0
 	Enemy._arcs_pic = 0      # statique : sans remise a zero, le plafond d'arcs se referme d'une partie a l'autre
@@ -2191,6 +2193,17 @@ func _finish_headless() -> void:
 		# Pic d'arcs simultanes : sert a savoir si le plafond ARC_CAP a REELLEMENT joue.
 		# Un plafond jamais atteint n'explique rien — autant le savoir.
 		print("[game] ARCS pic=%d/%d palier_max=%d" % [Enemy._arcs_pic, Enemy.ARC_CAP, Enemy._palier_max_run])
+		# 🚨 TEMPORAIRE (banc du 23/09) : les trois systemes non joues depuis leur ecriture.
+		# L'IQ ennemie (Enemy.gd, 4 couches) n'avait AUCUNE trace de banc — contrairement au
+		# palier d'ARME ci-dessus, qui est un systeme different malgre le nom voisin. On
+		# recalcule ici la MEME formule que Enemy._iq() (t/IQ_TEMPS vs (niveau-1)/IQ_NIVEAU,
+		# le plus rapide des deux) pour savoir combien de couches ont eu une CHANCE de jouer.
+		var iq_final: float = maxf(GameState.run_time / Enemy.IQ_TEMPS,
+			float(GameState.level - 1) / Enemy.IQ_NIVEAU)
+		print("[game] BANC decor_detruits=%d missiles_tires=%d iq_finale=%.2f encerclement=%s patience=%s opportunisme=%s" % [
+			PropScatter._detruits_bench, EnemyProjectile._tires_bench, iq_final,
+			str(GameState.run_time > Enemy.IQ_FLANC_T), str(GameState.run_time > Enemy.IQ_PATIENCE_T),
+			str(GameState.run_time > Enemy.IQ_OPPORTUNISME_T)])
 		print("[game] SMOKE PASS — kills=%d level=%d scrap=%d pv=%d dmg=%.2f endless=%s vague=%d od=%dx/%.0f%% (draft exercised), 0 errors" % [
 			GameState.kills, GameState.level, GameState.scrap, int(player.max_hp), player.damage,
 			str(GameState.endless), GameState.endless_wave, GameState.overdrive_count, od_pct])
