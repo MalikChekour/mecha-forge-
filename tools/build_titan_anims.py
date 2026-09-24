@@ -125,6 +125,19 @@ def apply_bunker_guard_base(arm):
         pb["LeftForeArm"].rotation_euler = (math.radians(-30), math.radians(5), 0)
     if "RightForeArm" in pb:
         pb["RightForeArm"].rotation_euler = (math.radians(-30), math.radians(-5), 0)
+    # 🚨 CORRECTIF JAMBE ASYMETRIQUE (patron, 24/09 : « une jambe qui tangue » a la marche).
+    # Le rig Meshy de titan a un bind pose DEJA asymetrique (mesure via bpy, angle par
+    # rapport a la verticale : hanche gauche 32.4°, hanche droite 22.1° — ~10° d'ecart, alors
+    # que le rig de vortex est symetrique a 0.1° pres). reset_pose() revient a ce bind pose,
+    # donc toute animation qui ne fixe pas explicitement UpLeg (idle, attack, hit) heritait
+    # de ce desequilibre ; celles qui le fixent (walk/run/die/melee) l'ECRASAIENT en assignant
+    # `=` plutot que `+=`, donc le correctif doit AUSSI passer par ces fonctions. Valeurs
+    # choisies par mesure (tools/_leg_pitch_probe, non versionne) pour ramener les deux jambes
+    # a ~15° de la verticale, symetriques.
+    if "LeftUpLeg" in pb:
+        pb["LeftUpLeg"].rotation_euler.x = math.radians(18.0)
+    if "RightUpLeg" in pb:
+        pb["RightUpLeg"].rotation_euler.x = math.radians(15.0)
     # Stance large : les jambes ecartees davantage qu'un chassis leger (rig au repos deja
     # ecarte pour la plupart des Meshy humanoides ; on ne force pas UpLeg en Y pour eviter
     # une torsion de hanche non voulue — l'ecart vient du modele + de l'amplitude en marche).
@@ -177,9 +190,9 @@ def pose_walk(arm, f, total_frames=8):
     r_ankle = -r_pitch * 0.6
 
     if "LeftUpLeg" in pb:
-        pb["LeftUpLeg"].rotation_euler.x = l_pitch
+        pb["LeftUpLeg"].rotation_euler.x += l_pitch
     if "RightUpLeg" in pb:
-        pb["RightUpLeg"].rotation_euler.x = r_pitch
+        pb["RightUpLeg"].rotation_euler.x += r_pitch
     if "LeftLeg" in pb:
         pb["LeftLeg"].rotation_euler.x = l_knee
     if "RightLeg" in pb:
@@ -221,9 +234,9 @@ def pose_run(arm, f, total_frames=8):
     r_knee = math.radians(62) * max(0.0, -math.sin(p + math.pi - 0.2))
 
     if "LeftUpLeg" in pb:
-        pb["LeftUpLeg"].rotation_euler.x = l_pitch
+        pb["LeftUpLeg"].rotation_euler.x += l_pitch
     if "RightUpLeg" in pb:
-        pb["RightUpLeg"].rotation_euler.x = r_pitch
+        pb["RightUpLeg"].rotation_euler.x += r_pitch
     if "LeftLeg" in pb:
         pb["LeftLeg"].rotation_euler.x = l_knee
     if "RightLeg" in pb:
@@ -333,9 +346,9 @@ def pose_die(arm, f, total_frames=8):
         pb["Hips"].location.z = hip_drop
         pb["Hips"].rotation_euler.x = math.radians(-6) * p
     if "LeftUpLeg" in pb:
-        pb["LeftUpLeg"].rotation_euler.x = math.radians(16) * p
+        pb["LeftUpLeg"].rotation_euler.x += math.radians(16) * p
     if "RightUpLeg" in pb:
-        pb["RightUpLeg"].rotation_euler.x = math.radians(-8) * p
+        pb["RightUpLeg"].rotation_euler.x += math.radians(-8) * p
     if "LeftLeg" in pb:
         pb["LeftLeg"].rotation_euler.x = knee_buckle
     if "RightLeg" in pb:
@@ -379,7 +392,7 @@ def pose_melee(arm, f, total_frames=8):
     if "Spine02" in pb:
         pb["Spine02"].rotation_euler.x = lean * 0.4
     if "RightUpLeg" in pb:
-        pb["RightUpLeg"].rotation_euler.x = math.radians(16) * (1.0 if t < 0.55 else max(0.0, 1.0 - (t - 0.55) * 3))
+        pb["RightUpLeg"].rotation_euler.x += math.radians(16) * (1.0 if t < 0.55 else max(0.0, 1.0 - (t - 0.55) * 3))
     if "LeftArm" in pb:
         pb["LeftArm"].rotation_euler.x += lean * 0.3
     if "RightArm" in pb:
