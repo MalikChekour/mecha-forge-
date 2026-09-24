@@ -187,13 +187,28 @@ const MECHS: Array = [
 	## via bpy (27.0°/21.1° de hanche, 5.9° d'ecart) -> correctif applique + choregraphie de
 	## vortex reprise A L'IDENTIQUE (build_bruiser_anims.py). « Si c'est pas bon on retire » :
 	## stats/arme choisies pour un premier test, pas figees.
-	{"id": "bruiser", "name": "BRUISER", "cost": 1800,
+	{"id": "bruiser", "name": "BRUISER", "cost": 0,
 		"weapons": ["plasma"], "hp": 22.0, "dmg": 1.35, "speed": 0.92, "crit": 0.06,
 		"arsenal": ["plasma", "autocannon", "railgun", "disque", "faisceau"],
 		"signature": "plasma", "accent": Color(0.82, 0.24, 0.20),
 		"sig_muzzle": ["fire_blast", 0.46],
 		"ligne": "FORCE BRUTE — chaque impact plie l'acier.",
 		"desc": "Chassis massif taillé pour l'assaut. Canon lourd en main, encaisse pour mieux frapper."},
+	## VANQUISHER (patron, 24/09) — INTEGRATION D'ESSAI. Genere depuis une image de reference
+	## fournie par le patron (pas un prompt FLUX texte) : evite le cycle iteratif couteux de
+	## bruiser en partant d'un design deja valide visuellement (canons doubles tenus en main,
+	## cockpit vitre visible, pod de missiles a l'epaule, aucune lame). Rig mesure via bpy
+	## (36.8°/28.6° de hanche, 8.2° d'ecart — la rotation seule ne peut PAS parfaitement
+	## egaliser les deux jambes sur ce rig, meilleur appariement trouve a 0.1° d'ecart) +
+	## choregraphie de vortex reprise A L'IDENTIQUE. « Si c'est pas bon on retire » : stats/
+	## arme choisies pour un premier test, pas figees.
+	{"id": "vanquisher", "name": "VANQUISHER", "cost": 1800,
+		"weapons": ["ricochet"], "hp": 23.0, "dmg": 1.10, "speed": 0.90, "crit": 0.10,
+		"arsenal": ["ricochet", "autocannon", "missilepod", "disque", "faisceau"],
+		"signature": "ricochet", "accent": Color(0.45, 0.55, 0.68),
+		"sig_muzzle": ["aaa_beam", 0.44],
+		"ligne": "SUPPRESSION CONTINUE — deux canons, aucun répit.",
+		"desc": "Chassis d'assaut à double canon et pod de missiles. Ne laisse jamais l'ennemi se regrouper."},
 ]
 
 ## 🚨 CHASSIS ECARTES, et pourquoi — a lire avant d'en rajouter un.
