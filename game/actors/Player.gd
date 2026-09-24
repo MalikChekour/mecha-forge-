@@ -112,6 +112,38 @@ const BASE_TINT: Color = Color(1.16, 1.14, 1.10)
 func get_layer_ok() -> bool:
 	return mecha != null
 
+## Reapplique le chassis EQUIPE (garage) + ses stats de base. Le Player n'est cree qu'UNE
+## SEULE FOIS, a Game._ready() (chargement de la page), AVANT que le hub/garage ne s'affiche.
+## Sans ceci, equiper un nouveau chassis puis lancer JOUER dans la MEME session gardait
+## l'ancien en jeu : repere 24/09, Titan equipe au garage (UI + sauvegarde corrects, verifie
+## par test headless) mais Vortex toujours affiche et joue en partie. Appele par Game juste
+## avant le tout premier _begin_run() d'une session (REJOUER passe par un reload de scene,
+## qui recree deja le Player correctement — pas concerne).
+func refresh_equipped_chassis() -> void:
+	var hero_id: String = SaveManager.equipped_mech()
+	if not GameState.mech_def(hero_id):
+		hero_id = "vortex"
+	if base_chassis == hero_id:
+		return   # rien equipe depuis le boot -> pas besoin de rebatir le sprite
+	var mech: Dictionary = GameState.mech_def(hero_id)
+	var gear: Dictionary = SaveManager.gear_totals()
+	max_hp = 70.0 + GameState.meta_hp + float(mech.get("hp", 0.0)) + float(gear.get("hp", 0.0))
+	damage = 12.0 * (1.0 + GameState.meta_dmg) * float(mech.get("dmg", 1.0)) * (1.0 + float(gear.get("damage_pct", 0.0)))
+	base_speed = 320.0 * (1.0 + GameState.meta_speed) * float(mech.get("speed", 1.0)) * (1.0 + float(gear.get("speed_pct", 0.0))) * Protocols.player_speed
+	crit_chance = 0.05 + float(mech.get("crit", 0.0)) + float(gear.get("crit", 0.0))
+	hp = max_hp
+	if mecha != null:
+		mecha.queue_free()
+	var dmech: DirectionalMecha = DirectionalMecha.new()
+	dmech.chassis = hero_id
+	dmech.frame_count = 8
+	dmech.display_height = 360.0
+	mecha = dmech
+	add_child(mecha)
+	base_chassis = hero_id
+	if mecha.has_method("set_tint"):
+		mecha.set_tint(BASE_TINT)
+
 func _ready() -> void:
 	add_to_group("player")
 	# equipped mech (garage) + persistent meta talents + EQUIPPED GEAR, applied together

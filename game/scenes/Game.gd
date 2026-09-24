@@ -733,6 +733,8 @@ func _on_difficulty_chosen(idx: int, overlay: CanvasLayer) -> void:
 	if is_instance_valid(overlay):
 		overlay.queue_free()
 	get_tree().paused = false
+	if player != null:
+		player.refresh_equipped_chassis()
 	_begin_run()
 
 ## SELECTION DE CHAPITRE (remplace le choix de difficulté). Liste les 5 chapitres ; les
@@ -807,6 +809,8 @@ func _on_chapter_chosen(idx: int, overlay: CanvasLayer) -> void:
 		overlay.queue_free()
 	get_tree().paused = false
 	_apply_chapter_biome(String(ch["biome"]))
+	if player != null:
+		player.refresh_equipped_chassis()
 	_begin_run()
 
 
