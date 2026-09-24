@@ -149,6 +149,19 @@ const MECHS: Array = [
 		"sig_muzzle": ["fire_blast", 0.40],
 		"ligne": "SOUFFLE RAPPROCHÉ — sature, disloque, se replie.",
 		"desc": "Éclaireur léger, très rapide, gerbe à courte portée. Frappe et se replie."},
+	## TITAN (patron, 24/09) — INTEGRATION D'ESSAI. Premier chassis choregraphie a la main
+	## (build_titan_anims.py, sur le modele de Vortex/Bluestrike) plutot que par le pipeline
+	## generique qui avait produit les 6 chassis ecartes. 28 planches verifiees une par une :
+	## aucun saut de pose, aucun desequilibre — la garde basse tient sur les 8 images de
+	## chaque animation. « Si c'est pas bon on retire » : stats/arme choisies pour un premier
+	## test, pas figees.
+	{"id": "titan", "name": "TITAN", "cost": 1800,
+		"weapons": ["missilepod"], "hp": 30.0, "dmg": 1.15, "speed": 0.88, "crit": 0.05,
+		"arsenal": ["missilepod", "railgun", "plasma", "disque", "faisceau"],
+		"signature": "missilepod", "accent": Color(0.55, 0.68, 0.42),
+		"sig_muzzle": ["fire_blast", 0.44],
+		"ligne": "BLINDAGE LOURD — encaisse, avance, ne recule pas.",
+		"desc": "Chassis blinde, lent mais massif. Garde basse, tir stabilise, absorbe plus qu'il n'esquive."},
 ]
 
 ## 🚨 CHASSIS ECARTES, et pourquoi — a lire avant d'en rajouter un.
