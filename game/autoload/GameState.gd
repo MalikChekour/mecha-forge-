@@ -162,23 +162,6 @@ const MECHS: Array = [
 		"sig_muzzle": ["fire_blast", 0.44],
 		"ligne": "BLINDAGE LOURD — encaisse, avance, ne recule pas.",
 		"desc": "Chassis blinde, lent mais massif. Garde basse, tir stabilise, absorbe plus qu'il n'esquive."},
-	## SENTINEL (patron, 24/09) — INTEGRATION D'ESSAI, remplace la tentative Titan pour la
-	## demarche. Titan a recu deux correctifs bases sur une analyse verifiee par rendu (hanche
-	## symetrique, puis phase du genou), et MEME aligne EXACTEMENT sur les constantes de
-	## vortex/bluestrike (prouvant que le code d'animation n'etait pas en cause), le probleme
-	## persistait en jeu. Cause reelle : le RIG meshy_in/titan est asymetrique au bind pose
-	## (mesure bpy : 10.3° d'ecart hanche gauche/droite). Plutot qu'un 3e correctif logiciel,
-	## ce chassis part d'un rig DEJA mesure symetrique (meshy_in/spitter, 0.8° d'ecart, meme
-	## ordre de grandeur que vortex 0.1° et bluestrike 0.3°) et reprend la choregraphie de
-	## vortex A L'IDENTIQUE (build_sentinel_anims.py, aucune formule modifiee). « Si c'est pas
-	## bon on retire » : stats/arme choisies pour un premier test, pas figees.
-	{"id": "sentinel", "name": "SENTINEL", "cost": 0,
-		"weapons": ["railgun"], "hp": 14.0, "dmg": 1.30, "speed": 0.98, "crit": 0.20,
-		"arsenal": ["railgun", "autocannon", "plasma", "disque", "faisceau"],
-		"signature": "railgun", "accent": Color(0.62, 0.48, 0.92),
-		"sig_muzzle": ["aaa_beam", 0.46],
-		"ligne": "VISÉE LONGUE PORTÉE — verrouille, perfore, ne rate jamais deux fois.",
-		"desc": "Chassis de précision, blindage léger. Un tir chargé, une faille exploitée."},
 	## BRUISER (patron, 24/09) — INTEGRATION D'ESSAI. Premier chassis genere FRAIS via Meshy
 	## pour ce jeu (pas un modele recycle) : concept FLUX -> image-to-3D -> rig, 4 corrections
 	## successives du patron avant validation (pas de lame car c'est un tireur ; plus musclu/
@@ -202,7 +185,7 @@ const MECHS: Array = [
 	## egaliser les deux jambes sur ce rig, meilleur appariement trouve a 0.1° d'ecart) +
 	## choregraphie de vortex reprise A L'IDENTIQUE. « Si c'est pas bon on retire » : stats/
 	## arme choisies pour un premier test, pas figees.
-	{"id": "vanquisher", "name": "VANQUISHER", "cost": 1800,
+	{"id": "vanquisher", "name": "VANQUISHER", "cost": 0,
 		"weapons": ["ricochet"], "hp": 23.0, "dmg": 1.10, "speed": 0.90, "crit": 0.10,
 		"arsenal": ["ricochet", "autocannon", "missilepod", "disque", "faisceau"],
 		"signature": "ricochet", "accent": Color(0.45, 0.55, 0.68),
