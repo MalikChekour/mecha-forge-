@@ -183,8 +183,19 @@ def pose_walk(arm, f, total_frames=8):
     l_pitch = math.radians(34) * math.sin(p)
     r_pitch = math.radians(34) * math.sin(p + math.pi)
 
-    l_knee = math.radians(58) * max(0.0, -math.sin(p - 0.25))
-    r_knee = math.radians(58) * max(0.0, -math.sin(p + math.pi - 0.25))
+    # 🚨 CORRECTIF PHASE GENOU (patron, 24/09 : « on a l'impression qu'il vole »). L'ancienne
+    # formule -sin(p-0.25) faisait culminer la flexion au DECOLLAGE (hanche au max arriere)
+    # et retombait a 0 (jambe raide) pendant tout le BALANCEMENT AVANT — or c'est justement
+    # pendant le balancement avant que le pied doit se soulever pour degager le sol ; une
+    # jambe raide qui pivote juste a la hanche en gardant le pied a hauteur constante (la
+    # cheville contre-tourne pour le garder a plat) glisse comme sur de la glace : aucun
+    # appui visible, d'ou l'impression de vol. cos(p) culmine a p=0, exactement quand
+    # l_pitch (=34*sin(p)) passe par 0 en augmentant — le milieu du balancement, pied a
+    # l'aplomb du corps, moment ou il doit etre le plus haut. Il retombe a 0 aux deux
+    # extremes (p=+-90°, ~pose jambe tendue a l'appui ET a la posee), et reste nul tout
+    # l'appui (p in [90°,270°]) : la jambe qui porte le poids ne plie pas.
+    l_knee = math.radians(58) * max(0.0, math.cos(p))
+    r_knee = math.radians(58) * max(0.0, -math.cos(p))
 
     l_ankle = -l_pitch * 0.6
     r_ankle = -r_pitch * 0.6
@@ -230,8 +241,10 @@ def pose_run(arm, f, total_frames=8):
     l_pitch = math.radians(44) * math.sin(p)
     r_pitch = math.radians(44) * math.sin(p + math.pi)
 
-    l_knee = math.radians(62) * max(0.0, -math.sin(p - 0.2))
-    r_knee = math.radians(62) * max(0.0, -math.sin(p + math.pi - 0.2))
+    # meme correctif de phase que pose_walk (voir son commentaire) : cos(p) culmine au milieu
+    # du balancement avant plutot qu'au decollage.
+    l_knee = math.radians(62) * max(0.0, math.cos(p))
+    r_knee = math.radians(62) * max(0.0, -math.cos(p))
 
     if "LeftUpLeg" in pb:
         pb["LeftUpLeg"].rotation_euler.x += l_pitch
