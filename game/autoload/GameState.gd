@@ -172,13 +172,28 @@ const MECHS: Array = [
 	## ordre de grandeur que vortex 0.1° et bluestrike 0.3°) et reprend la choregraphie de
 	## vortex A L'IDENTIQUE (build_sentinel_anims.py, aucune formule modifiee). « Si c'est pas
 	## bon on retire » : stats/arme choisies pour un premier test, pas figees.
-	{"id": "sentinel", "name": "SENTINEL", "cost": 1800,
+	{"id": "sentinel", "name": "SENTINEL", "cost": 0,
 		"weapons": ["railgun"], "hp": 14.0, "dmg": 1.30, "speed": 0.98, "crit": 0.20,
 		"arsenal": ["railgun", "autocannon", "plasma", "disque", "faisceau"],
 		"signature": "railgun", "accent": Color(0.62, 0.48, 0.92),
 		"sig_muzzle": ["aaa_beam", 0.46],
 		"ligne": "VISÉE LONGUE PORTÉE — verrouille, perfore, ne rate jamais deux fois.",
 		"desc": "Chassis de précision, blindage léger. Un tir chargé, une faille exploitée."},
+	## BRUISER (patron, 24/09) — INTEGRATION D'ESSAI. Premier chassis genere FRAIS via Meshy
+	## pour ce jeu (pas un modele recycle) : concept FLUX -> image-to-3D -> rig, 4 corrections
+	## successives du patron avant validation (pas de lame car c'est un tireur ; plus musclu/
+	## massif, pas svelte ; doit lire comme un engin PILOTE a echelle vehicule, pas un androide
+	## a taille humaine ; arme explicitement tenue en main, pas les poings vides). Rig mesure
+	## via bpy (27.0°/21.1° de hanche, 5.9° d'ecart) -> correctif applique + choregraphie de
+	## vortex reprise A L'IDENTIQUE (build_bruiser_anims.py). « Si c'est pas bon on retire » :
+	## stats/arme choisies pour un premier test, pas figees.
+	{"id": "bruiser", "name": "BRUISER", "cost": 1800,
+		"weapons": ["plasma"], "hp": 22.0, "dmg": 1.35, "speed": 0.92, "crit": 0.06,
+		"arsenal": ["plasma", "autocannon", "railgun", "disque", "faisceau"],
+		"signature": "plasma", "accent": Color(0.82, 0.24, 0.20),
+		"sig_muzzle": ["fire_blast", 0.46],
+		"ligne": "FORCE BRUTE — chaque impact plie l'acier.",
+		"desc": "Chassis massif taillé pour l'assaut. Canon lourd en main, encaisse pour mieux frapper."},
 ]
 
 ## 🚨 CHASSIS ECARTES, et pourquoi — a lire avant d'en rajouter un.
