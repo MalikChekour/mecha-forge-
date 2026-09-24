@@ -25,7 +25,7 @@ from PIL import Image
 CHASSIS = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else sys.argv[-1]
 GLB_IN = os.path.abspath("meshy_in/%s/anim_walk_mech.glb" % CHASSIS)
 OUT_DIR = os.path.abspath("game/assets/mecha")
-RES = 256
+RES = 512
 FRAMES = 8
 SAMPLES = 16
 EL = 40.0

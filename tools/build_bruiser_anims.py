@@ -38,7 +38,7 @@ GLB_IN = os.path.abspath("meshy_in/bruiser/rigged.glb")
 OUT_DIR = os.path.abspath("game/assets/mecha")
 PREVIEW_DIR = os.path.abspath("meshy_in/previews")
 CHASSIS = "bruiser"
-RES = 256
+RES = 512
 FRAMES = 8
 SAMPLES = 16
 EL = 40.0
@@ -110,15 +110,20 @@ def apply_combat_guard_base(arm):
     if "Spine02" in pb:
         pb["Spine02"].rotation_euler.x = math.radians(2)
 
-    # COMBAT READY GUARD POSTURE: Forearms raised FORWARD toward target!
+    # 🚨 GARDE BASSE (patron, 24/09 : « la position statique n'est pas bonne »). L'ancienne
+    # garde de vortex (bras LEVES, avant-bras a -52°, vise le sujet) suppose un canon COURT
+    # solidaire du bras (le cas de vortex) ; sur un chassis qui tient une arme LONGUE et
+    # separee (bruiser/vanquisher), ce meme angle pointe le canon vers/a travers la camera et
+    # lit mal a l'arret. Reprend la garde de titan (coudes proches du corps, avant-bras vers
+    # le bas-avant) — deja verifiee propre en jeu.
     if "LeftArm" in pb:
-        pb["LeftArm"].rotation_euler = (math.radians(-28), math.radians(16), math.radians(-12))
+        pb["LeftArm"].rotation_euler = (math.radians(-14), math.radians(10), math.radians(-8))
     if "RightArm" in pb:
-        pb["RightArm"].rotation_euler = (math.radians(-28), math.radians(-16), math.radians(12))
+        pb["RightArm"].rotation_euler = (math.radians(-14), math.radians(-10), math.radians(8))
     if "LeftForeArm" in pb:
-        pb["LeftForeArm"].rotation_euler = (math.radians(-52), math.radians(8), 0)
+        pb["LeftForeArm"].rotation_euler = (math.radians(-30), math.radians(5), 0)
     if "RightForeArm" in pb:
-        pb["RightForeArm"].rotation_euler = (math.radians(-52), math.radians(-8), 0)
+        pb["RightForeArm"].rotation_euler = (math.radians(-30), math.radians(-5), 0)
 
     # 🚨 CORRECTIF HANCHE (meme technique que titan, voir l'entete) : bind pose mesure a
     # 27.0°/21.1° de la verticale (5.9° d'ecart) -> ramene les deux jambes a ~15°, symetriques.
