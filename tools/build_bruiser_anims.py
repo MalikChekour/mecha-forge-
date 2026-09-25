@@ -152,6 +152,17 @@ def apply_combat_guard_base(arm):
     if "RightUpLeg" in pb:
         pb["RightUpLeg"].rotation_euler.x = math.radians(10.0)
 
+    # 🚨 STANCE TROP LARGE (patron, 25/09 : « bruiser jambes trop ecartees, garder en reference
+    # bluestrike et vortex »). Mesure directe sur l'ECART REEL entre pieds (position 3D, pas
+    # l'angle de hanche seul — les rotations composent) : bruiser brut 34.6% de la hauteur,
+    # contre vortex 17.0%, bluestrike 20.7%, titan (non corrige, jamais critique) 21.1%.
+    # Z=15/-12 (recherche empirique, meme methode que vanquisher) donne 20.3%, dans cette
+    # fourchette.
+    if "LeftUpLeg" in pb:
+        pb["LeftUpLeg"].rotation_euler.z = math.radians(15.0)
+    if "RightUpLeg" in pb:
+        pb["RightUpLeg"].rotation_euler.z = math.radians(-12.0)
+
     # 🚨 CORRECTIF GENOU / PIEDS PAS A PLAT (voir build_titan_anims.py) : le tibia brut penchait
     # a 34.6°/24.4° de la verticale (contre 4.6°/19.1° chez vortex). Recherche empirique de la
     # rotation de genou qui le ramene pres de la verticale (~16-18°).

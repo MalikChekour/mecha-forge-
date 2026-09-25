@@ -134,15 +134,18 @@ def apply_combat_guard_base(arm):
     if "RightUpLeg" in pb:
         pb["RightUpLeg"].rotation_euler.x = math.radians(8.0)
 
-    # 🚨 STANCE TROP LARGE (patron, 25/09 : « vanquisher trop rabougri » — jambes tres ecartees
-    # latéralement, la silhouette lit accroupie/tassee plutot que debout). Mesure : ecart lateral
-    # brut 35.5°/25.9° (plan frontal) contre 8.8°/10.0° chez vortex. L'axe Z de UpLeg controle
-    # exclusivement cet ecartement (verifie : Y n'a aucun effet). Recherche empirique ramene les
-    # deux jambes a ~10°, alignees sur vortex.
+    # 🚨 STANCE TROP LARGE, PUIS TROP CORRIGEE (patron 24/09 : « trop rabougri » -> 1er
+    # correctif Z=28/-16 sur l'angle de hanche seul ; patron 25/09 : « vanquisher a les pieds
+    # joints » -> ce correctif ecrasait bien plus que prevu une fois COMBINE au correctif de
+    # genou (les deux rotations composent, l'angle de hanche seul ne predit pas l'ecart final).
+    # Remesure directe sur l'ECART REEL entre pieds (position 3D, pas l'angle de hanche) :
+    # vortex 17.0% de la hauteur, bluestrike 20.7%, titan (non corrige, jamais critique) 21.1%.
+    # L'ancien Z=28/-16 donnait 5.2% (pieds quasi joints). Z=10/-6 donne 19.4%, dans la
+    # fourchette vortex/bluestrike/titan.
     if "LeftUpLeg" in pb:
-        pb["LeftUpLeg"].rotation_euler.z = math.radians(28.0)
+        pb["LeftUpLeg"].rotation_euler.z = math.radians(10.0)
     if "RightUpLeg" in pb:
-        pb["RightUpLeg"].rotation_euler.z = math.radians(-16.0)
+        pb["RightUpLeg"].rotation_euler.z = math.radians(-6.0)
 
     # 🚨 CORRECTIF GENOU / PIEDS PAS A PLAT (voir build_titan_anims.py) : le tibia brut penchait
     # a 35.8°/22.3° de la verticale (contre 4.6°/19.1° chez vortex). Recherche empirique de la
