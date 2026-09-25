@@ -134,6 +134,14 @@ def apply_combat_guard_base(arm):
     if "RightUpLeg" in pb:
         pb["RightUpLeg"].rotation_euler.x = math.radians(8.0)
 
+    # 🚨 CORRECTIF GENOU / PIEDS PAS A PLAT (voir build_titan_anims.py) : le tibia brut penchait
+    # a 35.8°/22.3° de la verticale (contre 4.6°/19.1° chez vortex). Recherche empirique de la
+    # rotation de genou qui le ramene pres de la verticale (~10-14°).
+    if "LeftLeg" in pb:
+        pb["LeftLeg"].rotation_euler.x = math.radians(-44.0)
+    if "RightLeg" in pb:
+        pb["RightLeg"].rotation_euler.x = math.radians(-18.0)
+
 # --- ANIMATION KEYFRAMERS (copie A L'IDENTIQUE de build_vortex_anims.py — voir l'entete) ---
 
 def pose_idle(arm, f, total_frames=8):

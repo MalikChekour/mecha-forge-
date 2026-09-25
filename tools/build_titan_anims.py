@@ -142,6 +142,22 @@ def apply_bunker_guard_base(arm):
     # ecarte pour la plupart des Meshy humanoides ; on ne force pas UpLeg en Y pour eviter
     # une torsion de hanche non voulue — l'ecart vient du modele + de l'amplitude en marche).
 
+    # 🚨 CORRECTIF GENOU / PIEDS PAS A PLAT (patron, 24/09 : « les mechas n'ont pas les pieds
+    # et jambes bien a plat comme vortex et bluestrike »). Le correctif de hanche ci-dessus ne
+    # touchait QUE la cuisse ; le genou brut du bind pose restait heritee telle quelle, penchant
+    # le TIBIA loin de la verticale (mesure : 30.9°/36.0° chez titan, contre 4.6°/19.1° chez
+    # vortex qui lit "plante au sol"). Recherche empirique (meme technique que la hanche) de la
+    # rotation de genou qui ramene le tibia pres de la verticale (~10-16°, cible 10°, meme ordre
+    # de grandeur que vortex). Assignation directe (`=`, pas `+=`) car applique APRES la ligne
+    # ci-dessus dans une fonction dont le seul appelant pour ces bones est reset_pose (0°) ;
+    # walk/run/die recalculent leur propre flexion de genou (`=`, pas de base a heriter — sans
+    # objet pour walk, deja remplace par bake_walk_mech.py) ; attack/hit/idle heritent bien
+    # (aucune ecriture, ou `+=` pour hit).
+    if "LeftLeg" in pb:
+        pb["LeftLeg"].rotation_euler.x = math.radians(-26.0)
+    if "RightLeg" in pb:
+        pb["RightLeg"].rotation_euler.x = math.radians(-34.0)
+
 # --- ANIMATION KEYFRAMERS ---
 
 def pose_idle(arm, f, total_frames=8):
