@@ -38,6 +38,12 @@ const DEFS: Dictionary = {
 	"bs_ruines":    {"name": "Charognard", "chassis": "bs_ruines", "hp": 26.0, "speed": 186.0, "dmg": 9.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "drops_bonus": true, "unlock": 0.0},
 	# ===== ENNEMI TIREUR : canon lourd telegraphie (bi-canon modelise, accent teal, yeux rouges) =====
 	"gunner":       {"name": "Artilleur lourd", "chassis": "gunner", "hp": 36.0, "speed": 148.0, "dmg": 8.0, "radius": 34.0, "size": 178.0, "motion": "walk", "rank": 0, "w": 1, "behavior": "ranged", "heavy": true, "attack_dmg": 20.0, "attack_cd": 2.4, "prefer_dist": 360.0, "unlock": 0.0},
+	# ===== ENNEMI TIREUR RAPIDE (patron, 25/09) : VANQUISHER recycle du roster joueur (memes
+	# planches, cf. assets/mecha/) — apporte une silhouette neuve au palier tireur rang 0, jusque
+	# la monopolise par le chassis "warden" (tourelle/lancefeu/cracheur/artilleur, 4 variantes du
+	# meme modele). Identite "suppression continue" (cf. sa fiche joueur) : cadence rapide
+	# (attack_cd bas) plutot que le gros coup telegraphie de gunner.
+	"mitrailleur":  {"name": "Mitrailleur", "chassis": "vanquisher", "hp": 32.0, "speed": 184.0, "dmg": 8.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "attack_dmg": 9.0, "attack_cd": 1.3, "prefer_dist": 340.0, "unlock": 0.0},
 	# behavior: rush | ranged | dasher.  "chassis" = baked art reuse (10 chassis). "name" = affichage.
 	# La CORRUPTION par biome (teinte) est appliquee au spawn (enemy_tint), pas ici.
 	# ---------- UNIVERSELS (pool de CHAQUE biome ; cles brute/drone conservees = refs carcasse/beacon) ----------
