@@ -30,6 +30,14 @@ FRAMES = 8
 SAMPLES = 16
 EL = 40.0
 
+# 🚨 25/09 : correctif d'ecartement envisage ici (meme logique que apply_bunker_guard_base),
+# puis ABANDONNE apres mesure directe — l'ecart reel entre pieds de CETTE animation est deja
+# de 20.7-22.3% sur les 8 frames (verifie via le meme calcul LeftFoot/RightFoot que le
+# correctif idle), dans la fourchette vortex(17%)/bluestrike(20.7%)/titan(21.1%). L'appliquer
+# aurait resserre le pas au lieu de l'elargir. Le probleme signale (« bancal pas droit ») n'est
+# donc pas l'ecartement lateral des jambes mais autre chose (a chercher cote inclinaison du
+# buste si ca revient) ; ne pas reappliquer de correctif Z ici sans re-mesurer.
+
 def setup_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=GLB_IN)
