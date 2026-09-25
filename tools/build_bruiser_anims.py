@@ -49,6 +49,24 @@ os.makedirs(OUT_DIR, exist_ok=True)
 def setup_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=GLB_IN)
+
+    # 🚨 TEXTURE TROP SOMBRE (patron, 24/09 : « bruiser est trop sombre » — a corriger SANS
+    # repasser par Meshy). Mesure : luminance moyenne 40.5/255 contre 71.2 (titan) et 68.9
+    # (vanquisher) — pas une impression, un ecart chiffre. Correction gamma (0.65, cf.
+    # meshy_in/bruiser/tex_base_color_bright.png) ramene la moyenne a 71.3, alignee sur titan.
+    # Remplace l'image "texture_0" (alimente Base Color ET Emission dans Material_1) par la
+    # version eclaircie, generee une fois via PIL (voir commentaire ci-dessous pour regenerer).
+    bright_path = os.path.abspath("meshy_in/bruiser/tex_base_color_bright.png")
+    if os.path.exists(bright_path) and "texture_0" in bpy.data.images:
+        old_img = bpy.data.images["texture_0"]
+        new_img = bpy.data.images.load(bright_path)
+        for mat in bpy.data.materials:
+            if not mat.use_nodes:
+                continue
+            for n in mat.node_tree.nodes:
+                if n.type == "TEX_IMAGE" and n.image == old_img:
+                    n.image = new_img
+
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
