@@ -1,0 +1,208 @@
+===============================================================================
+PACK DE GENERATION D'IMAGES — DECOR DE JEU "MECHA-FORGE"
+Destine a une IA specialiste en generation d'images. Lire ENTIEREMENT avant de
+generer quoi que ce soit : les regles ci-dessous s'appliquent a CHACUNE des
+11 images demandees plus bas.
+===============================================================================
+
+CONTEXTE
+--------
+Ce sont des elements de decor pour un jeu video 2D vu de dessus (top-down),
+style action/arcade. Chaque image sera integree telle quelle dans le moteur du
+jeu, redimensionnee automatiquement, sans retouche manuelle possible derriere.
+C'est pourquoi les regles techniques ci-dessous sont strictes : une image qui
+ne les respecte pas ne pourra pas etre utilisee et devra etre regeneree.
+
+===============================================================================
+REGLES TECHNIQUES OBLIGATOIRES (lire avant chaque generation)
+===============================================================================
+
+1. FORMAT DE SORTIE
+   - PNG avec une VRAIE couche alpha transparente (transparence native du
+     fichier), PAS un damier gris/blanc dessine, PAS un fond blanc uni, PAS un
+     fond d'une autre couleur unie. Le fond doit etre réellement transparent
+     au sens informatique du terme (canal alpha = 0 autour du sujet).
+   - Resolution minimale conseillee : 1024x1024 pixels (carre). Une image plus
+     grande est acceptable, plus petite que 768x768 ne l'est pas.
+   - Jamais de JPG (pas de transparence possible dans ce format).
+
+2. CADRAGE ET COMPOSITION
+   - UN SEUL objet par image. Jamais de scene, jamais de second plan, jamais
+     d'autres objets secondaires autour du sujet principal.
+   - Le sujet doit etre CENTRE dans le cadre, avec une marge vide d'environ
+     15-20% de chaque cote (haut/bas/gauche/droite). Ne jamais laisser le
+     sujet toucher ou depasser les bords de l'image : il sera recadre/redimensionne
+     automatiquement et un sujet coupe au bord produira un rendu casse en jeu.
+   - PAS de texte, PAS de watermark, PAS de signature, PAS de logo, PAS
+     d'interface (pas de barre de vie, pas de HUD, pas de cadre decoratif).
+   - PAS d'ombre portee dessinee sous l'objet (le moteur de jeu ajoute sa
+     propre ombre automatiquement par-dessus ; une ombre deja presente dans
+     l'image créerait un doublon visuel moche).
+
+3. TROIS CATEGORIES D'IMAGES — chaque prompt ci-dessous precise sa categorie,
+   le traitement est DIFFERENT selon la categorie :
+
+   CATEGORIE A — "Objet debout" (vue 3/4 plongeante)
+     Un objet mecanique/industriel vu depuis au-dessus et legerement de cote,
+     comme si on regardait une tourelle ou une machine posee au sol depuis un
+     point de vue en hauteur a ~45-60 degres. L'objet a du VOLUME (hauteur
+     visible), pas juste une forme plate.
+
+   CATEGORIE B — "Danger de sol" (vue du dessus, quasi a plat)
+     Un element qui est au RAS DU SOL (une flaque, une plaque de glace, un
+     trou, une grille) : pas de volume vertical important, vu presque
+     perpendiculairement depuis au-dessus, comme un decalque pose sur le sol.
+     Ne pas dessiner de perspective 3/4 pour ces elements-la : c'est plat.
+
+   CATEGORIE C — "Texture de sol" (uniquement pour les textures, aucune ici)
+     Non applicable a ce pack (les 4 textures de sol ont deja ete generees
+     separement). Ignorer cette categorie pour ce pack-ci.
+
+4. STYLE VISUEL A RESPECTER SUR TOUTES LES IMAGES
+   - Rendu "concept-art peint numeriquement", PAS photorealiste, PAS
+     cartoon/chibi, PAS pixel-art.
+   - Eclairage directionnel doux venant du HAUT-GAUCHE sur chaque image (pour
+     que toutes les images aient une direction de lumiere coherente entre
+     elles une fois mises cote a cote dans le jeu).
+   - Silhouette nette et lisible, meme en tres petit (l'image sera affichee a
+     une taille reduite dans le jeu — evitez les details fins qui
+     disparaitraient en miniature).
+   - Finition "science-fiction industrielle" : metal, panneaux, rivets,
+     tuyaux, lumieres neon/emissives selon la couleur precisee dans chaque
+     prompt.
+   - Une image de reference de style est jointe a ce pack
+     (reference_style.png) : si votre outil accepte une image de reference,
+     joignez-la systematiquement pour les images de CATEGORIE A (objets
+     debout). Elle n'est pas necessaire pour les images de CATEGORIE B.
+     DESCRIPTION DE LA REFERENCE (si vous ne pouvez pas charger le fichier) :
+     une tourelle de defense industrielle, vue 3/4 plongeante, metal gris-bleu
+     acier avec rivets et panneaux, rendu peint numerique avec ombres douces,
+     silhouette tres nette, fond entierement transparent.
+
+5. COULEURS — respecter STRICTEMENT la couleur d'accentuation indiquee dans
+   chaque prompt (cyan electrique, orange avertissement, dore, etc.) : c'est
+   le code couleur qui permet au joueur d'identifier le type de danger en un
+   coup d'oeil dans le jeu. Ne pas improviser une autre couleur d'accent.
+
+6. NOMMAGE DES FICHIERS EN SORTIE — merci de nommer chaque image exactement
+   comme indique entre crochets [nom_fichier.png] au debut de chaque prompt
+   ci-dessous, pour que l'integration dans le jeu soit directe.
+
+===============================================================================
+LES 11 IMAGES A GENERER
+===============================================================================
+
+--- [porte_securite_orbitale.png] — CATEGORIE A — Couleur d'accent : dore + bleu electrique ---
+A two-panel security door closing at the center, premium gold/electric-blue
+finish (distinct from the raw industrial grey-steel look of other similar
+props — this one reads as high-tech/ceremonial), viewing ports along the
+seam where the two panels meet, a glowing electric-blue status light above
+the frame. Shown fully CLOSED (both panels meeting in the middle, no gap).
+Top-down 3/4 perspective view, matching the reference image's camera angle.
+Single object, centered, pure transparent background, no shadow, no text.
+
+--- [emetteur_laser_rotatif.png] — CATEGORIE A — Couleur d'accent : dore + orange ---
+A laser-emitting turret mounted on a circular base, designed to sit at the
+center of a platform: body finished in gold and electric-blue metal, a
+rotating barrel/emitter on top, a thin dotted orange line extending from the
+barrel suggesting the sweep trajectory of its laser, a small glowing lens at
+the very front of the barrel. Top-down 3/4 perspective view, matching the
+reference image's camera angle. Single object, centered, pure transparent
+background, no shadow, no text.
+
+--- [pilier_energie.png] — CATEGORIE A — Couleur d'accent : dore ---
+A massive, imposing architectural pillar — the single grandest and largest
+piece of decor described in this pack, meant to read as a landmark, not a
+small prop: a tall golden column engraved with glowing blue circuit-line
+patterns that run from its base to its top, a wide heavy base anchoring it
+to the ground, the top of the column radiating a soft warm golden glow.
+Top-down 3/4 perspective view, matching the reference image's camera angle,
+but taller/larger in proportion than a normal prop. Single object, centered,
+pure transparent background, no shadow, no text.
+
+--- [segment_mur_modulaire.png] — CATEGORIE A — Couleur d'accent : dore + bleu electrique ---
+A single modular wall panel segment, the kind used in a reconfigurable
+arena (it can slide and move): a sturdy rectangular wall panel in gold and
+electric-blue metal, visible mechanical grooves/rails running along its
+left and right edges (implying it slides along tracks), a single glowing
+blue line running along its top edge. Shown as a FLAT FRONT-FACING wall
+panel (like looking directly at a wall, not from above) — this one exception
+does not use the reference's 3/4 top-down angle, since it represents a
+vertical wall surface. Single object, centered, pure transparent background,
+no shadow, no text.
+
+--- [plaque_de_glace.png] — CATEGORIE B (danger de sol) — Couleur d'accent : bleu glace pale ---
+A patch of smooth, slick ice resting on a floor surface: a roughly circular
+sheet of pale blue ice with a few subtle internal crack lines, a faint
+reflective/glossy sheen on its surface, sitting slightly ABOVE the floor
+level (like a thin raised layer of ice), a light cold mist wisping gently at
+its outer edge. Viewed from DIRECTLY ABOVE, almost flat/orthographic — NOT
+the 3/4 angle used for upright objects, this is a ground-level hazard decal.
+Single object, centered, pure transparent background, no shadow, no text.
+
+--- [pic_de_glace.png] — CATEGORIE A (but low to the ground) — Couleur d'accent : cyan ---
+A sharp cluster of ice spikes bursting upward out of the ground: jagged,
+translucent blue-white ice crystals of varying heights erupting from a
+cracked opening in the floor, a faint cyan glow emanating from the crack
+where the ice broke through. Top-down 3/4 perspective view, matching the
+reference image's camera angle. Single object, centered, pure transparent
+background, no shadow, no text.
+
+--- [trou_glace_effondree.png] — CATEGORIE B (danger de sol) — Couleur d'accent : bleu fonce / noir ---
+A hole in a broken ice floor: jagged shards of ice ring the edge of a dark
+circular opening that reveals black water visible below, thin fracture
+lines radiating outward from the hole across the surrounding ice surface.
+Viewed from DIRECTLY ABOVE, almost flat/orthographic — this is a ground-level
+hazard decal, not an upright object. Single object, centered, pure
+transparent background, no shadow, no text.
+
+--- [bassin_liquide_toxique.png] — CATEGORIE B (danger de sol) — Couleur d'accent : vert toxique ---
+A pool of toxic radioactive liquid resting in a floor surface: murky,
+glowing green liquid with a faintly bubbling surface texture, a ring of
+corroded/rusted metal forming the rim around the pool, thin wisps of toxic
+green-tinted vapor rising gently off the liquid's surface. Viewed from
+DIRECTLY ABOVE, almost flat/orthographic — ground-level hazard decal, not an
+upright object. Single object, centered, pure transparent background, no
+shadow, no text.
+
+--- [turbine_geante.png] — CATEGORIE A (background-scale piece) — Couleur d'accent : orange avertissement ---
+A giant industrial turbine fan, built into the wall or floor of a reactor
+room and shown PARTIALLY (as if only part of it is visible, the rest
+implied to continue off-frame): a massive circular fan housing with
+clearly visible rotating blades inside, black-and-yellow warning stripes
+painted around its outer rim, a subtle motion-blur suggestion on the spinning
+blades to imply movement. Top-down 3/4 perspective view, matching the
+reference image's camera angle, but noticeably LARGER in scale/proportion
+than a normal prop (this is a background landmark piece, not something the
+player interacts with directly). Single object, centered, pure transparent
+background, no shadow, no text.
+
+--- [grille_ventilation.png] — CATEGORIE B (danger de sol) — Couleur d'accent : orange ---
+A steam-vent floor grate set flush into the ground: a flat metal grille
+(evenly spaced slats), a faint wisp of white steam just beginning to rise up
+through the slats, a thin orange warning ring painted on the floor around
+the grate's perimeter. Viewed from DIRECTLY ABOVE, almost flat/orthographic
+— ground-level hazard decal, not an upright object. Single object, centered,
+pure transparent background, no shadow, no text.
+
+--- [sol_collant.png] — CATEGORIE B (danger de sol) — Couleur d'accent : violet-vert organique ---
+A patch of sticky biomechanical residue spread on the ground: a glistening,
+dark purple-green puddle with a slightly raised, tacky/gooey-looking
+surface, a few thin organic strands or filaments stretching upward from it
+like thick mucus or resin, a faint sickly bioluminescent glow coming from
+within the puddle. Viewed from DIRECTLY ABOVE, almost flat/orthographic —
+ground-level hazard decal, not an upright object. Single object, centered,
+pure transparent background, no shadow, no text.
+
+===============================================================================
+RECAPITULATIF — CE QUI FERA ECHOUER UNE IMAGE (a vérifier avant de livrer)
+===============================================================================
+[ ] Fond transparent reel (pas blanc, pas gris, pas un damier dessine)
+[ ] Un seul objet, rien d'autre dans le cadre
+[ ] Objet centre avec de la marge, rien de coupe au bord
+[ ] Aucun texte, watermark, signature, logo, HUD
+[ ] Aucune ombre portee dessinee sous l'objet
+[ ] Bon cadrage selon la categorie (3/4 pour A, vue de dessus plate pour B)
+[ ] Couleur d'accent respectee
+[ ] Nom de fichier correct
+===============================================================================

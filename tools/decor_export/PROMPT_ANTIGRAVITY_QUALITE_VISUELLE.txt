@@ -1,0 +1,206 @@
+===============================================================================
+PROMPT POUR ANTIGRAVITY — PASSE QUALITE VISUELLE : MAPS, DECOR, DECOR
+INTERACTIF, EFFETS SPECIAUX
+===============================================================================
+
+CHEMIN DU PROJET : C:\Users\Administrator\mecha-forge
+Moteur : Godot 4.3, GDScript. Jeu "MECHA-FORGE" (survivor-like top-down).
+Code testable en headless (voir section TESTS en bas — a utiliser AVANT et
+APRES chaque changement, aucune exception).
+
+-------------------------------------------------------------------------------
+CONTEXTE — CE QUI EXISTE DEJA (lire avant de modifier quoi que ce soit)
+-------------------------------------------------------------------------------
+Le jeu a 5 "biomes" jouables issus d'un plan de refonte "15 maps" : tech
+(Secteur Tech), cryo (Zone Cryo), reacteur (Noyau Instable), ruche
+(Biomecanique), citadelle (Forge Finale). Chacun a son propre decor
+interactif (plateformes, pieges, zones de danger, etc.) defini dans :
+
+  game/actors/PropScatter.gd   <- le plus gros fichier, const DECOR (toutes
+                                   les entrees de decor : sprite, taille "sz",
+                                   HP, couleur de glow, mecanique associee),
+                                   const BIOME_DECOR (quel decor dans quel
+                                   biome), const BIOME_MAP_SEGMENTS (quelle
+                                   mecanique appartient a quelle map source,
+                                   avec une PROGRESSION dans le temps -
+                                   _map_phase_weights()/_pick_kind() font
+                                   deriver le decor tire vers la map suivante
+                                   au fil du temps de jeu), et la classe
+                                   interne "Prop" qui porte toute la logique
+                                   de chaque mecanique (un _ready() qui lit
+                                   les champs du dict DECOR, un _process() qui
+                                   fait vivre la mecanique).
+
+  game/actors/GroundZone.gd    <- zone de danger telegraphee au sol (cercle
+                                   ou ligne qui pulse puis explose), reutilisee
+                                   par la plupart des dangers du decor.
+
+  game/scenes/Game.gd          <- impact_fx(pos, color, kind, dir, scale) est
+                                   LE point d'entree pour un effet d'impact
+                                   complet (flash + anneau + debris + halo au
+                                   sol), deja utilise par le combat ET
+                                   (recemment) par le decor. spawn_vfx(...)
+                                   est le rendu de bas niveau (une planche
+                                   animee en sprite additif).
+
+Une passe recente a deja :
+- Ajoute une progression de map dans le temps (BIOME_MAP_SEGMENTS).
+- Elargi la fenetre de chargement du decor (LOAD_R) pour eviter le pop-in/out
+  visible a l'ecran en mode defilement infini.
+- Corrige l'espacement entre decors pour que les nuages proceduraux
+  (brouillard_froid, nuage_spores - sprite de base minuscule, vrai rendu bien
+  plus grand) ne soient plus recouverts par d'autres objets.
+- Fait passer les impacts/explosions du decor par impact_fx() (halo + coeur +
+  anneau + debris, au lieu d'un simple sprite plat) et ajoute un "coeur" a
+  tous les halos ambiants (anneaux de zones toxiques, gelees, etc.).
+
+Ce travail est VERIFIE par une suite de tests automatises (liste en bas) -
+toujours verte actuellement. Ne pas la casser.
+
+-------------------------------------------------------------------------------
+LA DEMANDE
+-------------------------------------------------------------------------------
+Fais une passe d'amelioration qualitative SIGNIFICATIVE sur l'ensemble :
+les maps, le decor (statique et interactif), et les effets speciaux. Objectif :
+que le rendu visuel soit nettement plus beau, plus lisible, et plus
+professionnel - pas juste "fonctionnel".
+
+1. QUALITE VISUELLE GENERALE
+   - Revois le rendu de chaque mecanique de decor interactif (anneaux de
+     zone, telegraphes de danger, effets d'activation) : est-ce que ca se
+     voit bien, est-ce que ca a l'air "vivant" (pulsation, mouvement,
+     variation), ou est-ce que ca a l'air plat/statique/place au hasard ?
+   - Revois la composition de chaque map/biome : la repartition du decor
+     raconte-t-elle une histoire coherente avec le theme (laboratoire gele,
+     reacteur en surchauffe, ruche organique, citadelle doree...) ou est-ce
+     que ca ressemble a un remplissage aleatoire ?
+   - Ameliore ce qui doit l'etre SANS reinventer l'architecture : ce fichier
+     accumule des mecaniques qui reutilisent toutes les memes idiomes deja
+     prouves (GroundZone pour le telegraphe, impact_fx pour l'impact, un
+     halo+coeur pour les auras) - reste sur ces idiomes, ne construis pas un
+     nouveau systeme de rendu parallele.
+
+2. CORRIGER LES BUGS DE TAILLE ENTRE LES ELEMENTS DE DECOR
+   - Chaque entree de `DECOR` a un champ `"sz"` qui fixe sa taille a l'ecran.
+     Audite TOUTES les valeurs `sz` du fichier (il y en a plusieurs dizaines,
+     de 20 a 220+) : repere les incoherences - un objet cense etre un
+     "petit" decor qui s'affiche plus gros qu'un point de repere cense etre
+     "grand", des objets de la MEME famille conceptuelle (ex. toutes les
+     tourelles, tous les cristaux, tous les anneaux de zone) avec des tailles
+     qui ne se justifient pas, ou des elements qui changent visiblement de
+     taille entre deux apparitions sans raison de gameplay.
+   - Attention au piege deja rencontre sur ce fichier : certains decors
+     (brouillard_froid, nuage_spores) ont un `sz` minuscule parce que leur
+     sprite de base est volontairement cache (`_sprite.visible = false`) et
+     remplace par un rendu procedural (un halo anime) dont la vraie taille
+     vient d'un AUTRE champ (`fog_r`, `spore_r`, etc.) - ne te fie jamais au
+     seul `sz` sans verifier s'il y a un rendu procedural qui le remplace.
+   - Etablis (ou corrige) une hierarchie de taille VOLONTAIRE et coherente :
+     petit prop de remplissage < objet interactif normal < point de repere
+     "grand" (un pilier, une turbine geante...) - et assure-toi que chaque
+     objet d'une meme categorie dans TOUS les biomes suit la meme echelle
+     relative, pas des valeurs choisies au hasard biome par biome.
+
+3. EFFETS SPECIAUX
+   - Le combat (armes/tirs/impacts) suit deja une regle etablie : jamais un
+     effet plat, toujours halo diffus + coeur brillant + liseré blanc chaud,
+     une amorce et un impact, en reutilisant les planches animees de
+     `game/assets/vfx/` (decoupees en une seule frame via AtlasTexture/
+     hframes, rendues en additif). Verifie que CETTE regle est bien respectee
+     partout, y compris sur le decor qui vient d'etre aligne dessus - et
+     pousse-la plus loin si tu trouves un effet qui reste plat malgre tout.
+   - Chaque famille d'effet doit avoir sa propre signature (forme + couleur),
+     jamais le meme effet juste reteinte.
+   - Reste leger : pas de nouveau shader lourd, pas de particules non
+     plafonnees (ce jeu tourne sur navigateur web, sans GPU dedie).
+
+-------------------------------------------------------------------------------
+CONTRAINTES — A RESPECTER STRICTEMENT
+-------------------------------------------------------------------------------
+- NE TOUCHE PAS a la logique de gameplay (degats, timers, probabilites,
+  deblocage de chapitres, ennemis/boss). C'est une passe VISUELLE uniquement.
+- Les 4 boss de chapitre (cryoboss/reacteurboss/rucheboss/citadelleboss) sont
+  VOLONTAIREMENT desactives dans `game/systems/EnemySpawner.gd` (commentes
+  dans `DEFS`, en attente d'un vrai art 3D) - ne les reactive pas.
+- Reutilise les helpers deja existants (`impact_fx`, `spawn_vfx`, `_glow_sprite`,
+  `_core_child`, `GroundZone`) plutot que d'inventer un nouveau mecanisme de
+  rendu. Si un vrai besoin nouveau apparait, calque-le sur l'idiome le plus
+  proche deja present dans le fichier.
+- Zero regression : voir TESTS ci-dessous, a lancer avant de commencer
+  (reference) et apres chaque changement significatif.
+
+-------------------------------------------------------------------------------
+TESTS — A LANCER (godot doit etre installe, verifie sur cette machine)
+-------------------------------------------------------------------------------
+Depuis C:\Users\Administrator\mecha-forge\game, avec le binaire Godot 4.3
+(ex. C:\Users\Administrator\godot_ci\Godot_v4.3-stable_win64_console.exe) :
+
+  godot --headless --path . --import
+
+puis, pour chacun de ces fichiers (doit afficher "SMOKE PASS (0 echec(s))") :
+
+  godot --headless --path . res://_test_decor_tech.tscn
+  godot --headless --path . res://_test_decor_cryo.tscn
+  godot --headless --path . res://_test_decor_phase2.tscn
+  godot --headless --path . res://_test_decor_map_phase.tscn
+  godot --headless --path . res://_test_chapters.tscn
+  godot --headless --path . res://_test_boss_chapitres.tscn
+  godot --headless --path . res://_test_vfx_signature.tscn
+  godot --headless --path . res://_test_kill_tracking.tscn
+  godot --headless --path . res://_test_hybrids.tscn
+  godot --headless --path . res://_test_weapon_loan.tscn
+  godot --headless --path . res://_test_gear.tscn
+  godot --headless --path . res://_test_dates.tscn
+
+Puis un smoke runtime sur chaque biome (verifie l'absence d'erreur/warning
+dans la sortie, en ignorant les lignes "leaked"/"still in use"/"clear (core") :
+
+  godot --headless --path . -- --biome=tech
+  godot --headless --path . -- --biome=cryo
+  godot --headless --path . -- --biome=reacteur
+  godot --headless --path . -- --biome=ruche
+  godot --headless --path . -- --biome=citadelle
+
+Si tu ajoutes ou modifies une mecanique, ajoute une assertion correspondante
+dans le fichier de test concerne (meme style que l'existant : fonction
+`_ok(cond, label, detail)`, impression "PASS"/"FAIL", `get_tree().quit()` a
+la fin) plutot que de laisser un changement non verifie.
+
+-------------------------------------------------------------------------------
+PUBLICATION SUR ITCH.IO — A FAIRE EN DERNIER, UNIQUEMENT SI TOUT EST VERT
+-------------------------------------------------------------------------------
+Une fois TOUS les tests ci-dessus verts ET le smoke des 5 biomes propre (aucune
+ligne d'erreur/warning hors "leaked"/"still in use"/"clear (core"), publie la
+mise a jour sur itch.io :
+
+1. Ouvre `game/project.godot`, cherche la ligne `config/version="X.Y"`, et
+   incremente Y de 1 (ex. "11.6" -> "11.7"). C'est le numero affiche sur la
+   page itch, il doit changer a chaque publication.
+
+2. Lance, depuis une invite PowerShell, a la racine du depot
+   (C:\Users\Administrator\mecha-forge) :
+
+     powershell -ExecutionPolicy Bypass -File tools\push_itch.ps1
+
+   Ce script fait tout seul : export Web + export Android depuis le code
+   source actuel, puis push des deux builds vers itch.io (cible
+   "whimora/mecha-forge", canaux "html5" et "android") via butler. La cle API
+   est deja configuree (C:\Users\Administrator\.itch_key) - rien d'autre a
+   fournir. Le script peut prendre plusieurs minutes (export + upload).
+
+3. Verifie que la publication est bien passee ET entierement traitee cote
+   serveur (pas juste "uploadee") :
+
+     $env:BUTLER_API_KEY = (Get-Content "C:\Users\Administrator\.itch_key" -Raw).Trim()
+     & "C:\Users\Administrator\tools\butler\butler.exe" status whimora/mecha-forge
+
+   Les deux lignes ("android" et "html5") doivent afficher un "√" devant le
+   build le plus recent, ET la colonne VERSION doit correspondre au nouveau
+   numero de la etape 1. Si une ligne affiche encore un "∙" (en cours de
+   traitement), attends quelques secondes et relance la commande jusqu'a
+   voir les deux "√".
+
+NE PUBLIE PAS si un test echoue ou si le smoke d'un biome montre une erreur -
+corrige d'abord, re-teste, et ne lance la publication qu'une fois vraiment
+tout vert.
+===============================================================================

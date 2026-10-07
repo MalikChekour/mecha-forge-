@@ -11,8 +11,13 @@ var _spawn_t: float = 0.0
 var speed_mult: float = 1.0   # biome modifier on enemy movement speed
 var spawn_mult: float = 1.0   # biome modifier on spawn density
 var arena_half: float = 0.0   # bounded-arena clamp for spawns (0 = unbounded)
+var arena: Rect2 = Rect2(-1000000, -1000000, 2000000, 2000000)
 var difficulty_bonus: float = 0.0   # permanent step-up per cleared zone (set by Game.next_map)
 var current_biome: String = "tech"   # set by Game per zone -> filtre le pool d ennemis
+## Quel chapitre a ete choisi au demarrage de la run (pas par zone -> jamais touche par
+## next_map()/_apply_chapter_biome, seulement au lancement). Sert UNIQUEMENT a distinguer
+## "chapitre 1" pour BELIER-01 (voir plus bas) ; ne change jamais en cours de run.
+var chapter: int = 1
 var enemy_tint: Color = Color(1, 1, 1)   # corruption visuelle du biome, appliquee a chaque ennemi
 # Scripted HORDES: a massive coordinated wave that crashes in at timed moments. First at
 # ~1 min, then on an interval; each wave grows with run time and stays mobile-safe (capped).
@@ -25,76 +30,31 @@ const ENEMY_CAP: int = 220   # weak swarm dies fast -> allow a denser horde on s
 # and bosses. Timeline we replicate ('unlock' = when the kind may spawn at all, in seconds):
 #   0:00 melee swarm only      1:00 ranged units join      1:30 a 2nd melee type
 #   3:00 intermediates + ELITE event      5:00 boss      12:00 ELITE event      15:00 final boss
+# 30/09 : roster entier retire a la demande du patron (47 entrees). Vide deliberement, pas un
+# oubli — toutes les fonctions de spawn plus bas sont gardees contre un DEFS/BIOME_POOL vide
+# (kind absent -> no-op silencieux, jamais un crash). L'art (assets/enemies/) et le dispatch de
+# comportement generique (Enemy.gd) restent en place, prets si des ennemis reviennent un jour.
 const DEFS: Dictionary = {
-	# ===== TEST : Blue Strike = SEUL ennemi, une peinture + specificite PAR CARTE =====
-	"bs_tech":      {"name": "Machine Tech", "chassis": "bs_tech", "hp": 26.0, "speed": 178.0, "dmg": 9.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"bs_earth":     {"name": "Broyeur Terre", "chassis": "bs_earth", "hp": 42.0, "speed": 150.0, "dmg": 12.0, "radius": 34.0, "size": 158.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"bs_spaceship": {"name": "Spectre", "chassis": "bs_spaceship", "hp": 22.0, "speed": 214.0, "dmg": 8.0, "radius": 30.0, "size": 146.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "dasher", "unlock": 0.0},
-	"bs_volcanic":  {"name": "Fondeur", "chassis": "bs_volcanic", "hp": 28.0, "speed": 192.0, "dmg": 15.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"bs_desert":    {"name": "Raider", "chassis": "bs_desert", "hp": 20.0, "speed": 232.0, "dmg": 8.0, "radius": 30.0, "size": 144.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"bs_ice":       {"name": "Blinde Givre", "chassis": "bs_ice", "hp": 46.0, "speed": 150.0, "dmg": 10.0, "radius": 34.0, "size": 158.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "shield": 14.0, "unlock": 0.0},
-	"bs_jungle":    {"name": "Rodeur Jungle", "chassis": "bs_jungle", "hp": 18.0, "speed": 202.0, "dmg": 7.0, "radius": 28.0, "size": 142.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"bs_swamp":     {"name": "Corrosif", "chassis": "bs_swamp", "hp": 30.0, "speed": 152.0, "dmg": 11.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"bs_ruines":    {"name": "Charognard", "chassis": "bs_ruines", "hp": 26.0, "speed": 186.0, "dmg": 9.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "drops_bonus": true, "unlock": 0.0},
-	# ===== ENNEMI TIREUR : canon lourd telegraphie (bi-canon modelise, accent teal, yeux rouges) =====
-	"gunner":       {"name": "Artilleur lourd", "chassis": "gunner", "hp": 36.0, "speed": 148.0, "dmg": 8.0, "radius": 34.0, "size": 178.0, "motion": "walk", "rank": 0, "w": 1, "behavior": "ranged", "heavy": true, "attack_dmg": 20.0, "attack_cd": 2.4, "prefer_dist": 360.0, "unlock": 0.0},
-	# ===== ENNEMI TIREUR RAPIDE (patron, 25/09) : VANQUISHER recycle du roster joueur (memes
-	# planches, cf. assets/mecha/) — apporte une silhouette neuve au palier tireur rang 0, jusque
-	# la monopolise par le chassis "warden" (tourelle/lancefeu/cracheur/artilleur, 4 variantes du
-	# meme modele). Identite "suppression continue" (cf. sa fiche joueur) : cadence rapide
-	# (attack_cd bas) plutot que le gros coup telegraphie de gunner.
-	"mitrailleur":  {"name": "Mitrailleur", "chassis": "vanquisher", "hp": 32.0, "speed": 184.0, "dmg": 8.0, "radius": 32.0, "size": 150.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "attack_dmg": 9.0, "attack_cd": 1.3, "prefer_dist": 340.0, "unlock": 0.0},
-	# behavior: rush | ranged | dasher.  "chassis" = baked art reuse (10 chassis). "name" = affichage.
-	# La CORRUPTION par biome (teinte) est appliquee au spawn (enemy_tint), pas ici.
-	# ---------- UNIVERSELS (pool de CHAQUE biome ; cles brute/drone conservees = refs carcasse/beacon) ----------
-	"brute":     {"name": "Rodeur", "chassis": "u_rodeur", "proc": true, "hp": 14.0, "speed": 224.0, "dmg": 6.0, "radius": 30.0, "size": 124.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "unlock": 0.0},
-	"drone":     {"name": "Guepe", "chassis": "u_guepe", "proc": true, "hp": 10.0, "speed": 300.0, "dmg": 3.0, "radius": 18.0, "size": 78.0, "motion": "hover", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 4.0, "attack_cd": 1.9, "prefer_dist": 280.0, "unlock": 40.0},
-	"quadshell": {"name": "Belier", "chassis": "u_belier", "proc": true, "hp": 18.0, "speed": 214.0, "dmg": 9.0, "radius": 26.0, "size": 122.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "dasher", "unlock": 55.0},
-	# ---------- SPECIALISTES par biome (cles neuves, chassis reutilise) ----------
-	"sentinelle": {"name": "Sentinelle", "chassis": "shielded", "proc": true, "hp": 26.0, "speed": 196.0, "dmg": 8.0, "radius": 32.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "rush", "shield": 16.0, "unlock": 25.0},
-	"tourelle":   {"name": "Tourelle", "chassis": "warden", "proc": true, "hp": 72.0, "speed": 168.0, "dmg": 12.0, "radius": 34.0, "size": 146.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "ranged", "attack_dmg": 14.0, "attack_cd": 1.7, "prefer_dist": 360.0, "drops_bonus": true, "unlock": 120.0},
-	"charognard": {"name": "Charognard", "chassis": "elite", "proc": true, "hp": 16.0, "speed": 250.0, "dmg": 7.0, "radius": 28.0, "size": 130.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"broyeur":    {"name": "Broyeur", "chassis": "crusher", "proc": true, "hp": 80.0, "speed": 170.0, "dmg": 17.0, "radius": 36.0, "size": 156.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "rush", "drops_bonus": true, "unlock": 120.0},
-	"voltigeur":  {"name": "Voltigeur", "chassis": "elite", "proc": true, "hp": 16.0, "speed": 242.0, "dmg": 8.0, "radius": 26.0, "size": 118.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "dasher", "unlock": 0.0},
-	"essaim":     {"name": "Essaim", "chassis": "eyedrone", "proc": true, "hp": 13.0, "speed": 180.0, "dmg": 5.0, "radius": 20.0, "size": 96.0, "motion": "hover", "rank": 1, "w": 1, "behavior": "ranged", "attack_dmg": 9.0, "attack_cd": 1.4, "prefer_dist": 320.0, "drops_bonus": true, "unlock": 90.0},
-	"lancefeu":   {"name": "Lance-feu", "chassis": "warden", "proc": true, "hp": 70.0, "speed": 172.0, "dmg": 11.0, "radius": 32.0, "size": 142.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "attack_dmg": 11.0, "attack_cd": 1.6, "prefer_dist": 330.0, "unlock": 30.0},
-	"fondeur":    {"name": "Fondeur", "chassis": "crusher", "proc": true, "hp": 90.0, "speed": 168.0, "dmg": 18.0, "radius": 36.0, "size": 158.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "rush", "drops_bonus": true, "unlock": 120.0},
-	"pillard":    {"name": "Pillard", "chassis": "elite", "proc": true, "hp": 15.0, "speed": 268.0, "dmg": 7.0, "radius": 28.0, "size": 128.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"foreuse":    {"name": "Foreuse", "chassis": "crusher", "proc": true, "hp": 68.0, "speed": 196.0, "dmg": 16.0, "radius": 30.0, "size": 140.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "dasher", "drops_bonus": true, "unlock": 120.0},
-	"eclat":      {"name": "Eclat", "chassis": "shielded", "proc": true, "hp": 24.0, "speed": 188.0, "dmg": 8.0, "radius": 32.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "rush", "shield": 12.0, "unlock": 25.0},
-	"givre":      {"name": "Givre", "chassis": "crusher", "proc": true, "hp": 86.0, "speed": 150.0, "dmg": 16.0, "radius": 36.0, "size": 158.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "rush", "drops_bonus": true, "unlock": 120.0},
-	"fourmi":     {"name": "Fourmi", "chassis": "elite", "proc": true, "hp": 11.0, "speed": 244.0, "dmg": 5.0, "radius": 26.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 5, "behavior": "rush", "unlock": 0.0},
-	"cracheur":   {"name": "Cracheur", "chassis": "warden", "proc": true, "hp": 70.0, "speed": 170.0, "dmg": 11.0, "radius": 32.0, "size": 142.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "ranged", "attack_dmg": 12.0, "attack_cd": 1.6, "prefer_dist": 340.0, "drops_bonus": true, "unlock": 120.0},
-	"rampant":    {"name": "Rampant", "chassis": "shielded", "proc": true, "hp": 28.0, "speed": 180.0, "dmg": 8.0, "radius": 32.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "rush", "shield": 14.0, "unlock": 25.0},
-	"sangsue":    {"name": "Sangsue", "chassis": "crusher", "proc": true, "hp": 84.0, "speed": 160.0, "dmg": 15.0, "radius": 36.0, "size": 156.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "rush", "drops_bonus": true, "unlock": 120.0},
-	"garde":      {"name": "Garde d assaut", "chassis": "elite", "proc": true, "hp": 20.0, "speed": 228.0, "dmg": 9.0, "radius": 30.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "rush", "unlock": 0.0},
-	"artilleur":  {"name": "Artilleur", "chassis": "warden", "proc": true, "hp": 74.0, "speed": 166.0, "dmg": 12.0, "radius": 34.0, "size": 146.0, "motion": "walk", "rank": 1, "w": 1, "behavior": "ranged", "attack_dmg": 15.0, "attack_cd": 1.8, "prefer_dist": 370.0, "drops_bonus": true, "unlock": 120.0},
-	# ---------- BOSS (w:0 -> planifies, hors pick) : 3 boss "top Meshy + jambes qui marchent" ----------
-	# COLOSSE (5 min) : ZONEUR AoE. Acier & or, ranged + ogive (zones telegraphiees) + bouclier.
-	"midboss": {"name": "Colosse", "chassis": "midboss", "hp": 950.0, "speed": 150.0, "dmg": 24.0, "radius": 60.0, "size": 320.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 22.0, "attack_cd": 2.2, "prefer_dist": 300.0, "shield": 240.0, "drops_bonus": true},
-	# BROYEUR (10 min, bonus) : BRUTE rusheuse. Rouille, gros bouclier + gros degats de contact, rapide.
-	"crusherboss": {"name": "Broyeur Titan", "chassis": "crusherboss", "hp": 1500.0, "speed": 190.0, "dmg": 30.0, "radius": 66.0, "size": 340.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "rush", "shield": 380.0, "drops_bonus": true},
-	# ===== MINI-BOSS a OGIVES (chassis ogreboss, Noir+Or) : GROS + boucliers + ogives explosives =====
-	# 5 min : ogive UNIQUE lente + AoE, bouclier standard.  10 min : SALVE 3 + tir RADIAL, bouclier DOUBLE + +PV.
-	# 🚨 CETTE PAIRE N'EST DANS AUCUN BOSS_SCHEDULE (verifie 23/09) : ni la campagne (qui joue
-	# Colosse/Broyeur Titan ci-dessus a 5/10 min), ni le sans-fin (ENDLESS_BOSS_INTERVAL ne tire
-	# que endboss). Entierement statuee (nom, PV, bouclier, comportement) mais jamais rencontree
-	# en jeu. Deux lectures possibles, ni l'une ni l'autre tranchee : (a) un brouillon anterieur a
-	# Colosse/Broyeur Titan, remplace mais jamais retire ; (b) une reserve pour un futur chapitre
-	# (CHAPTERS dans Game.gd en a 5, mais un seul BOSS_SCHEDULE sert tous les biomes pour l'instant
-	# — cette paire Noir+Or pourrait etre le palier d'un chapitre pas encore differencie). Ne pas
-	# la cabler ni la supprimer sans decision produit : c'est un choix d'equilibrage, pas un bug.
-	"midboss_a": {"name": "Le Bombardier", "chassis": "ogreboss", "hp": 900.0, "speed": 150.0, "dmg": 22.0, "radius": 62.0, "size": 340.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 22.0, "attack_cd": 2.2, "prefer_dist": 300.0, "shield": 220.0, "drops_bonus": true},
-	"midboss_b": {"name": "Le Devastateur", "chassis": "ogreboss", "hp": 1450.0, "speed": 160.0, "dmg": 26.0, "radius": 70.0, "size": 380.0, "motion": "walk", "rank": 3, "w": 0, "behavior": "ranged", "heavy": true, "ogive": true, "barrage": true, "attack_dmg": 20.0, "attack_cd": 1.7, "prefer_dist": 300.0, "shield": 450.0, "drops_bonus": true},
-	# SOUVERAIN (15 min, FINAL) : obsidienne. Barrage + ANNEAU AoE (ogive+barrage) + bouclier max.
-	"endboss": {"name": "Souverain", "chassis": "endboss", "hp": 2800.0, "speed": 160.0, "dmg": 32.0, "radius": 78.0, "size": 380.0, "motion": "walk", "rank": 4, "w": 0, "behavior": "ranged", "heavy": true, "ogive": true, "barrage": true, "attack_dmg": 22.0, "attack_cd": 1.7, "prefer_dist": 300.0, "shield": 500.0, "final": true, "drops_bonus": true},
+	# 04/10, DESACTIVES pour la publication itch (demande explicite du patron : "sans ennemis,
+	# juste decors/maps"). Code/tests/phases intacts, prets a etre reactives (decommenter les 4
+	# lignes) des que le vrai art Meshy de ces 4 boss sera pret - voir _test_boss_chapitres.gd,
+	# toujours vert, qui construit ces Enemy directement sans passer par DEFS.
+	# "cryoboss":      {"name": "Le Cryarque",   "chassis": "cryoboss",      "hp": 2800.0, "speed": 236.0, "dmg": 30.0, "radius": 78.0, "size": 360.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 26.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 380.0},
+	# "reacteurboss":  {"name": "Le Fulgurant",  "chassis": "reacteurboss",  "hp": 2940.0, "speed": 240.0, "dmg": 31.0, "radius": 78.0, "size": 370.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 27.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 400.0},
+	# "rucheboss":     {"name": "La Matriarche", "chassis": "rucheboss",     "hp": 3080.0, "speed": 244.0, "dmg": 32.0, "radius": 80.0, "size": 385.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 28.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 420.0},
+	# "citadelleboss": {"name": "L'Arcange",     "chassis": "citadelleboss", "hp": 3220.0, "speed": 248.0, "dmg": 34.0, "radius": 82.0, "size": 400.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 30.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 440.0},
 }
 
-# Pool PAR BIOME : 3 universels (brute/drone/quadshell) + 2 specialistes. Le pick est filtre dessus.
-const BIOME_POOL: Dictionary = {
-	"tech": ["bs_tech", "gunner"], "earth": ["bs_earth", "gunner"], "spaceship": ["bs_spaceship", "gunner"], "volcanic": ["bs_volcanic", "gunner"],
-	"desert": ["bs_desert", "gunner"], "ice": ["bs_ice", "gunner"], "jungle": ["bs_jungle", "gunner"], "swamp": ["bs_swamp", "gunner"], "ruines": ["bs_ruines", "gunner"],
+const BOSS_PHASE_THRESHOLDS: Dictionary = {
+	# 2 seuils -> la phase 3 (idx==2) est atteignable ; le defaut [0.5] (un seul seuil) ne
+	# l'atteindrait jamais, cf. _check_boss_phase() dans Enemy.gd.
+	"cryoboss": [0.5, 0.2],
+	"reacteurboss": [0.5, 0.2],
+	"rucheboss": [0.5, 0.2],
+	"citadelleboss": [0.5, 0.2],
 }
+
+const BIOME_POOL: Dictionary = {}
 
 # CORRUPTION visuelle par biome : teinte multiplicative sur CHAQUE ennemi (self_modulate). Subtile.
 const BIOME_TINT: Dictionary = {
@@ -107,16 +67,48 @@ const BIOME_TINT: Dictionary = {
 	"jungle":    Color(0.76, 1.14, 0.74),
 	"swamp":     Color(0.86, 1.04, 0.68),
 	"ruines":    Color(1.08, 0.90, 0.78),
+	"cryo":      Color(0.80, 0.94, 1.15),
+	"reacteur":  Color(0.80, 1.10, 0.75),
+	"ruche":     Color(1.05, 0.80, 1.10),
+	"citadelle": Color(1.15, 1.05, 0.75),
 }
 
 # Timed run structure: bosses at 5 min (build filter), 10 min, 15 min (final -> victory).
 # Matches Survivor.io's chapter 1 beats exactly (boss 5:00, boss ~10:00, final boss 15:00).
+# 🚨 Plan direction artistique (26/09) : "chaque environnement devrait avoir un boss qui
+# reutilise ses materiaux et ses mecaniques" — jusqu'ici les 5min/10min etaient FIXES
+# (midboss/crusherboss) quel que soit le biome. Les slots 0/1 sont maintenant resolus par
+# _mid_boss_for() ci-dessous, qui fait tourner 4 chassis mi-boss existants (dont midboss_a/
+# midboss_b, "Le Bombardier"/"Le Devastateur" — voir le commentaire au-dessus des DEFS : ils
+# n'etaient cables NULLE PART, "pas un bug, un choix produit non tranche" ; le choix est fait).
+# endboss (Souverain) reste universel a 15 min : boss FINAL de victoire, deja lie au chapitre 5
+# "La Cite Dechue" par son propre nom — pas un boss de zone comme les deux autres.
 const BOSS_SCHEDULE: Array = [
-	{"t": 300.0, "kind": "midboss"},      # 5 min : COLOSSE (zoneur AoE, acier & or)
-	{"t": 600.0, "kind": "crusherboss"},  # 10 min : BROYEUR TITAN (brute rusheuse, rouille) = mini-boss bonus
-	{"t": 900.0, "kind": "endboss"},      # 15 min : SOUVERAIN (boss final = victoire, obsidienne)
+	{"t": 300.0, "slot": 0},           # 5 min : mi-boss n°1, depend du biome
+	{"t": 600.0, "slot": 1},           # 10 min : mi-boss n°2, depend du biome (toujours != n°1)
+	{"t": 900.0, "kind": "endboss"},   # 15 min : SOUVERAIN (boss final = victoire, obsidienne)
 ]
 var _bosses_fired: int = 0
+const BIOME_ORDER: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp", "cryo", "reacteur", "ruche", "citadelle"]
+const MID_BOSSES: Array = ["midboss", "midboss_a", "crusherboss", "midboss_b"]
+func _mid_boss_for(offset: int) -> String:
+	var bi: int = maxi(0, BIOME_ORDER.find(current_biome))
+	return String(MID_BOSSES[(bi + offset) % MID_BOSSES.size()])
+
+# 03/10, "5 arenes de boss" (plan "15 maps") : certains chapitres remplacent le Souverain
+# universel par LEUR propre cloture a 15 min. Chapitre 1 = BELIER-01 (27/09, deja en prod) ;
+# chapitres 6-9 = les 4 nouveaux boss de biome. Dict + fonction pure plutot qu'un "if" par
+# chapitre : testable directement, sans faire tourner 900s d'horloge de run.
+const CHAPTER_FINAL_BOSS: Dictionary = {
+	1: "belier01", 6: "cryoboss", 7: "reacteurboss", 8: "rucheboss", 9: "citadelleboss",
+}
+## Quel "kind" remplace "endboss" pour ce chapitre (ou "endboss" lui-meme si ce chapitre n'a pas
+## de cloture dediee, ou si SANS FIN est actif - meme garde qu'avant, jamais de boss de campagne
+## en SANS FIN).
+func _final_boss_for(chapter_n: int, endless: bool) -> String:
+	if endless or not CHAPTER_FINAL_BOSS.has(chapter_n):
+		return "endboss"
+	return String(CHAPTER_FINAL_BOSS[chapter_n])
 # SANS FIN: once the scheduled bosses are spent, endbosses keep coming on this cadence forever.
 const ENDLESS_BOSS_INTERVAL: float = 210.0
 var _endless_next_boss: float = 0.0
@@ -154,14 +146,42 @@ func _process(delta: float) -> void:
 		# on retombe exactement sur l'ancien comportement. Les pics de vague sont conserves.
 		var live: int = get_tree().get_nodes_in_group("enemies").size()
 		var floor_pop: int = clampi(5 + int(_t / 22.0), 5, 24)
+		# 🚨 Rapport de test Manus (26/09, P0) : « mort possible en 20-30s des la difficulte
+		# Facile » — le plancher etait deja a 5 des t=0, et le rattrapage pouvait multiplier la
+		# cadence par x4 ; un joueur qui n'a pas encore appris le deplacement encaisse la pleine
+		# pression avant d'avoir compris les controles. GRACE adoucit plancher ET rattrapage
+		# pendant les 18 premieres secondes de CHAQUE partie, puis s'efface completement —
+		# aucun effet passe ce cap, ni sur la vague scriptee (38s), ni sur le sans-fin.
+		var grace: float = clampf(_t / 18.0, 0.0, 1.0)
+		floor_pop = clampi(mini(floor_pop, 2 + int(3.0 * grace)), 2, 24)
 		if live < floor_pop:
 			var deficit: float = float(floor_pop - live) / float(floor_pop)
-			rate /= (1.0 + 3.0 * deficit)
-		_spawn_t = rate / maxf(0.2, spawn_mult * float(GameState.diff().get("spawn", 1.0)) * Protocols.spawn_rate)
+			rate /= (1.0 + 3.0 * deficit * lerpf(0.4, 1.0, grace))
+		# 🚨 Rapport Manus (26/09, session suivante) : mort a 12-23s CONFIRMEE, MALGRE le
+		# correctif ci-dessus — celui-ci n'adoucissait que le rattrapage de population, pas le
+		# reste du calcul. Or un biome (Jungle "nuees denses" = spawn_mult 1.35) ou une
+		# combinaison de Protocoles (jusqu'a spawn_rate 2.4, cf. Protocols.gd) multiplient CE
+		# diviseur directement, des t=0, sans jamais passer par le rattrapage — pour un nouveau
+		# joueur qui tombe sur cette combinaison au tout premier essai, la grace precedente
+		# n'avait donc pratiquement aucun effet. Meme fenetre de 18s, mais elle plafonne
+		# maintenant le produit ENTIER (biome x difficulte x protocoles) a 1.0 au depart (jamais
+		# pire qu'un rythme normal), puis le laisse remonter jusqu'a sa vraie valeur.
+		var full_mult: float = spawn_mult * float(GameState.diff().get("spawn", 1.0)) * Protocols.spawn_rate
+		var eff_mult: float = lerpf(minf(1.0, full_mult), full_mult, grace)
+		_spawn_t = rate / maxf(0.2, eff_mult)
 		_spawn()
 	if _bosses_fired < BOSS_SCHEDULE.size() and GameState.run_time >= float(BOSS_SCHEDULE[_bosses_fired]["t"]) * _boss_scale:
 		if not _boss_alive():   # never let two bosses coexist -> avoids double next_map in one frame
-			_spawn_boss(String(BOSS_SCHEDULE[_bosses_fired]["kind"]))
+			var sched: Dictionary = BOSS_SCHEDULE[_bosses_fired]
+			var kind: String = String(sched["kind"]) if sched.has("kind") else _mid_boss_for(int(sched["slot"]) * 2)
+			# BELIER-01/boss de biome (03/10, generalise depuis le seul "chapitre 1 -> belier01"
+			# du 27/09) : certains chapitres recoivent LEUR propre cloture a 15 min au lieu du
+			# Souverain universel. Garde SANS FIN indispensable : ce mode ne fixe jamais `chapter`
+			# (reste a 1 par defaut) -> sans elle, une run SANS FIN spawnerait un boss de campagne
+			# comme-final ici au lieu de l'endboss RECURRENT attendu plus bas.
+			if kind == "endboss":
+				kind = _final_boss_for(chapter, GameState.endless)
+			_spawn_boss(kind)
 			_bosses_fired += 1
 	elif GameState.endless and _bosses_fired >= BOSS_SCHEDULE.size():
 		# schedule the first endless boss relative to when the scripted run ran out, not to t=0
@@ -245,8 +265,12 @@ func _spawn_elite(kind: String) -> void:
 	Audio.sfx("boss", 0.1)
 
 func _spawn_boss(kind: String) -> void:
+	if not DEFS.has(kind):
+		return
 	if player == null or not is_instance_valid(player):
 		return
+	print("[game] BOSS kind=%s chapter=%d endless=%s final=%s t=%.1f" % [
+		kind, chapter, str(GameState.endless), str(bool(DEFS[kind].get("final", false))), GameState.run_time])
 	var e: Enemy = Enemy.new()
 	var ang: float = randf() * TAU
 	e.global_position = player.global_position + Vector2(cos(ang), sin(ang)) * 760.0
@@ -275,7 +299,7 @@ func _weighted_pick(fodder_only: bool = false) -> String:
 	var t: float = GameState.run_time
 	var picks: Array = []
 	var total: int = 0
-	var pool: Array = BIOME_POOL.get(current_biome, ["brute", "drone", "quadshell"])   # filtre PAR BIOME
+	var pool: Array = BIOME_POOL.get(current_biome, [])   # filtre PAR BIOME
 	for k in pool:
 		if not DEFS.has(k):
 			continue
@@ -288,7 +312,7 @@ func _weighted_pick(fodder_only: bool = false) -> String:
 			continue
 		picks.append([k, w]); total += w
 	if picks.is_empty():
-		return "brute"                     # always-available opener (never fall back to a locked kind)
+		return ""                          # aucun ennemi defini/debloque -> rien a piocher
 	var r: int = randi() % maxi(1, total)
 	for pw in picks:
 		r -= int(pw[1])
@@ -323,13 +347,15 @@ func _spawn() -> void:
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
 	var kind: String = _weighted_pick()
+	if not DEFS.has(kind):
+		return
 	var e: Enemy = Enemy.new()
 	var spos: Vector2 = player.global_position + _spawn_offset()
 	if arena_half > 0.0:
 		# Keep spawns inside the walls. Fleeing toward a wall means the ahead-spawns land ON the
 		# wall in front of you -> you get pinned, which is the whole point of the bounded arena.
-		spos.x = clampf(spos.x, -arena_half, arena_half)
-		spos.y = clampf(spos.y, -arena_half, arena_half)
+		spos.x = clampf(spos.x, arena.position.x, arena.end.x)
+		spos.y = clampf(spos.y, arena.position.y, arena.end.y)
 	e.global_position = spos
 	game.enemy_layer.add_child(e)
 	e.setup(kind, DEFS[kind], player, game)
@@ -341,14 +367,14 @@ func spawn_at(pos: Vector2, kind: String) -> void:
 	if player == null or not is_instance_valid(player):
 		return
 	if not DEFS.has(kind):
-		kind = "drone"
+		return
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
 	var e: Enemy = Enemy.new()
 	var p: Vector2 = pos
 	if arena_half > 0.0:
-		p.x = clampf(p.x, -arena_half, arena_half)
-		p.y = clampf(p.y, -arena_half, arena_half)
+		p.x = clampf(p.x, arena.position.x, arena.end.x)
+		p.y = clampf(p.y, arena.position.y, arena.end.y)
 	e.global_position = p
 	game.enemy_layer.add_child(e)
 	e.setup(kind, DEFS[kind], player, game)
@@ -388,6 +414,8 @@ func _spawn_wave() -> void:
 	if count <= 0:
 		return
 	var lead: String = _weighted_pick(true)   # waves are pure weak swarm (fodder only)
+	if lead == "":
+		return   # aucun ennemi defini -> pas de vague (evite une banniere "VAGUE MASSIVE" pour rien)
 	var base_ang: float = randf() * TAU
 	# STAGGERED: building ~50 enemies (sprite + shadow + collider + shader material each) in ONE
 	# frame was a ~200-node spike -> a visible hitch every wave, on any hardware. Queue them and

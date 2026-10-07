@@ -2,11 +2,29 @@ extends CharacterBody2D
 class_name Player
 ## Top-down player with an "Overdrive" transformation, continuous energy beam, and melee saber.
 
+# 🚨 class_name StackPips (nouveau fichier) : le cache global de classes de Godot n'est
+# rafraichi que par l'editeur, pas par une simple execution --headless -> "type not found in
+# scope" en boucle (et le process ne se terminait jamais). preload() contourne le cache.
+const StackPips = preload("res://actors/StackPips.gd")
+
 var game: Node
 var mecha   # the mech visual (DirectionalMecha baked sheets OR HeroRig 2D cut-out rig)
 var base_speed: float = 320.0
 var move_mult: float = 1.0   # biome modifier on movement (e.g. swamp slows, low-g speeds up)
 var field_slow: float = 1.0  # transient: a slow-field prop dampens this each frame you're inside
+var _stun_t: float = 0.0     # BRAS PRESSEUR (decor tech) : mouvement coupe le temps que ca dure
+## GLACE "sol glissant" (plan direction artistique, 26/09 : "chaque zone doit modifier vraiment
+## la partie"). 0 = arcade actuel (changement de direction instantane, comme tous les autres
+## biomes) ; plus proche de 1 = le mecha glisse, met du temps a rejoindre la vitesse visee.
+## Jamais applique pendant le dash Bluestrike (cf. _physics_process), pour ne pas l'affaiblir.
+var inertia: float = 0.0
+var _patch_inertia: float = 0.0   # PLAQUE DE GLACE : contribution temporaire, se relache seule
+## PYLONE (27/09, rapport "concepts visuels") : ancrage — rester immobile ANCHOR_DELAY
+## deploie l'ancrage (voir _physics_process) ; WeaponSystem.gd lit `anchored` pour booster
+## uniquement le Faisceau (portee + tir plus net), jamais un autre chassis/arme.
+var anchored: bool = false
+var _anchor_t: float = 0.0
+const ANCHOR_DELAY: float = 0.5
 var hp: float = 100.0
 var max_hp: float = 70.0   # smaller base -> the health bar starts modest and GROWS only via the
 # VITALITE competence (+25/pick), the mech's base hp, gear and meta_hp. Early game is meant to bite.
@@ -19,6 +37,10 @@ var cooldown_mult: float = 1.0    # haste: <1 = faster weapons
 # --- passifs facon Survivor.io ---
 var size_mult: float = 1.0        # HE Fuel : taille/portee des projectiles + rayons d'effets (cap ~1.7)
 var proj_speed_mult: float = 1.0  # Ammo Thruster : vitesse des projectiles (cap ~1.6)
+## GRAVITE FAIBLE (plan direction artistique, 26/09 : "projectiles plus rapides"). Champ SEPARE
+## de proj_speed_mult expres : ce dernier s'ACCUMULE avec les passifs Ammo Thruster (+0.12/pick) —
+## le reecrire depuis le biome a chaque changement de zone effacerait la progression du joueur.
+var biome_proj_speed: float = 1.0
 var hp_regen: float = 0.0         # Energy Drink : PV regeneres par seconde
 var magnet_range: float = 165.0  # pickup vacuum radius.
 # 🚨 MESURE DU TESTEUR EQUILIBRAGE : a 50 px (le rayon de ramassage est deja de 30) il fallait
@@ -51,6 +73,41 @@ var arena_half: float = 0.0:                                      # Game sets th
 
 var bot_active: bool = false
 var auto_aim: bool = false          # player opt-in (settings menu): aim locks onto the nearest foe
+var lock_reticle_enabled: bool = true   # player opt-out (settings menu): show the lock-on reticle
+
+## BLUESTRIKE "frapper et fuir" (plan de differenciation des chassis, prototype A — valide par
+## le patron ET un specialiste externe le 26/09). Chiffres retenus par le specialiste, milieu de
+## chaque fourchette recommandee : +60% vitesse (50-70), 0.3s (0.25-0.35), cooldown interne 1.8s
+## (1.5-2s — sans lui, une arene dense enchaine des dash gratuits + i-frames en continu). AUCUNE
+## extension des i-frames au-dela des 0.55s deja communs a tous les chassis (voir take_damage).
+const DASH_SPEED_MULT: float = 1.6
+const DASH_DUR: float = 0.3
+const DASH_COOLDOWN: float = 1.8
+var _dash_t: float = 0.0
+var _dash_dir: Vector2 = Vector2.ZERO
+var _dash_cd: float = 0.0
+
+## VORTEX "aligner" (plan de differenciation des chassis, prototype B — valide 26/09, ordre
+## remonte par le specialiste : mesure la perceptibilite d'un placement SANS toucher au systeme
+## de degats global ni a l'etat des ennemis). +6%/pile jusqu'a 5 (+30%). Chaque tir perforant qui
+## touche son 2e ennemi (cf. Projectile._on_hit) donne UNE pile et rafraichit la chaine ; passe
+## 2s sans nouvelle pile, elle se vide UNE pile a la fois (jamais d'un coup).
+const ALIGN_STACK_DUR: float = 2.0
+const ALIGN_PER_STACK: float = 0.06
+var _align_stacks: int = 0
+var _align_t: float = 0.0
+var _align_pips: StackPips
+
+func align_dmg_mult() -> float:
+	return 1.0 + ALIGN_PER_STACK * float(_align_stacks)
+
+func vortex_align_stack() -> void:
+	if base_chassis != "vortex":
+		return
+	_align_stacks = mini(_align_stacks + 1, 5)
+	_align_t = ALIGN_STACK_DUR
+	if _align_pips != null:
+		_align_pips.count = _align_stacks
 var bot_move: Vector2 = Vector2.ZERO
 var aim_dir: Vector2 = Vector2.DOWN
 
@@ -61,9 +118,12 @@ var _stick_origin: Vector2 = Vector2.ZERO
 var _stick_vec: Vector2 = Vector2.ZERO
 var _aim_stick_id: int = -1
 var _aim_stick_origin: Vector2 = Vector2.ZERO
+var _aim_stick_vec: Vector2 = Vector2.ZERO    # drag offset, for the HUD ring (0..1 of radius)
+var _aim_stick_active: bool = false           # true only past the drag deadzone (see _update_aim)
 var _thruster: CPUParticles2D
 var _laser: Line2D
-var _laser_dot: Sprite2D
+var _laser_dot: LockReticle
+var _last_lock_target: Node2D = null
 var _laser_eye: Sprite2D      # red glow at the head/eye where the targeting laser originates
 var _weapons: WeaponSystem
 
@@ -72,6 +132,21 @@ var _tf_t: float = 0.0
 var base_chassis: String = ""
 const TF_DUR: float = 8.0   # Overdrive "harvester" spike: short, intense, then vulnerable again
 var _space_was: bool = false
+
+## VERROUILLAGE avion de chasse (patron, 25/09) : forme par chassis, pas juste une couleur —
+## chacune colle a l'identite deja etablie du mecha (cf. GameState.MECHS "ligne"). La couleur,
+## elle, reutilise l'accent du chassis (deja la teinte de sa signature/ses tirs) : meme identite
+## visuelle, pas une nouvelle palette a memoriser.
+const LOCK_STYLE: Dictionary = {
+	"vortex": "brackets", "bluestrike": "diamond", "titan": "heavy",
+	"bruiser": "chevron", "vanquisher": "rings",
+}
+func _apply_lock_visuals(hero_id: String) -> void:
+	if _laser_dot == null:
+		return
+	_laser_dot.style = String(LOCK_STYLE.get(hero_id, "brackets"))
+	_laser_dot.col = Color(GameState.mech_def(hero_id).get("accent", Color(0.55, 0.93, 1.0)))
+	_laser_dot.reacquire()
 
 const BEAM_LEN: float = 1000.0
 const BEAM_DPS: float = 90.0
@@ -90,6 +165,7 @@ var _beam_arc_list: Array = []
 var _beam_arc_t: float = 0.0
 
 var _od_aura: Sprite2D       # overdrive/transform aura around the mech
+var _od_ring: Sprite2D       # sustained ground ring for the duration of Overdrive (see _ready)
 var _mark: Sprite2D = null       # anneau au sol « c'est toi » (lisibilite en combat dense)
 var _mark_in: Sprite2D = null    # second anneau, plus serre
 var _mark_top: Sprite2D = null   # chevron au-dessus du chassis
@@ -120,7 +196,7 @@ func get_layer_ok() -> bool:
 ## avant le tout premier _begin_run() d'une session (REJOUER passe par un reload de scene,
 ## qui recree deja le Player correctement — pas concerne).
 func refresh_equipped_chassis() -> void:
-	var hero_id: String = SaveManager.equipped_mech()
+	var hero_id: String = GameState.debug_force_mech if GameState.debug_force_mech != "" else SaveManager.equipped_mech()
 	if not GameState.mech_def(hero_id):
 		hero_id = "vortex"
 	if base_chassis == hero_id:
@@ -135,7 +211,7 @@ func refresh_equipped_chassis() -> void:
 	if mecha != null:
 		mecha.queue_free()
 	var dmech: DirectionalMecha = DirectionalMecha.new()
-	dmech.chassis = hero_id
+	dmech.chassis = String(GameState.RENDER_CHASSIS.get(hero_id, hero_id))   # reskin (27/09), voir RENDER_CHASSIS
 	dmech.frame_count = 8
 	dmech.display_height = 360.0
 	mecha = dmech
@@ -143,6 +219,7 @@ func refresh_equipped_chassis() -> void:
 	base_chassis = hero_id
 	if mecha.has_method("set_tint"):
 		mecha.set_tint(BASE_TINT)
+	_apply_lock_visuals(hero_id)   # le reticule de verrouillage suit le changement de chassis
 
 func _ready() -> void:
 	add_to_group("player")
@@ -157,11 +234,11 @@ func _ready() -> void:
 	# VISUAL: the equipped mech's baked 4-direction ANIMATED sheets (idle/walk/run/attack/hit/die,
 	# 8 frames each). The garage 'id' IS the DirectionalMecha chassis, so picking a mech changes
 	# look AND playstyle. Facing follows the aim vector (manual aim, no auto-aim).
-	var hero_id: String = SaveManager.equipped_mech()
+	var hero_id: String = GameState.debug_force_mech if GameState.debug_force_mech != "" else SaveManager.equipped_mech()
 	if not GameState.mech_def(hero_id):
 		hero_id = "vortex"
 	var dmech: DirectionalMecha = DirectionalMecha.new()
-	dmech.chassis = hero_id
+	dmech.chassis = String(GameState.RENDER_CHASSIS.get(hero_id, hero_id))   # reskin (27/09), voir RENDER_CHASSIS
 	dmech.frame_count = 8       # baked animated sheets: 8 frames per anim per facing
 	dmech.display_height = 360.0   # bigger, imposing mecha (VORTEX fills ~46% of the cell -> bump)
 	mecha = dmech
@@ -238,6 +315,7 @@ func _ready() -> void:
 	# puis la partie suivante repartait FORCEE sur ON, sans rien dire. Le reglage est desormais
 	# reellement respecte au demarrage de chaque partie.
 	auto_aim = bool(SaveManager.setting("auto_aim", true))
+	lock_reticle_enabled = bool(SaveManager.setting("lock_reticle", true))
 
 	var cs: CollisionShape2D = CollisionShape2D.new()
 	var c: CircleShape2D = CircleShape2D.new()
@@ -265,6 +343,14 @@ func _ready() -> void:
 	_thruster.material = tm
 	add_child(_thruster)
 
+	# VORTEX "aligner" — pips de chaine au-dessus de la tete (visible pour tous, mais ne
+	# s'affiche que si _align_stacks > 0, donc uniquement en jouant Vortex).
+	_align_pips = StackPips.new()
+	_align_pips.col = Color(0.45, 0.95, 1.0)
+	_align_pips.offset_y = -70.0
+	_align_pips.z_index = 11
+	add_child(_align_pips)
+
 	# TERMINATOR targeting sight — DISCREET: a thin cyan thread from the eye that FADES OUT with distance
 	# (gradient), so it hints the aim without a glaring full-screen line. A small soft dot marks the target.
 	# 🚨 il etait ROUGE et large de 1 px : « quasi invisible, et le rouge est la couleur du
@@ -287,14 +373,10 @@ func _ready() -> void:
 	_laser.add_point(Vector2.ZERO)
 	add_child(_laser)
 
-	_laser_dot = Sprite2D.new()
-	_laser_dot.texture = Tex.glow(Color(0.62, 0.95, 1.0), 26)   # cyan, comme le fil (voir plus haut)
-	var dm: CanvasItemMaterial = CanvasItemMaterial.new()
-	dm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	_laser_dot.material = dm
-	_laser_dot.modulate = Color(1, 1, 1, 0.5)
-	_laser_dot.z_index = 8
+	_laser_dot = LockReticle.new()
+	_laser_dot.z_index = 12   # au-dessus de tout (mecha=6, laser=8, eye=9) — jamais masque
 	add_child(_laser_dot)
+	_apply_lock_visuals(base_chassis)
 
 	# the emitting EYE: a small glow at the head where the sight starts (cyan, pas rouge)
 	_laser_eye = Sprite2D.new()
@@ -356,6 +438,20 @@ func _ready() -> void:
 	_od_aura.visible = false
 	add_child(_od_aura)
 
+	# 🚨 rapport externe 26/09 "Surcharge : signaler l'activation" : le flash d'activation
+	# (Game.transform_fx) et le halo (_od_aura ci-dessus) existaient deja ; ce qui manquait
+	# reellement, c'est un signal SOUTENU au sol pendant les TF_DUR=8s (pas juste au moment
+	# d'entrer en Surcharge). Anneau au sol, sous le mecha, qui tourne lentement.
+	_od_ring = Sprite2D.new()
+	_od_ring.texture = Tex.ring(Color(1.0, 0.6, 0.2), 128)
+	var rgm: CanvasItemMaterial = CanvasItemMaterial.new()
+	rgm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_od_ring.material = rgm
+	_od_ring.scale = Vector2(1.5, 1.5)
+	_od_ring.z_index = -2
+	_od_ring.visible = false
+	add_child(_od_ring)
+
 func _physics_process(delta: float) -> void:
 	_update_marker(delta)
 	var alive_now: bool = GameState.alive
@@ -387,9 +483,45 @@ func _physics_process(delta: float) -> void:
 	_tick_borrow(delta)
 
 	_iframe = maxf(0.0, _iframe - delta)
+	_dash_cd = maxf(0.0, _dash_cd - delta)
+	if _align_stacks > 0:
+		_align_t -= delta
+		if _align_t <= 0.0:
+			_align_stacks -= 1                                  # une pile a la fois, pas tout d'un coup
+			_align_t = ALIGN_STACK_DUR if _align_stacks > 0 else 0.0
+			if _align_pips != null:
+				_align_pips.count = _align_stacks
 	field_slow = minf(1.0, field_slow + delta * 2.5)   # recover when out of a slow field
-	var mv: Vector2 = _move_input()
-	velocity = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0)   # Overdrive = x2 speed
+	# PLAQUE DE GLACE (decor cryo) : inertia sert DEJA de reglage fixe par biome (ex. "ice",
+	# fixe une fois au demarrage et jamais redecremente) -> on NE DOIT PAS le faire decroitre en
+	# continu, ca effacerait ce reglage de biome en une fraction de seconde. Un canal separe pour
+	# l'effet TEMPORAIRE de zone, qui se relache tout seul, et se combine au reglage de biome
+	# sans jamais l'ecraser vers le bas.
+	_patch_inertia = maxf(0.0, _patch_inertia - delta * 2.5)
+	_stun_t = maxf(0.0, _stun_t - delta)
+	var mv: Vector2 = Vector2.ZERO if _stun_t > 0.0 else _move_input()
+	if base_chassis == "pylone" and not transformed:
+		_anchor_t = minf(_anchor_t + delta, ANCHOR_DELAY) if mv == Vector2.ZERO else 0.0
+		anchored = _anchor_t >= ANCHOR_DELAY
+	else:
+		_anchor_t = 0.0
+		anchored = false
+	if _dash_t > 0.0:
+		# BLUESTRIKE dash escape : remplace le mouvement pilote par le joueur pendant sa duree —
+		# feedback visible impose par le specialiste : le thruster (deja existant) vire orange.
+		_dash_t = maxf(0.0, _dash_t - delta)
+		velocity = _dash_dir * base_speed * DASH_SPEED_MULT
+		_thruster.emitting = true
+		_thruster.direction = -_dash_dir
+		_thruster.color = Color(1.0, 0.55, 0.15)
+	else:
+		_thruster.color = Palette.CYAN
+		var target_vel: Vector2 = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0)
+		var eff_inertia: float = maxf(inertia, _patch_inertia)
+		if eff_inertia > 0.0:
+			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
+		else:
+			velocity = target_vel   # Overdrive = x2 speed deja dans target_vel
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
@@ -437,6 +569,11 @@ func _physics_process(delta: float) -> void:
 			var ta: float = Time.get_ticks_msec() / 1000.0
 			_od_aura.scale = Vector2.ONE * (2.3 + 0.3 * sin(ta * 6.0))
 			_od_aura.modulate = Color(1, 1, 1, 0.55 + 0.2 * sin(ta * 6.0))
+		if _od_ring != null:
+			_od_ring.visible = true
+			_od_ring.rotation += delta * 1.1
+			var tr: float = Time.get_ticks_msec() / 1000.0
+			_od_ring.modulate = Color(1, 1, 1, 0.5 + 0.15 * sin(tr * 4.0))
 		_weapons.set_active(false)
 		_laser.visible = false
 		_laser_dot.visible = false
@@ -461,13 +598,19 @@ func _physics_process(delta: float) -> void:
 					_laser_eye.position = origin
 				_laser_eye.visible = true
 			_laser.visible = true
-			# a faint reticle painted on the actual target enemy, not a floating dot in empty space
-			var tgt: Node2D = _nearest_enemy()
+			# VERROUILLAGE avion de chasse (patron, 25/09) : suit la cible REELLEMENT visee — l'auto-aim
+			# quand il pilote aim_dir, sinon celle dans l'axe de tir manuel (_aim_target) — pas
+			# toujours "le plus proche" comme avant, qui s'allumait meme hors de la visee manuelle.
+			var tgt: Node2D = _aim_target() if lock_reticle_enabled else null
 			if tgt != null and is_instance_valid(tgt):
+				if tgt != _last_lock_target:
+					_laser_dot.reacquire()   # nouvelle cible -> les crochets se referment a nouveau
+					_last_lock_target = tgt
 				_laser_dot.position = to_local(tgt.global_position)
 				_laser_dot.visible = true
 			else:
 				_laser_dot.visible = false
+				_last_lock_target = null
 
 func add_weapon(id: String) -> void:
 	if _weapons != null:
@@ -1040,14 +1183,23 @@ func _transform_off() -> void:
 		mecha.set_tint(BASE_TINT)   # on revient a la teinte du heros, pas au blanc neutre
 	if _od_aura != null:
 		_od_aura.visible = false
+	if _od_ring != null:
+		_od_ring.visible = false
 	if game != null and game.has_method("transform_fx"):
 		game.transform_fx(global_position, false)
 	Events.player_transformed.emit(false)
 
 func _update_aim() -> void:
-	# AUTO-AIM (player opt-in via settings, or the CI bot) has ABSOLUTE priority — checked first so
-	# it keeps locking the nearest foe WHILE YOU MOVE. Before, the aim-stick check ran first, so a
-	# stray finger on the aim side (common while thumbing the move stick) silently cancelled it.
+	# MANUAL OVERRIDE (patron, 25/09 : "orienter la visee manuellement meme si la visee est
+	# automatique") — a deliberate DRAG on the aim-stick wins over auto-aim, checked first.
+	# Gated on _aim_stick_active (past the 10px deadzone in _unhandled_input), NOT merely
+	# _aim_stick_id != -1 (finger down, no drag yet): a bare touch must stay inert, or a
+	# resting/stray finger on the right half of the screen (common while thumbing the move
+	# stick) would silently cancel auto-aim again — exactly the bug the old "auto-aim checked
+	# first" ordering below was written to avoid. Reverts to auto-aim the instant it's released.
+	if _aim_stick_active:
+		return   # aim_dir already set from the aim-stick drag in _unhandled_input
+	# AUTO-AIM (player opt-in via settings, or the CI bot): locks the nearest foe WHILE YOU MOVE.
 	if auto_aim or bot_active:
 		var t: Node2D = _nearest_enemy()
 		if t != null:
@@ -1062,7 +1214,7 @@ func _update_aim() -> void:
 	# MANUAL (default, no auto-aim): the right aim-stick (touch) or a held mouse button aims freely;
 	# otherwise the mech shoots where it moves. Keep the last dir when idle so it doesn't spin.
 	if _aim_stick_id != -1:
-		return   # aim_dir already set from the aim-stick drag in _unhandled_input
+		return   # stick held but not dragged past the deadzone yet: keep the last aim_dir
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var m: Vector2 = (get_global_mouse_position() - global_position).normalized()
 		if m != Vector2.ZERO:
@@ -1100,19 +1252,25 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif e.pressed and _aim_stick_id == -1 and e.position.x >= get_viewport_rect().size.x * 0.55:
 			_aim_stick_id = e.index
 			_aim_stick_origin = e.position
+			_aim_stick_vec = Vector2.ZERO
+			_aim_stick_active = false
 		elif not e.pressed:
 			if e.index == _stick_id:
 				_stick_id = -1
 				_stick_vec = Vector2.ZERO
 			if e.index == _aim_stick_id:
 				_aim_stick_id = -1
+				_aim_stick_vec = Vector2.ZERO
+				_aim_stick_active = false   # release -> falls back to auto-aim next frame
 	elif e is InputEventScreenDrag:
 		if e.index == _stick_id:
 			_stick_vec = (e.position - _stick_origin).limit_length(80.0) / 80.0
 		elif e.index == _aim_stick_id:
 			var d: Vector2 = e.position - _aim_stick_origin
+			_aim_stick_vec = d.limit_length(80.0) / 80.0   # HUD ring position, shown even under the deadzone
 			if d.length() > 10.0:
 				aim_dir = d.normalized()
+				_aim_stick_active = true
 
 var _nearest_frame: int = -1
 var _nearest_cache: Node2D = null
@@ -1129,11 +1287,136 @@ func _nearest_enemy() -> Node2D:
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e is Node2D:
 			var d: float = global_position.distance_squared_to((e as Node2D).global_position)
+			if e is Enemy and (e as Enemy).priority_boost > 0.0:
+				d *= 1.0 - clampf((e as Enemy).priority_boost, 0.0, 0.95)
 			if d < bd:
 				bd = d
 				best = e
 	_nearest_cache = best
 	return best
+
+## Cible du RETICULE DE VERROUILLAGE. 🚨 25/09 (patron) : « ca s'affiche pas » — la 1ere version
+## exigeait une cible DANS le cone de 55° de aim_dir en visee manuelle, et n'affichait RIEN sinon ;
+## en jeu reel (aim_dir suit le MOUVEMENT tant qu'on ne tient pas le stick de visee), le cone est
+## satisfait bien plus rarement qu'en theorie — d'ou l'impression que le reticule n'existe pas.
+## Comme un vrai HUD de chasse garde un contact affiche meme hors boresight : on prefere la cible
+## dans l'axe (_cone_target), mais a defaut on retombe sur la menace la plus proche quand meme —
+## il y a donc TOUJOURS un verrouillage affiche des qu'un ennemi existe, meme en visee manuelle.
+func _aim_target() -> Node2D:
+	# 🚨 25/09 (patron) : "quand je vise manuellement la cible visee doit etre verrouillee" — ce
+	# garde avait disparu au fix precedent (_aim_target suivait TOUJOURS l'auto-visee), alors que
+	# _update_aim() (plus haut) donne bien la priorite au drag manuel pour le TIR reel. Le reticule
+	# doit suivre la MEME priorite, sinon il montre l'auto-visee pendant qu'on vise ailleurs a la main.
+	if (auto_aim or bot_active) and not _aim_stick_active:
+		return _nearest_enemy()
+	var b: Node2D = _cone_target()
+	return b if b != null else _nearest_enemy()
+
+const LOCK_CONE_COS: float = 0.57   # cos(55°) — meme cone que le homing (Projectile._find_homing_target)
+func _cone_target() -> Node2D:
+	var best: Node2D = null
+	var best_d: float = 1.0e12
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not (e is Enemy) or not is_instance_valid(e) or not (e as Enemy).alive:
+			continue
+		var to: Vector2 = (e as Node2D).global_position - global_position
+		if to.length_squared() < 1.0:
+			continue
+		if aim_dir.dot(to.normalized()) < LOCK_CONE_COS:
+			continue
+		var d: float = to.length_squared()
+		if (e as Enemy).priority_boost > 0.0:
+			d *= 1.0 - clampf((e as Enemy).priority_boost, 0.0, 0.95)
+		if d < best_d:
+			best_d = d
+			best = e
+	return best
+
+## Reticule de VERROUILLAGE (patron, 25/09 : "afficher le modele cible verrouille comme dans un
+## avion de chasse, different esthetiquement pour chaque mecha"). Remplace l'ancien point cyan
+## generique par une forme procedurale PAR CHASSIS (LOCK_STYLE plus haut ; couleur = accent du
+## chassis, deja la teinte de sa signature/ses tirs — meme identite, pas une nouvelle palette) qui
+## se REFERME sur la cible a l'acquisition, comme un HUD de chasse, au lieu d'apparaitre figee.
+class LockReticle extends Node2D:
+	var style: String = "brackets"
+	var col: Color = Color(0.55, 0.93, 1.0)
+	const LOCK_IN_TIME: float = 0.22
+	var _t: float = 0.0        # temps depuis l'acquisition (anime le snap-in)
+	var _spin: float = 0.0     # horloge continue (rotation/pulsation, selon le style)
+
+	func _process(delta: float) -> void:
+		_t = minf(_t + delta, LOCK_IN_TIME)
+		_spin += delta
+		if visible:
+			queue_redraw()
+
+	func reacquire() -> void:
+		_t = 0.0
+
+	func _draw() -> void:
+		var k: float = _t / LOCK_IN_TIME
+		var ease: float = 1.0 - pow(1.0 - k, 3.0)      # ease-out : vite, puis se pose
+		# 🚨 25/09 : "ca s'affiche pas" — premiere passe trop discrete (22-40px, alpha 0.30 mini)
+		# pour se voir a coup sur dans une melee chargee. Agrandi + jamais transparent.
+		var r: float = lerpf(74.0, 46.0, ease)          # les crochets arrivent de loin et se referment
+		var a: float = lerpf(0.65, 1.0, ease)
+		var c: Color = Color(col.r, col.g, col.b, a)
+		match style:
+			"diamond":
+				_draw_diamond(r, c)
+			"heavy":
+				_draw_heavy(r, c)
+			"chevron":
+				_draw_chevron(r, c)
+			"rings":
+				_draw_rings(r, c)
+			_:
+				_draw_brackets(r, c, 3.6, 0.55, 1.0)
+
+	## 4 crochets en L aux coins d'un carre — lock-on classique. Tourne lentement (VORTEX).
+	func _draw_brackets(s: float, c: Color, thick: float, len_ratio: float, spin_mul: float) -> void:
+		var rot: float = _spin * 0.6 * spin_mul
+		var corners: Array = [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
+		var ln: float = s * len_ratio
+		for corner in corners:
+			var p: Vector2 = corner.rotated(rot) * s
+			var ex: Vector2 = Vector2(-corner.x, 0.0).rotated(rot) * ln
+			var ey: Vector2 = Vector2(0.0, -corner.y).rotated(rot) * ln
+			draw_line(p, p + ex, c, thick)
+			draw_line(p, p + ey, c, thick)
+
+	## 4 courtes barres tangentielles aux points N/E/S/O d'un losange — BLUESTRIKE (gerbe large).
+	func _draw_diamond(s: float, c: Color) -> void:
+		for i in 4:
+			var ang: float = _spin * -0.8 + float(i) / 4.0 * TAU
+			var dir: Vector2 = Vector2.from_angle(ang)
+			var perp: Vector2 = dir.orthogonal()
+			var p: Vector2 = dir * s
+			draw_line(p - perp * 10.0, p + perp * 10.0, c, 3.6)
+			draw_line(p, p - dir * (s * 0.24), c, 3.6)
+
+	## Crochets doubles, epais, quasi immobiles — TITAN (lourd, verrouille au sol).
+	func _draw_heavy(s: float, c: Color) -> void:
+		_draw_brackets(s, c, 4.8, 0.4, 0.15)
+		_draw_brackets(s * 0.72, Color(c.r, c.g, c.b, c.a * 0.7), 3.2, 0.5, 0.15)
+
+	## 4 chevrons qui convergent vers le centre en boucle — BRUISER (force brute, "il se referme").
+	func _draw_chevron(s: float, c: Color) -> void:
+		var pulse: float = fmod(_spin * 0.9, 1.0)
+		var rr: float = lerpf(s * 1.3, s * 0.55, pulse)
+		for i in 4:
+			var ang: float = float(i) / 4.0 * TAU + PI * 0.25
+			var dir: Vector2 = Vector2.from_angle(ang)
+			var perp: Vector2 = dir.orthogonal()
+			var tip: Vector2 = dir * (rr - 9.0)
+			draw_line(dir * rr + perp * 10.0, tip, c, 3.8)
+			draw_line(dir * rr - perp * 10.0, tip, c, 3.8)
+
+	## Deux anneaux partiels contra-rotatifs — VANQUISHER (scan radar, "suppression continue").
+	func _draw_rings(s: float, c: Color) -> void:
+		draw_arc(Vector2.ZERO, s, _spin * 1.4, _spin * 1.4 + PI * 1.3, 24, c, 3.4, true)
+		draw_arc(Vector2.ZERO, s * 0.7, -_spin * 1.8, -_spin * 1.8 + PI * 1.0, 20,
+			Color(c.r, c.g, c.b, c.a * 0.85), 3.0, true)
 
 ## Marqueur du joueur + FLASH ROUGE a l'encaissement.
 ## 🚨 L'animation « hit » existante n'etait jouee QUE si le joueur etait immobile (pour ne pas
@@ -1157,7 +1440,7 @@ func _update_marker(delta: float) -> void:
 			var f: float = _hurt_t / 0.30
 			mecha.set_tint(BASE_TINT.lerp(Color(2.6, 0.48, 0.40), clampf(f, 0.0, 1.0)))
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
 	if _iframe > 0.0 or not GameState.alive:
 		return
 	if transformed:   # Overdrive = invincible; the hit just sparks off the aura
@@ -1165,6 +1448,13 @@ func take_damage(amount: float) -> void:
 			game.shield_ripple(global_position, 150.0, Color(1.0, 0.85, 0.4))
 		return
 	amount *= (1.0 - clampf(armor, 0.0, 0.75))   # Armure passive
+	# TITAN "encaisser en avancant" (plan de differenciation des chassis, prototype D — 26/09).
+	# Version PRUDENTE explicitement recommandee par le specialiste : commencer par une
+	# reduction de degats en mouvement (purement defensif), PAS des degats de contact au premier
+	# essai — evite le risque d'equilibrage le plus eleve du plan (traverser une horde en tuant
+	# tout gratuitement) le temps de valider que le verbe "avancer" se ressent deja comme ca.
+	if base_chassis == "titan" and velocity.length() > 10.0:
+		amount *= 0.78   # -22%, valeur de prototypage — pas mesuree, a ajuster au playtest
 	hp -= amount
 	_iframe = 0.55
 	_hurt_t = 0.30   # flash rouge du chassis — visible AUSSI en mouvement (voir _update_marker)
@@ -1182,11 +1472,29 @@ func take_damage(amount: float) -> void:
 		GameState.alive = false
 		mecha.play("die")
 		Events.player_died.emit()
-	elif velocity.length() < 0.1:
+		return
+	if velocity.length() < 0.1:
 		# visible flinch on a non-lethal hit, but only when standing still so it never
 		# stutters the walk/run cycle (the one-shot auto-returns to idle, _process reasserts
 		# walk/run next frame if the player is moving).
 		mecha.play("hit")
+	_trigger_dash_escape(source_pos)
+
+## BLUESTRIKE uniquement : voir le bloc de constantes pres de base_chassis pour le detail des
+## chiffres retenus. Direction = opposee a la source du coup ; a defaut (source inconnue),
+## opposee a la vitesse courante ; a defaut de tout, vers le bas (jamais un dash "nulle part").
+func _trigger_dash_escape(source_pos: Vector2) -> void:
+	if base_chassis != "bluestrike" or _dash_cd > 0.0:
+		return
+	_dash_cd = DASH_COOLDOWN
+	_dash_t = DASH_DUR
+	var away: Vector2 = global_position - source_pos
+	if away.length() > 1.0:
+		_dash_dir = away.normalized()
+	elif velocity.length() > 1.0:
+		_dash_dir = -velocity.normalized()
+	else:
+		_dash_dir = Vector2.DOWN
 
 func heal(amount: float) -> void:
 	if not GameState.alive:
@@ -1196,3 +1504,7 @@ func heal(amount: float) -> void:
 
 func grant_invuln(t: float) -> void:
 	_iframe = maxf(_iframe, t)
+
+## BRAS PRESSEUR (decor tech, GroundZone shape="line") : coupe le mouvement sans toucher aux PV.
+func stun(duration: float) -> void:
+	_stun_t = maxf(_stun_t, duration)

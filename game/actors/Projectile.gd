@@ -1,6 +1,8 @@
 extends Area2D
 class_name Projectile
 
+const LockChevron = preload("res://actors/LockChevron.gd")   # voir la note dans Player.gd
+
 var velocity: Vector2 = Vector2.ZERO
 var damage: float = 10.0
 var pierce: int = 0
@@ -21,9 +23,17 @@ var _last_hit: Node = null      # pour ne pas rebondir sur l'ennemi qu'on vient 
 var _boom_t: float = 0.0        # temps restant avant de faire demi-tour
 var _boom_back: bool = false
 
+## Plan de differenciation des chassis (26/09) : identite du tireur, pour VORTEX (chaine
+## d'alignement, ci-dessous) et BRUISER (transmise a Enemy.take_damage). Vide = sans effet.
+var chassis_id: String = ""
+var _align_hits: int = 0        # combien d'ennemis CE projectile a deja touche (perce)
+var _align_granted: bool = false   # une seule pile accordee par projectile, au 2e ennemi touche
+var _relaunched: bool = false    # CERCLIER : une seule relance du Disque a son premier retour
+
 var _spr: Sprite2D
 var _light: Sprite2D          # additive halo, not a dynamic light (see _ready)
 var _trail: Line2D
+var _lock_mark: LockChevron   # missile-only : chevron sur la cible reellement poursuivie
 var _built: bool = false
 var _turn_rate: float = 3.0
 var _orb_pulse: bool = false       # plasma orbs breathe
@@ -45,6 +55,10 @@ const BULLET_FAMILY: Dictionary = {
 	"disperseur": "tracer", "deflagrateur": "tracer",   # eclats rapides
 	"ricochet": "orb", "carambole": "orb",              # bille qui tourne en rebondissant
 	"disque": "lance", "guillotine": "lance",           # lame allongee
+	# 04/10, signale par le patron (VFX "vraiment nuls") : rail_nova/frelon retombaient sur le
+	# defaut "tracer" (silencieux, jamais signale) - meme famille que l'arme dont elles reprennent
+	# le mecanisme (rail_nova perce comme railgun, frelon rebondit comme ricochet).
+	"rail_nova": "lance", "frelon": "orb",
 }
 # family -> {scale on screen, native_hue (skip the accent tint), spin rad/s}
 const BULLET_STYLE: Dictionary = {
@@ -120,6 +134,10 @@ func setup(pos: Vector2, dir: Vector2, params: Dictionary) -> void:
 	life = float(params.get("life", 2.0))          # portee courte = duree de vie courte
 	bounces = int(params.get("bounces", 0))
 	boomerang = bool(params.get("boomerang", false))
+	chassis_id = String(params.get("chassis", ""))
+	_align_hits = 0          # 🚨 objet PIOCHE DANS UN POOL (_proj_pool) : reinitialiser ici,
+	_align_granted = false   # sinon un ancien tir Vortex "contaminerait" le suivant.
+	_relaunched = false
 	_last_hit = null
 	_boom_t = life * 0.45                          # demi-tour a mi-course
 	_boom_back = false
@@ -160,6 +178,11 @@ func setup(pos: Vector2, dir: Vector2, params: Dictionary) -> void:
 		_trail.gradient = g
 		_trail.material = Tex.add_mat()
 		add_child(_trail)
+		_lock_mark = LockChevron.new()
+		_lock_mark.top_level = true
+		_lock_mark.z_index = 5
+		_lock_mark.visible = false
+		add_child(_lock_mark)
 		area_entered.connect(_on_hit)
 		body_entered.connect(_on_body)
 	
@@ -271,11 +294,24 @@ func _physics_process(delta: float) -> void:
 		elif home != null:
 			var back: Vector2 = (home.global_position - global_position)
 			if back.length() < 46.0:
+				# CERCLIER (27/09, rapport "exploiter le retour du Disque") : au premier retour,
+				# repart UNE fois vers l'ennemi le plus proche, degats reduits. boomerang=false ->
+				# la branche ci-dessus ne joue plus, il vole tout droit jusqu'a l'impact ou l'expiration.
+				if chassis_id == "cerclier" and not _relaunched:
+					var nxt: Node2D = _find_nearest_enemy()
+					if nxt != null:
+						_relaunched = true
+						boomerang = false
+						damage *= 0.5
+						velocity = (nxt.global_position - global_position).normalized() * 620.0
+						rotation = velocity.angle()
+						life = maxf(life, 1.0)
+						return
 				_recycle()
 				return
 			velocity = velocity.lerp(back.normalized() * 780.0, delta * 5.0)
 	if homing:
-		var tgt: Node2D = _find_nearest_enemy()
+		var tgt: Node2D = _find_homing_target()
 		if tgt != null and is_instance_valid(tgt):
 			var cur_ang: float = velocity.angle()
 			var des_ang: float = global_position.angle_to_point(tgt.global_position)
@@ -288,6 +324,10 @@ func _physics_process(delta: float) -> void:
 			var spd2: float = velocity.length()
 			velocity = Vector2.from_angle(cur_ang) * spd2
 			rotation = cur_ang
+			_lock_mark.visible = true
+			_lock_mark.global_position = tgt.global_position + Vector2(0.0, -46.0)
+		else:
+			_lock_mark.visible = false
 	global_position += velocity * delta
 	# plasma churns rather than flying clean: offset the logged point perpendicular to travel
 	var tp: Vector2 = global_position
@@ -313,6 +353,31 @@ func _find_nearest_enemy() -> Node2D:
 				best = e
 	return best
 
+## HOMING (missilepod/hydra) uniquement — PAS le rebond du ricochet (_find_nearest_enemy ci-dessus,
+## omnidirectionnel par design : "on repart vers l'ennemi le plus proche AUTRE que celui touche").
+## 🚨 patron 25/09 : "le tir doit aller dans la direction de la visee meme s'il y a rien" — sans
+## filtre directionnel, un missile tire vers du vide accrochait le PLUS PROCHE ennemi du plan
+## entier (meme dans le dos du joueur), ignorant totalement la visee manuelle des qu'un seul
+## ennemi existait quelque part. Cone de 55 deg autour de la vitesse courante : hors cone -> pas
+## de cible, le missile vole droit dans l'axe vise au lieu de detourner vers n'importe quoi.
+const HOMING_CONE_COS: float = 0.57   # cos(55°)
+func _find_homing_target() -> Node2D:
+	var best: Node2D = null
+	var best_d: float = 99999999.0
+	var fwd: Vector2 = velocity.normalized() if velocity.length() > 1.0 else Vector2.RIGHT
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e is Node2D and is_instance_valid(e):
+			var to: Vector2 = (e as Node2D).global_position - global_position
+			if to.length_squared() < 1.0:
+				continue
+			if fwd.dot(to.normalized()) < HOMING_CONE_COS:
+				continue   # hors du couloir de tir -> ignore, meme si c'est le plus proche
+			var d: float = to.length_squared()
+			if d < best_d:
+				best_d = d
+				best = e
+	return best
+
 func _on_hit(area: Area2D) -> void:
 	if not alive:
 		return
@@ -322,10 +387,20 @@ func _on_hit(area: Area2D) -> void:
 		else:
 			var is_crit: bool = randf() < crit_chance
 			var dmg: float = damage * (crit_mult if is_crit else 1.0)
-			(area as Enemy).take_damage(dmg)
+			(area as Enemy).take_damage(dmg, chassis_id, impact_kind)
 			Events.damage_dealt.emit(global_position, int(dmg), is_crit)
 			if is_crit:
 				Audio.sfx("crit", 0.1)
+			# VORTEX "aligner" (prototype B) : un tir perforant qui touche son 2e ennemi donne
+			# UNE pile (pas une par ennemi supplementaire — un Disque a 20 de perce ne doit pas
+			# remplir la chaine d'un seul lancer). cf. Player.vortex_align_stack.
+			if chassis_id == "vortex" and pierce > 0:
+				_align_hits += 1
+				if _align_hits >= 2 and not _align_granted:
+					_align_granted = true
+					if game != null and "player" in game and game.player != null \
+							and game.player.has_method("vortex_align_stack"):
+						game.player.vortex_align_stack()
 		if game != null and game.has_method("impact_fx"):
 			# AoE weapons: match the burst to the ACTUAL (level-grown) blast radius, so a wide
 			# splash reads wide. Others use the weapon's fx_scale directly.
@@ -369,7 +444,7 @@ func _do_splash() -> void:
 			if d <= aoe_sq:
 				var is_crit: bool = randf() < crit_chance   # AoE hits crit like single-target ones
 				var dmg: float = damage * (crit_mult if is_crit else 1.0)
-				(e as Enemy).take_damage(dmg)
+				(e as Enemy).take_damage(dmg, chassis_id, impact_kind)
 				Events.damage_dealt.emit((e as Node2D).global_position, int(dmg), is_crit)
 				if is_crit:
 					Audio.sfx("crit", 0.1)
@@ -384,6 +459,8 @@ func _on_body(body: Node) -> void:
 
 func _recycle() -> void:
 	alive = false
+	if _lock_mark != null:
+		_lock_mark.visible = false
 	if game != null and game.has_method("reclaim_proj"):
 		game.reclaim_proj(self)
 	else:
@@ -397,3 +474,5 @@ func deactivate() -> void:
 	global_position = Vector2(1.0e7, 1.0e7)
 	if _trail != null:
 		_trail.clear_points()
+	if _lock_mark != null:
+		_lock_mark.visible = false

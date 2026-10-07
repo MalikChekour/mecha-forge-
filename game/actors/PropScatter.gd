@@ -1,5 +1,6 @@
 extends Node2D
 class_name PropScatter
+const DwellZone = preload("res://actors/DwellZone.gd")   # voir la note dans Player.gd
 ## Scatters the Gemini decor sprites across the arena, coherently per biome. Every prop is a
 ## StaticBody2D (blocks the player; enemies steer around it via Game.cover_list). Some crates are
 ## DESTRUCTIBLE and drop a skill bonus; the rest are indestructible obstacles.
@@ -17,12 +18,22 @@ var biome: String = "tech"
 # 50 props alive over 22x the visible area: 50 sprites+shadows+colliders+lights for nothing,
 # and every one of 220 enemies rescanned all of them each physics frame.
 const CHUNK: float = 1000.0        # world units per chunk
-const LOAD_R: int = 1              # chunks kept alive around the player (3x3 -> 18 props)
+# 04/10, pop-in/pop-out signale par le patron (mode defilement infini, BOUNDED=false, le mode en
+# prod) : la camera peut voir jusqu'a ~viewport/zoom unites de monde (zoom descend a 0.4 sur petit
+# ecran -> jusqu'a 2.5x la largeur de viewport visible), largement plus que la frontiere de
+# dechargement a LOAD_R=1 (zone 3x3 = 3000 unites, frontiere reelle a 1000-2000 unites du joueur
+# selon sa position dans son chunk). Un decor pouvait donc disparaitre/apparaitre a l'ecran, pas
+# hors champ. LOAD_R=2 (zone 5x5 = 5000 unites, frontiere a 1500-3000 unites) pousse la frontiere
+# bien au-dela du champ visible dans les cas realistes - cout memoire/CPU negligeable (jusqu'a 75
+# props simultanes au lieu de 27, aucune boucle par-ennemi sur _chunks, seul cover_list l'est et
+# reste borne separement par COVER_R).
+const LOAD_R: int = 2              # chunks kept alive around the player (5x5 -> jusqu'a 75 props)
 const PER_CHUNK: int = 2           # props per chunk (density 2.0 per million units^2)
 const MARGIN: float = 170.0        # inset from chunk edges >= max gap -> no cross-border overlap
 const CLEAR_R: float = 340.0       # never drop a prop on top of the player
 # props that threaten the player — capped at one per chunk so you meet them at a readable cadence
-const HAZARDS: Array = ["generateur", "antenne", "conduit", "tourelle", "capaciteur", "baril", "emetteur"]
+const HAZARDS: Array = ["generateur", "antenne", "conduit", "tourelle", "capaciteur", "baril", "emetteur",
+	"bras_presseur", "surchauffe_sol", "zone_chargement"]
 
 var _chunks: Dictionary = {}       # Vector2i -> Array[Prop]  (ALL chunks, placed once, never freed)
 var _last_cell: Vector2i = Vector2i(9999999, 9999999)
@@ -40,16 +51,16 @@ const COVER_R: int = 1             # chunks around the player kept in cover_list
 # gold competence cache), glow, boom(fuel barrel), shoot*(hostile turret), awaken(carcass)
 const DECOR: Dictionary = {
 	# --- fuel barrels: get close and they arm, then blow up (see BOOM_* in Prop) ---
-	"baril":      {"f": "g20", "hp": 40.0,  "sz": 80.0,  "destruct": true,  "skill": 0.30, "boom": true, "glow": "orange"},
+	"baril":      {"f": "g20", "hp": 40.0,  "sz": 90.0,  "destruct": true,  "skill": 0.30, "boom": true, "glow": "orange"},
 	"caisses":    {"f": "g21", "hp": 38.0,  "sz": 92.0,  "destruct": true,  "skill": 0.50},
 	# ARC PYLON: zaps the nearest enemies with lightning, and blows an EMP shockwave when destroyed.
 	# Neutral-helpful — lead the horde past it and it thins them; break it for a burst. Tougher HP.
-	"generateur": {"f": "g22", "hp": 170.0, "sz": 128.0, "destruct": true, "glow": "cyan",
+	"generateur": {"f": "g22", "hp": 170.0, "sz": 140.0, "destruct": true, "glow": "cyan",
 	               "arc": true, "arc_cd": 1.5, "arc_dmg": 22.0, "arc_r": 300.0},
 	# BEACON: spawns enemies until destroyed -> a PRIORITY target. It makes standing still costly
 	# and pushing in to silence it rewarding (the aggression the game was missing). Tougher HP so
 	# killing it is a real commitment, not a stray shot.
-	"antenne":    {"f": "g23", "hp": 220.0, "sz": 176.0, "destruct": true, "glow": "orange",
+	"antenne":    {"f": "g23", "hp": 220.0, "sz": 150.0, "destruct": true, "glow": "orange",
 	               "beacon": true, "beacon_cd": 3.4, "beacon_kind": "drone"},
 	# SLOW FIELD: a persistent zone that bogs down the player AND the horde. A trap AND a tool —
 	# lead the swarm into it and hold the edge. Destroy it (low HP) to clear the zone.
@@ -80,10 +91,10 @@ const DECOR: Dictionary = {
 	# It is the answer to "the mech can retreat forever for free": dodging it demands a LATERAL
 	# move, which breaks a straight-line retreat and lets the horde close.
 	# Destructible (220 HP) because every hazard must have counterplay.
-	"capaciteur": {"f": "g25", "hp": 220.0, "sz": 188.0, "destruct": true, "glow": "magenta",
+	"capaciteur": {"f": "g25", "hp": 220.0, "sz": 140.0, "destruct": true, "glow": "magenta",
 	               "beam": true, "beam_dmg": 45.0, "beam_dmg_enemy": 170.0},
 	# --- NATURE: indestructible scenery ---
-	"rocher":     {"f": "g29", "hp": 170.0, "sz": 120.0, "nature": true},
+	"rocher":     {"f": "g29", "hp": 170.0, "sz": 140.0, "nature": true},
 	# CRISTAUX — shatters into damaging shards on destruction (+ a little Overdrive). Break it in a crowd.
 	"cristaux":   {"f": "g30", "hp": 70.0,  "sz": 100.0, "nature": true, "destruct": true, "glow": "cyan", "shatter": true},
 	"arbre":      {"f": "g31", "hp": 70.0,  "sz": 178.0, "nature": true},
@@ -104,6 +115,120 @@ const DECOR: Dictionary = {
 	               "aura": "snare", "aura_r": 120.0, "aura_p1": 0.35},
 	# Catalogue nos 19-35 supprimes (patron) : immeuble(s), vaisseau(x), voiture, gravats, pylone,
 	# panneau, barricade, carcasse, lave_geyser, champignon, campement, epave_gel, serveurs, capsule.
+
+	# ===== 27/09, rapports "Gravité faible" / "Quatre cartes inedites" : le jeu ne place pas de
+	# SALLES a geometrie fixe (streaming procedural par chunk, voir l'entete du fichier) — la
+	# lecture "salle en losange" des rapports ne correspond a rien ici. Meme intention (une
+	# decision spatiale locale par prop), reexprimee avec le systeme de decor generique existant
+	# (def-driven, comme aura/slow/arc ci-dessus) au lieu d'inventer un systeme de salles. Chassis
+	# reutilises (g22/g24 deja en jeu ; g38 etait au catalogue mais JAMAIS reference nulle part).
+	"impulsion": {"f": "g24", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
+	              "push": true, "push_cd": 3.2, "push_force": 380.0, "push_r": 260.0},
+	"aimant":    {"f": "g22", "hp": 130.0, "sz": 128.0, "destruct": true, "glow": "cyan",
+	              "guard": true, "guard_r": 170.0, "guard_cd": 3.5, "guard_force": 300.0},
+	"terminal":  {"f": "g38", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
+	              "dwell": true, "dwell_r": 100.0, "dwell_time": 1.2, "dwell_force": 260.0},
+	"archives":  {"f": "g23", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "cyan",
+	              "spot": true, "spot_r": 340.0, "spot_boost": 0.55, "spot_hold": 3.0},
+	"quai":      {"f": "g28", "hp": 130.0, "sz": 140.0, "nature": true, "block": 0.34,
+	              "cycle": true, "cycle_on": 6.0, "cycle_off": 3.0},
+	"convoyeur": {"f": "g27", "hp": 150.0, "sz": 130.0, "destruct": true, "glow": "orange",
+	              "convey": true, "convey_r": 200.0, "convey_cd": 2.2, "convey_dist": 90.0},
+
+	# ===== 30/09, refonte decor "Secteur Tech" (plan "15 maps" - maps 1-3 fusionnees en un seul
+	# decor enrichi pour "tech", voir le plan d'implementation). Memes idiomes que ci-dessus. =====
+	"convoyeur_sol":      {"f": "convoyeur_sol", "hp": 150.0, "sz": 130.0, "destruct": true, "glow": "orange",
+	                       "conveyor": true, "conveyor_r": 150.0, "conveyor_speed": 60.0},
+	"console_convoyeur":  {"f": "console_convoyeur", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
+	                       "console": true, "console_r": 400.0},
+	"bras_presseur":      {"f": "bras_presseur", "hp": 150.0, "sz": 130.0, "destruct": true, "glow": "orange",
+	                       "presser": true, "presser_len": 240.0, "presser_dmg": 15.0, "presser_stun": 0.5},
+	"piston_hydraulique": {"f": "piston_hydraulique", "hp": 150.0, "sz": 130.0, "nature": true, "block": 0.30,
+	                       "cycle": true, "cycle_on": 2.0, "cycle_off": 2.0},
+	"vanne_refroidissement": {"f": "vanne_refroidissement", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
+	                       "valve": true, "valve_r": 150.0, "valve_cd": 30.0},
+	"surchauffe_sol":     {"f": "surchauffe_sol", "hp": 90.0,  "sz": 150.0, "nature": true,
+	                       "overheat": true, "overheat_max": 260.0},
+	"porte_automatique":  {"f": "porte_automatique", "hp": 150.0, "sz": 150.0, "nature": true, "block": 0.40,
+	                       "cycle": true, "cycle_on": 6.0, "cycle_off": 5.0},
+	"zone_chargement":    {"f": "zone_chargement", "hp": 90.0,  "sz": 150.0, "destruct": true, "glow": "orange",
+	                       "dropzone": true},
+	"container_mobile":   {"f": "container_mobile", "hp": 160.0, "sz": 140.0, "destruct": true,
+	                       "rail": true, "rail_span": 220.0, "rail_speed": 15.0},
+
+	# ===== 03/10, refonte decor "Zone Cryo" (plan 15 maps, maps 4-6, nouveau biome "cryo").
+	# Memes idiomes que le Secteur Tech ci-dessus. Tous ont recu leur art dedie (03/10) sauf
+	# brouillard_froid qui reste procedural (g20, aucun art externe necessaire, cf. nuage_spores).
+	"plaque_de_glace":    {"f": "plaque_de_glace", "hp": 90.0,  "sz": 140.0, "nature": true, "block": 0.0,
+	                       "ice_patch": true, "ice_patch_r": 130.0, "ice_patch_amt": 0.8},
+	"capsule_cryogenique": {"f": "capsule_cryogenique", "hp": 60.0, "sz": 130.0, "destruct": true, "glow": "cyan",
+	                       "capsule": true},
+	"jet_de_cryo":        {"f": "jet_de_cryo", "hp": 90.0,  "sz": 110.0, "destruct": true, "glow": "cyan",
+	                       "cryo_jet": true, "cryo_jet_r": 70.0, "cryo_jet_stun": 1.0},
+	"brouillard_froid":   {"f": "g20", "hp": 90.0,  "sz": 20.0,  "nature": true, "block": 0.0,
+	                       "fog": true, "fog_r": 260.0},
+	"radiateur":          {"f": "radiateur", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "orange",
+	                       "defroster": true, "defroster_r": 180.0},
+	"pic_de_glace":       {"f": "pic_de_glace", "hp": 110.0, "sz": 120.0, "destruct": true, "glow": "cyan",
+	                       "ice_spike": true},
+	"borne_thermique":    {"f": "borne_thermique", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "orange",
+	                       "thermal": true, "thermal_r": 150.0},
+	"glace_fragile":      {"f": "glace_fragile", "hp": 90.0,  "sz": 130.0, "nature": true, "block": 0.0,
+	                       "fragile_ice": true},
+
+	# ===== 03/10, refonte decor "Noyau Instable" (plan 15 maps, maps 7-9, nouveau biome
+	# "reacteur"). Memes idiomes que ci-dessus. Les 8 ont leur art final (zone_alternante/
+	# pulse_energie integres le 03/10).
+	"bassin_toxique":     {"f": "bassin_liquide_toxique", "hp": 90.0, "sz": 150.0, "nature": true, "block": 0.0,
+	                       "toxic_pool": true, "toxic_r": 150.0, "toxic_dps": 6.0},
+	"vanne_drainage":     {"f": "vanne_drainage", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
+	                       "drain": true, "drain_r": 250.0},
+	"poche_de_vent":      {"f": "turbine_geante", "hp": 130.0, "sz": 170.0, "destruct": true, "glow": "orange",
+	                       "wind": true, "wind_r": 220.0, "wind_speed": 50.0},
+	"console_vent":       {"f": "console_controle_vent", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
+	                       "wind_console": true, "wind_console_r": 400.0},
+	"grille_ventilation": {"f": "grille_ventilation", "hp": 90.0, "sz": 110.0, "nature": true, "block": 0.0,
+	                       "vent_grate": true},
+	"zone_alternante":    {"f": "zone_alternante", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "green",
+	                       "alt_zone": true, "alt_zone_r": 100.0, "alt_zone_dps": 10.0, "cycle_on": 5.0, "cycle_off": 5.0,
+	                       "block": 0.0},
+	"cristal_instable":   {"f": "cristal_energie_instable", "hp": 0.0, "sz": 100.0, "nature": true, "block": 0.0,
+	                       "unstable_crystal": true},
+	"pulse_energie":      {"f": "pulse_energie", "hp": 130.0, "sz": 140.0, "destruct": true, "glow": "green",
+	                       "energy_pulse": true},
+
+	# ===== 03/10, refonte decor "Biomecanique" (plan 15 maps, maps 10-12, nouveau biome
+	# "ruche"). Memes idiomes que ci-dessus. 4/6 ont deja leur art final ; nuage_spores est
+	# procedural comme brouillard_froid (aucun art externe necessaire) ; residu_biomecanique
+	# (ajoute 03/10, separee de sol_collant qui etait a tort fusionnee avec elle) en placeholder.
+	"cocon":              {"f": "cocon", "hp": 60.0, "sz": 130.0, "destruct": true, "glow": "cyan",
+	                       "capsule": true},
+	"residu_biomecanique": {"f": "g33", "hp": 90.0, "sz": 140.0, "nature": true, "block": 0.0,
+	                       "bio_residue": true, "bio_residue_r": 150.0, "bio_residue_slow": 0.6, "bio_residue_pull": 40.0},
+	"sol_collant":        {"f": "sol_collant", "hp": 90.0, "sz": 140.0, "nature": true, "block": 0.0,
+	                       "sticky": true, "sticky_r": 150.0, "sticky_mult": 0.45},
+	"tentacule_emergence": {"f": "tentacule_emergence", "hp": 110.0, "sz": 130.0, "destruct": true, "glow": "green",
+	                       "tentacle": true},
+	"nuage_spores":       {"f": "g20", "hp": 90.0, "sz": 20.0, "nature": true, "block": 0.0,
+	                       "spore_cloud": true, "spore_r": 220.0, "spore_dps": 5.0},
+	"plante_lumineuse":   {"f": "plante_lumineuse", "hp": 60.0, "sz": 80.0, "destruct": true, "glow": "green",
+	                       "light_plant": true, "light_plant_r": 180.0},
+
+	# ===== 03/10, refonte decor "Forge Finale" (plan 15 maps, maps 13-15, nouveau biome
+	# "citadelle"). Memes idiomes que ci-dessus. Les 6 ont leur art final (zone_depressurisation/
+	# zone_push_pull integres le 03/10).
+	"porte_securite_orbitale": {"f": "porte_securite_orbitale", "hp": 170.0, "sz": 150.0, "nature": true, "block": 0.40,
+	                       "cycle": true, "cycle_on": 6.0, "cycle_off": 5.0},
+	"zone_depressurisation": {"f": "zone_depressurisation", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "orange",
+	                       "depress": true, "depress_r": 200.0, "depress_force": 220.0},
+	"zone_push_pull":     {"f": "zone_push_pull", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "cyan",
+	                       "grav_zone": true, "grav_r": 180.0, "grav_force": 60.0},
+	"emetteur_laser_rotatif": {"f": "emetteur_laser_rotatif", "hp": 170.0, "sz": 150.0, "destruct": true, "glow": "orange",
+	                       "rot_laser": true},
+	"pilier_energie":     {"f": "pilier_energie", "hp": 260.0, "sz": 220.0, "destruct": true, "glow": "orange",
+	                       "pillar": true},
+	"segment_mur_modulaire": {"f": "segment_mur_modulaire", "hp": 220.0, "sz": 170.0, "nature": true, "block": 0.40,
+	                       "cycle": true, "cycle_on": 10.0, "cycle_off": 8.0},
 }
 
 # What a smashed man-made prop leaves. A gold-glow crate ("skill" pre-rolled at spawn) always
@@ -140,6 +265,14 @@ const BIOME_BORDER: Dictionary = {
 	"tech":      ["rocher", "cristaux"],
 	"spaceship": ["rocher", "cristaux"],
 	"ruines":    ["rocher", "cristaux"],   # immeuble/gravats2 supprimes -> mur de roche generique
+	"cryo":      ["glace", "cristaux"],
+	# 03/10, trou signale par le patron : ces 3 biomes retombaient sur le defaut ["rocher","arbre"]
+	# (faute d'entree dediee), incoherent avec leur theme. Reutilisent des kinds DECOR deja en art
+	# reel (aucune generation necessaire) choisis pour leur silhouette large/imposante, adaptee a
+	# un mur de bordure oversized.
+	"reacteur":  ["poche_de_vent", "rocher"],   # poche_de_vent = sprite turbine_geante.png
+	"ruche":     ["tentacule_emergence", "racines"],
+	"citadelle": ["segment_mur_modulaire", "pilier_energie"],
 }
 const BORDER_STEP: float = 300.0    # spacing along the wall (props are rendered wider -> they overlap)
 const BORDER_SZ: float = 320.0      # oversized wall props: big enough to touch at BORDER_STEP
@@ -201,8 +334,17 @@ const BIOME_DECOR: Dictionary = {
 	# (generateur) + mine (baril), on top of its native flora/terrain. No map is ever short on traps.
 	"earth":     ["rocher", "tourelle", "capaciteur", "generateur", "baril", "antenne", "arbre", "epave", "caisses"],
 	"volcanic":  ["lave", "tourelle", "capaciteur", "generateur", "baril", "lave", "rocher", "epave", "caisses"],
-	"spaceship": ["generateur", "conduit", "capaciteur", "tourelle", "antenne", "emetteur", "baril", "cristaux", "container", "caisses"],
-	"tech":      ["generateur", "conduit", "antenne", "capaciteur", "tourelle", "emetteur", "baril", "cristaux", "container", "caisses"],
+	"spaceship": ["generateur", "conduit", "capaciteur", "tourelle", "antenne", "emetteur", "baril", "cristaux", "container", "caisses", "impulsion"],
+	"tech":      ["generateur", "conduit", "antenne", "capaciteur", "tourelle", "emetteur", "baril", "cristaux", "container", "caisses", "aimant", "terminal", "archives", "quai", "convoyeur",
+	              "convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "vanne_refroidissement", "surchauffe_sol", "porte_automatique", "zone_chargement", "container_mobile"],
+	"cryo": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
+	         "plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "brouillard_froid", "radiateur", "pic_de_glace", "borne_thermique", "glace_fragile"],
+	"reacteur": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
+	         "bassin_toxique", "vanne_drainage", "poche_de_vent", "console_vent", "grille_ventilation", "zone_alternante", "cristal_instable", "pulse_energie"],
+	"ruche": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
+	         "cocon", "residu_biomecanique", "sol_collant", "tentacule_emergence", "nuage_spores", "plante_lumineuse"],
+	"citadelle": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
+	         "porte_securite_orbitale", "zone_depressurisation", "zone_push_pull", "emetteur_laser_rotatif", "pilier_energie", "segment_mur_modulaire"],
 	"desert":    ["arche", "tourelle", "capaciteur", "generateur", "baril", "antenne", "rocher", "epave", "caisses"],
 	"ice":       ["glace", "tourelle", "capaciteur", "generateur", "baril", "conduit", "cristaux", "epave", "caisses"],
 	"jungle":    ["plante", "tourelle", "capaciteur", "generateur", "baril", "antenne", "racines", "arbre", "epave", "caisses"],
@@ -210,6 +352,108 @@ const BIOME_DECOR: Dictionary = {
 	# ruines repeuple avec les decors SURVIVANTS (robot-war wreckage) apres suppression des nos 19-35
 	"ruines":    ["epave", "rocher", "capaciteur", "tourelle", "epave", "caisses", "baril", "container", "cristaux"],
 }
+
+# ===== 03/10, PROGRESSION PAR MAP (plan "15 maps") =====
+# Le patron a releve que les 5 biomes "15 maps" melangeaient leurs 3 maps sources dans UNE SEULE
+# liste plate (BIOME_DECOR ci-dessus) : un tirage uniforme ne respecte aucun "ordre" entre les
+# maps 4/5/6 (ou 1/2/3, 7/8/9, etc.) — tout pouvait apparaitre des la premiere minute. Correctif :
+# chaque biome "15 maps" associe ses kinds a l'une de ses 3 maps sources (verifie ligne a ligne
+# contre le PDF d'origine), et _pick_kind() ci-dessous fait deriver un tirage PONDERE par le temps
+# ecoule (GameState.run_time) d'une map vers la suivante, sans jamais couper une map a zero (pour
+# garder de la surprise). Les biomes HORS de ce dict (earth/volcanic/...) n'ont pas de notion de
+# "map" dans le document source : ils gardent le tirage uniforme a l'identique (code inchange).
+const MAP_PHASE_DURATION: float = 300.0   # 5 min/segment -> une run de 15 min traverse les 3 maps
+const MAP_PHASE_FLOOR: float = 0.15       # une map "pas encore due"/"deja passee" reste possible
+const BIOME_MAP_SEGMENTS: Dictionary = {
+	"tech": [
+		# 04/10, trou signale par le patron : les 10 decors generiques herites d'avant la refonte
+		# (conduit/antenne/emetteur/cristaux/container/aimant/terminal/archives/quai/convoyeur)
+		# n'etaient dans AUCUN segment -> toujours tires a poids fixe, jamais concernes par la
+		# progression. Rattaches par affinite thematique avec chaque map du document source ; les 5
+		# restants (generateur/capaciteur/tourelle/baril/caisses) deviennent la vraie base neutre de
+		# "tech", symetrique avec les 6 items de base des 4 autres biomes "15 maps".
+		["convoyeur_sol", "console_convoyeur", "bras_presseur", "convoyeur", "terminal", "archives"],      # Map 1 - Hall d'Assemblage
+		["piston_hydraulique", "vanne_refroidissement", "surchauffe_sol", "conduit", "emetteur", "aimant"], # Map 2 - Fonderie des Pistons
+		["porte_automatique", "zone_chargement", "container_mobile", "antenne", "cristaux", "container", "quai"], # Map 3 - Quai de Chargement
+	],
+	"cryo": [
+		["plaque_de_glace", "capsule_cryogenique", "jet_de_cryo"],           # Map 4 - Cryo-Voute
+		["brouillard_froid", "radiateur", "pic_de_glace"],                   # Map 5 - Serres Gelees
+		["borne_thermique", "glace_fragile"],                                # Map 6 - Lac de Permafrost
+	],
+	"reacteur": [
+		["bassin_toxique", "vanne_drainage"],                                # Map 7 - Bassins Toxiques
+		["poche_de_vent", "console_vent", "grille_ventilation"],             # Map 8 - Salle des Turbines
+		["zone_alternante", "cristal_instable", "pulse_energie"],            # Map 9 - Noyau Fissure
+	],
+	"ruche": [
+		["cocon", "residu_biomecanique"],                                    # Map 10 - Couvoir Mecanique
+		["sol_collant", "tentacule_emergence"],                              # Map 11 - Veines Vivantes
+		["nuage_spores", "plante_lumineuse"],                                # Map 12 - Jardin de Spores
+	],
+	"citadelle": [
+		["porte_securite_orbitale", "zone_depressurisation"],                # Map 13 - Pont Orbital
+		["zone_push_pull", "emetteur_laser_rotatif"],                        # Map 14 - Anneau de Gravite
+		["pilier_energie", "segment_mur_modulaire"],                         # Map 15 - Chambre de la Forge
+	],
+}
+
+## Poids triangulaires sur les 3 segments pour le temps de run courant : le segment i culmine a la
+## minute (i+1)*5 et retombe lineairement vers ses voisins (derive, pas de couperet). Plancher a
+## MAP_PHASE_FLOOR pour qu'une map "pas encore due" garde une petite chance (surprise > purete).
+func _map_phase_weights() -> Array:
+	var pos: float = clampf(GameState.run_time / MAP_PHASE_DURATION, 0.0, 2.0)
+	var w: Array = [0.0, 0.0, 0.0]
+	for i in 3:
+		w[i] = maxf(MAP_PHASE_FLOOR, 1.0 - absf(pos - float(i)))
+	var total: float = w[0] + w[1] + w[2]
+	return [w[0] / total, w[1] / total, w[2] / total]
+
+## 04/10, pour la banniere de transition (Game.gd) : quel segment (0/1/2) DOMINE actuellement, sur
+## la seule base du temps ecoule - meme seuil que _map_phase_weights ci-dessus (une seule source de
+## verite pour MAP_PHASE_DURATION), mais arrondi a l'indice le plus proche plutot qu'une ponderation.
+func current_map_phase() -> int:
+	return clampi(int(round(clampf(GameState.run_time / MAP_PHASE_DURATION, 0.0, 2.0))), 0, 2)
+
+## Pioche un kind dans la liste du biome. Pour les biomes "15 maps" (BIOME_MAP_SEGMENTS) : les
+## kinds HORS segment (tourelle/capaciteur/...) gardent un poids de 1.0 chacun comme avant ; les
+## kinds DANS un segment se partagent un poids total egal a (poids_de_phase x nb_kinds_thematiques)
+## -> la proportion globale "base generique vs decor thematique" ne change pas (meme densite de
+## danger par chunk qu'avant), seul le kind thematique qui gagne derive avec le temps. Les biomes
+## absents de BIOME_MAP_SEGMENTS gardent le tirage uniforme d'origine, inchange.
+func _pick_kind(kinds: Array, rng: RandomNumberGenerator) -> String:
+	var segs: Array = BIOME_MAP_SEGMENTS.get(biome, [])
+	if segs.is_empty():
+		return String(kinds[rng.randi() % kinds.size()])
+	var themed_total: int = 0
+	for seg in segs:
+		themed_total += (seg as Array).size()
+	var themed_set: Dictionary = {}
+	for seg in segs:
+		for k in seg:
+			themed_set[k] = true
+	var w: Array = _map_phase_weights()
+	var entry_kinds: Array = []
+	var entry_weights: Array = []
+	var total_w: float = 0.0
+	for k in kinds:
+		var ks: String = String(k)
+		if themed_set.has(ks):
+			continue
+		entry_kinds.append(ks); entry_weights.append(1.0); total_w += 1.0
+	for i in segs.size():
+		var seg: Array = segs[i]
+		if seg.is_empty():
+			continue
+		var per_kind_w: float = (float(w[i]) * float(themed_total)) / float(seg.size())
+		for k in seg:
+			entry_kinds.append(String(k)); entry_weights.append(per_kind_w); total_w += per_kind_w
+	var roll: float = rng.randf() * total_w
+	for i in entry_kinds.size():
+		roll -= entry_weights[i]
+		if roll <= 0.0:
+			return entry_kinds[i]
+	return entry_kinds[entry_kinds.size() - 1]
 
 ## Kept for the old call site: seeds the chunks around the player straight away. The `count`
 ## argument is now ignored — density comes from PER_CHUNK and coverage is endless.
@@ -340,14 +584,23 @@ func _load_chunk(c: Vector2i) -> void:
 			pos = origin + Vector2(rng.randf_range(lo, hi), rng.randf_range(lo, hi))
 		if pos.distance_to(ppos) < CLEAR_R:
 			continue                     # never spawn a prop on the player (spawn is at origin)
-		var kind: String = String(kinds[rng.randi() % kinds.size()])
+		var kind: String = _pick_kind(kinds, rng)
 		if HAZARDS.has(kind):            # cap hazards per chunk -> swap extras for a harmless prop
 			if haz_count >= 2:
 				kind = _nonhazard(kinds)
 			else:
 				haz_count += 1
 		# footprint radius: big props need far more room so their enemy-repulsion bubbles never overlap.
-		var gap: float = 55.0 + float((DECOR.get(kind, {}) as Dictionary).get("sz", 110.0)) * 0.45
+		# 04/10, lisibilite signalee par le patron : brouillard_froid/nuage_spores masquent leur
+		# sprite de base (sz=20, quasi nul) et affichent UNIQUEMENT un nuage procedural bien plus
+		# grand (fog_r/spore_r * 2.2, ~500-600 unites) - l'espacement calcule sur le seul "sz"
+		# laissait donc poser d'autres decors presque DANS le nuage, illisible. Utilise le plus
+		# grand des deux (generalise a tout futur "nuage procedural", pas un cas particulier fige).
+		var kdef: Dictionary = DECOR.get(kind, {}) as Dictionary
+		var eff_sz: float = float(kdef.get("sz", 110.0))
+		if kdef.has("fog_r"): eff_sz = maxf(eff_sz, float(kdef["fog_r"]) * 2.2)
+		if kdef.has("spore_r"): eff_sz = maxf(eff_sz, float(kdef["spore_r"]) * 2.2)
+		var gap: float = 55.0 + eff_sz * 0.45
 		var ok: bool = true
 		for e in placed:
 			if pos.distance_to(e["pos"]) < gap + float(e["gap"]):
@@ -405,6 +658,13 @@ class Prop extends StaticBody2D:
 	var _shoot_dmg: float = 8.0
 	var _shoot_t: float = 0.0
 	var _cannon: Vector2 = Vector2.RIGHT   # world direction the baked barrel actually points
+	# TOURELLE PIRATABLE (plan direction artistique, 26/09 : "Secteur Tech — tourelles
+	# piratables"). Affaiblie sous 40% de PV SANS mourir -> elle bascule au lieu d'exploser :
+	# meme canon FIXE, meme cone, mais elle cherche desormais un ennemi dans son arc au lieu du
+	# joueur. Pas de nouveau bouton d'interaction : "l'affaiblir sans l'achever" EST le geste.
+	var _hp_start: float = 0.0
+	var _hacked: bool = false
+	const HACK_THRESHOLD: float = 0.4
 	var _arc: float = 0.52                 # half-angle of the firing cone (rad)
 	var _muzzle: Vector2 = Vector2.ZERO    # barrel tip, local px (already scaled)
 	var flip: bool = false                 # mirrored copy -> cannon points down-RIGHT instead
@@ -443,6 +703,353 @@ class Prop extends StaticBody2D:
 	var _aura_t: float = 0.0
 	const AURA_TICK: float = 0.4
 	var _shatter: bool = false   # crystal: burst damaging shards on destruction
+	# ===== 27/09 : six props "def-driven" supplementaires, meme idiome que arc/slow/aura ci-dessus =====
+	# IMPULSION (Gravite faible) : pousse joueur+ennemis dans UN axe fixe (seede, comme le beam du
+	# capaciteur), a intervalle. Jamais de degats — un choix entre securite et raccourci.
+	var _push: bool = false
+	var _push_cd: float = 3.2
+	var _push_force: float = 380.0
+	var _push_r: float = 260.0
+	var _push_t: float = 0.0
+	var _push_dir: Vector2 = Vector2.RIGHT
+	var _push_ring: Sprite2D = null
+	# AIMANT (Casse magnetique) : repousse les ennemis proches QUAND le joueur est pres du prop —
+	# un outil defensif de positionnement, pas une invincibilite.
+	var _guard: bool = false
+	var _guard_r: float = 170.0
+	var _guard_cd: float = 3.5
+	var _guard_force: float = 300.0
+	var _guard_t: float = 0.0
+	var _guard_ring: Sprite2D = null
+	# TERMINAL (Terminal de delestage) : DwellZone (rester pres du module remplit une jauge) ->
+	# onde qui repousse les petits ennemis proches. "Quitter le rayon annule" deja gere par DwellZone.
+	var _dwell: bool = false
+	var _dwell_zone: DwellZone = null
+	var _dwell_force: float = 260.0
+	# ARCHIVES (Archives-machines) : marque periodiquement l'ennemi le plus proche avec
+	# priority_boost (Player._nearest_enemy/_cone_target le preferent), SANS bonus de degats.
+	var _spot: bool = false
+	var _spot_r: float = 340.0
+	var _spot_boost: float = 0.55
+	var _spot_hold: float = 3.0
+	var _spot_t: float = 0.0
+	var _spot_marked: Enemy = null
+	var _spot_beam: Line2D = null
+	# QUAI (Quai de chargement) : caisse-ecran qui alterne presente/absente sur un cycle fixe —
+	# une couverture qui a un debut et une fin, pas une permanente.
+	var _cycle: bool = false
+	var _cycle_on: float = 6.0
+	var _cycle_off: float = 3.0
+	var _cycle_t: float = 0.0
+	var _cycle_present: bool = true
+	var _cycle_col: CollisionShape2D = null
+	# CONVOYEUR (Chaine de fonderie) : deplace les ennemis proches d'une courte distance le long
+	# d'un axe fixe. Precedent deja valide en jeu par le comportement "pusher" (Enemy.gd) : une
+	# nudge externe de global_position compose sans conflit, chaque ennemi redérive son
+	# desired_vel depuis sa position COURANTE a chaque frame. Ne JAMAIS l'ajouter a cover_list :
+	# cette liste sert aux ennemis a se repousser HORS des props, ca annulerait sa propre nudge.
+	var _convey: bool = false
+	var _convey_r: float = 200.0
+	var _convey_cd: float = 2.2
+	var _convey_dist: float = 90.0
+	var _convey_t: float = 0.0
+	var _convey_dir: Vector2 = Vector2.RIGHT
+
+	# ===== 30/09, refonte decor "Secteur Tech" (plan 15 maps, maps 1-3 fusionnees en un seul
+	# decor enrichi pour le biome "tech" - voir le plan). Memes idiomes que les mecaniques
+	# ci-dessus (nudge direct de global_position, DwellZone, _cycle, spawn_ground_zone depuis un
+	# timer comme le boss _phase_crusher) : aucun nouveau moteur generique. =====
+
+	# CONVOYEUR SOL (Hall d'Assemblage) : pousse le JOUEUR et les ennemis en continu tant qu'ils
+	# restent dans le rayon - meme nudge que IMPULSION mais CHAQUE frame au lieu d'un burst a
+	# intervalle. Une CONSOLE voisine peut le couper temporairement.
+	var _conveyor: bool = false
+	var _conveyor_r: float = 150.0
+	var _conveyor_speed: float = 60.0
+	var _conveyor_dir: Vector2 = Vector2.RIGHT
+	var _conveyor_stop_t: float = 0.0   # >0 = coupe, decremente chaque frame ; pose par une console
+	var _conveyor_vfx_t: float = 0.0    # 04/10, WEAK signale par le patron : aucun VFX contrairement
+	                                     # a son frere "convoyeur" - pulse periodique, pas chaque frame
+
+	# CONSOLE DE CONVOYEUR (Hall d'Assemblage) : DwellZone DEDIEE (pas celle de "terminal", pour
+	# ne jamais risquer de mélanger les deux comportements) -> coupe les convoyeurs proches 8s.
+	# Cooldown en float decremente chaque frame, comme toutes les autres mecaniques du fichier
+	# (_push_t/_guard_t/...) — donc _console rejoint le set_process plus bas.
+	var _console: bool = false
+	var _console_r: float = 400.0
+	var _console_stop_dur: float = 8.0
+	var _console_cd: float = 25.0
+	var _console_cd_t: float = 0.0
+	var _console_zone: DwellZone = null
+
+	# BRAS PRESSEUR (Hall d'Assemblage) : GroundZone en LIGNE a intervalle aleatoire, meme idiome
+	# que le boss _phase_crusher (Enemy.gd:899-910) qui appelle deja spawn_ground_zone depuis un
+	# timer. Stun court via Player.stun(), jamais de knockback (aucune API de knockback joueur
+	# n'existe dans ce projet, voir le plan).
+	var _presser: bool = false
+	var _presser_t: float = 0.0
+	var _presser_len: float = 240.0
+	var _presser_dmg: float = 15.0
+	var _presser_stun: float = 0.5
+	var _presser_dir: Vector2 = Vector2.RIGHT
+
+	# VANNE DE REFROIDISSEMENT (Fonderie) : DwellZone DEDIEE -> ouvre une zone sure temporaire
+	# (GroundZone a 0 degat, sert de repere visuel + petit repit). Le "contre-effet" qui
+	# surchauffe une autre zone (propose par le document) est HORS SCOPE : ca demanderait une
+	# coordination entre deux zones distantes, ecarte pour la stabilite (voir le plan).
+	var _valve: bool = false
+	var _valve_r: float = 150.0
+	var _valve_cd: float = 30.0
+	var _valve_cd_t: float = 0.0
+	var _valve_zone: DwellZone = null
+
+	# SURCHAUFFE DU SOL (Fonderie) : re-spawn une GroundZone un peu plus grande toutes les ~2s
+	# jusqu'a un rayon max - simule une croissance SANS vraie persistance (GroundZone.gd ne peut
+	# pas durer indefiniment, voir le plan).
+	var _overheat: bool = false
+	var _overheat_t: float = 0.0
+	var _overheat_r: float = 70.0
+	var _overheat_max: float = 260.0
+
+	# ZONE DE CHARGEMENT (Quai de chargement) : cercle telegraphie classique a intervalle, aucune
+	# nouveaute au-dela d'un appel periodique a spawn_ground_zone.
+	var _dropzone: bool = false
+	var _dropzone_t: float = 0.0
+
+	# CONTAINER MOBILE (Quai de chargement) : seule piece reellement NEUVE de ce plan - translate
+	# entre 2 points sur un rail fixe. Reste un StaticBody2D statique au sens Godot (jamais
+	# move_and_slide) : rien d'autre dans ce fichier ne deplace un prop par la physique, donc une
+	# simple interpolation de position reste l'option la plus previsible.
+	var _rail: bool = false
+	var _rail_span: float = 220.0
+	var _rail_speed: float = 15.0
+	var _rail_dir: Vector2 = Vector2.RIGHT
+	var _rail_inited: bool = false
+	var _rail_origin: Vector2 = Vector2.ZERO
+	var _rail_t: float = 0.0        # 0..1 le long du rail
+	var _rail_fwd: bool = true
+
+	# ===== 03/10, refonte decor "Zone Cryo" (plan 15 maps, maps 4-6, nouveau biome "cryo") :
+	# memes idiomes que le Secteur Tech ci-dessus. Deux vraies nouveautes assumees dans le plan
+	# (brouillard qui derive librement, glace fragile qui devient permanente) ; le reste calque
+	# un precedent deja prouve. =====
+
+	# PLAQUE DE GLACE (Cryo-Voute) : glisse - ecrit Player._patch_inertia (canal dedie, voir
+	# Player.gd) chaque frame tant que le joueur reste dans le rayon, meme idiome que _slow qui
+	# ecrit field_slow. Walkable ("block":0 dans la DECOR entry) : ce n'est pas un obstacle
+	# comme les "glace"/"lave" existants (qui sont des rochers solides, pas des flaques au sol).
+	var _ice_patch: bool = false
+	var _ice_patch_r: float = 130.0
+	var _ice_patch_amt: float = 0.8
+	var _ice_patch_ring: Sprite2D = null
+
+	# CAPSULE CRYOGENIQUE (Cryo-Voute) : destruction-hook, voir take_damage() plus bas.
+	var _capsule: bool = false
+
+	# JET DE CRYO (Cryo-Voute) : meme idiome que bras_presseur (Secteur Tech) - un emetteur
+	# decoratif qui spawn periodiquement une GroundZone (cercle + stun, pas la forme ligne).
+	var _cryo_jet: bool = false
+	var _cryo_jet_t: float = 0.0
+	var _cryo_jet_r: float = 70.0
+	var _cryo_jet_stun: float = 1.0
+
+	# BROUILLARD FROID (Serres Gelees) : SEULE vraie nouveaute de mouvement de cette phase -
+	# derive en ligne droite et change de direction a intervalle aleatoire (contrairement au
+	# rail a 2 points fixes de container_mobile). Sprite procedural (meme helper _glow_sprite
+	# que les autres champs/auras) : aucun nouvel asset necessaire pour cette mecanique.
+	var _fog: bool = false
+	var _fog_r: float = 260.0
+	var _fog_dir: Vector2 = Vector2.RIGHT
+	var _fog_retarget_t: float = 0.0
+	var _fog_sprite: Sprite2D = null
+	var _fog_alpha_mult: float = 1.0   # reduit localement par un radiateur proche
+
+	# RADIATEUR (Serres Gelees) : a portee, reduit l'alpha du brouillard le plus proche - meme
+	# idiome que console_convoyeur qui parcourt un groupe de props voisins (ici "cryo_fog").
+	var _defroster: bool = false
+	var _defroster_r: float = 180.0
+	var _defroster_ring: Sprite2D = null   # 04/10, WEAK signale par le patron : rien ne se voyait
+	                                        # sur le radiateur lui-meme quand il agissait
+
+	# PIC DE GLACE (Serres Gelees) : meme idiome que bras_presseur/surchauffe_sol - cercle
+	# classique a intervalle (pas de forme ligne), degats + ralentissement court (field_slow,
+	# aucune nouveaute).
+	var _ice_spike: bool = false
+	var _ice_spike_t: float = 0.0
+
+	# BORNE THERMIQUE (Lac de Permafrost) : calque exact de vanne_refroidissement (DwellZone
+	# dediee).
+	var _thermal: bool = false
+	var _thermal_r: float = 150.0
+	var _thermal_cd: float = 25.0
+	var _thermal_cd_t: float = 0.0
+	var _thermal_zone: DwellZone = null
+
+	# GLACE FRAGILE (Lac de Permafrost) : simplification assumee dans le plan - PAS un vrai
+	# compteur de passages : sur un timer, la glace cede et devient un obstacle PERMANENT pour
+	# le reste de cette map. Reutilise exactement le motif _cycle_col ("quai") - une collision
+	# qui lui appartient deja, juste activee une fois pour de bon au lieu d'alterner.
+	var _fragile_ice: bool = false
+	var _fragile_ice_t: float = 0.0
+	var _fragile_broken: bool = false
+
+	# ===== 03/10, refonte decor "Noyau Instable" (plan 15 maps, maps 7-9, nouveau biome
+	# "reacteur"). Memes idiomes que Zone Cryo/Secteur Tech ci-dessus. =====
+
+	# BASSIN TOXIQUE (Bassins Toxiques) : zone de sol marchable a degats continus, meme idiome
+	# que plaque_de_glace (ecrit un champ tant que le joueur est dedans) mais degat au lieu de
+	# glisse. Une vanne de drainage proche peut la suspendre temporairement.
+	var _toxic_pool: bool = false
+	var _toxic_r: float = 150.0
+	var _toxic_dps: float = 6.0
+	var _toxic_suppressed_t: float = 0.0
+	var _toxic_ring: Sprite2D = null
+
+	# VANNE DE DRAINAGE (Bassins Toxiques) : DwellZone dediee -> suspend les bassins voisins,
+	# meme idiome que console_convoyeur qui parcourt un groupe de props voisins.
+	var _drain: bool = false
+	var _drain_r: float = 250.0
+	var _drain_cd: float = 25.0
+	var _drain_cd_t: float = 0.0
+	var _drain_zone: DwellZone = null
+
+	# POCHE DE VENT (Salle des Turbines, simplifiee en zone locale plutot qu'une force globale
+	# sur toute l'arene + les projectiles - cf. le plan, stabilite avant fidelite) : pousse le
+	# joueur et les ennemis en continu dans un axe, meme idiome que convoyeur_sol.
+	var _wind: bool = false
+	var _wind_r: float = 220.0
+	var _wind_speed: float = 50.0
+	var _wind_dir: Vector2 = Vector2.RIGHT
+
+	# CONSOLE DE VENT (Salle des Turbines) : DwellZone dediee -> inverse la direction des poches
+	# de vent voisines, meme idiome que console_convoyeur.
+	var _wind_console: bool = false
+	var _wind_console_r: float = 400.0
+	var _wind_console_cd: float = 15.0
+	var _wind_console_cd_t: float = 0.0
+	var _wind_console_zone: DwellZone = null
+
+	# GRILLE DE VENTILATION (Salle des Turbines) : cercle classique a intervalle, meme idiome
+	# que bras_presseur/pic_de_glace, stun au lieu de degats de ligne.
+	var _vent_grate: bool = false
+	var _vent_grate_t: float = 0.0
+
+	# ZONE ALTERNANTE (Noyau Fissure) : bascule sure/dangereuse sur un cycle fixe, reutilise
+	# EXACTEMENT _cycle (meme pattern que piston_hydraulique/porte_automatique) pour le on/off,
+	# plus un tick de degats pendant la phase "danger".
+	var _alt_zone: bool = false
+	var _alt_zone_r: float = 100.0
+	var _alt_zone_dps: float = 10.0
+	var _alt_warn_ring: Sprite2D = null   # 04/10, WEAK signale par le patron : le sprite est MASQUE
+	                                       # pendant la phase sure (_sprite.visible=_cycle_present),
+	                                       # donc le clignoter lui-meme ne marche pas - anneau dedie,
+	                                       # ignore le masquage, qui rampe dans la derniere seconde
+	                                       # avant le basculement en danger (meme idiome que le baril)
+
+	# CRISTAL D'ENERGIE INSTABLE (Noyau Fissure) : ramasse au contact (DwellZone a fill_time
+	# quasi nul), puis explose apres un delai - combine proximite + le timer de surchauffe_sol.
+	var _unstable_crystal: bool = false
+	var _crystal_zone: DwellZone = null
+	var _crystal_armed: bool = false
+	var _crystal_t: float = 0.0
+
+	# PULSE D'ENERGIE (Noyau Fissure) : anneau qui "s'etend" - meme idiome que surchauffe_sol
+	# (respawn une GroundZone un peu plus grande a chaque tick, pas de vraie persistance).
+	var _energy_pulse: bool = false
+	var _energy_pulse_t: float = 0.0
+
+	# ===== 03/10, refonte decor "Biomecanique" (plan 15 maps, maps 10-12, nouveau biome
+	# "ruche"). Memes idiomes que ci-dessus. =====
+
+	# COCON (Couvoir Mecanique) : destruction-hook - reutilise DIRECTEMENT le flag "capsule"
+	# (meme comportement exact que capsule_cryogenique, voir sa DECOR entry), pas de nouveau
+	# champ necessaire.
+
+	# SOL COLLANT (Veines Vivantes) : ralentit le joueur en continu, reutilise DIRECTEMENT
+	# field_slow (meme canal que le champ de ralentissement _slow deja en jeu, pas besoin d'un
+	# canal dedie comme pour inertia - field_slow se relache deja tout seul chaque frame).
+	var _sticky: bool = false
+	var _sticky_r: float = 150.0
+	var _sticky_mult: float = 0.45
+	var _sticky_ring: Sprite2D = null
+
+	# 03/10 RESIDU BIOMECANIQUE (Couvoir Mecanique, Map 10) : distinct de sol_collant (Map 11) -
+	# signale par le patron apres verif contre le doc source, les deux etaient fusionnees a tort.
+	# Ralentit le joueur (field_slow, meme canal que _sticky) ET attire en continu les ennemis
+	# proches vers son centre (meme math que _guard/AIMANT mais direction inversee et en continu,
+	# pas a cooldown - un piege organique, pas une pulsation).
+	var _bio_residue: bool = false
+	var _bio_residue_r: float = 150.0
+	var _bio_residue_slow: float = 0.6
+	var _bio_residue_pull: float = 40.0
+	var _bio_residue_ring: Sprite2D = null
+
+	# EMERGENCE DE TENTACULE (Veines Vivantes) : cercle classique a intervalle, meme idiome que
+	# bras_presseur/pic_de_glace/grille_ventilation.
+	var _tentacle: bool = false
+	var _tentacle_t: float = 0.0
+
+	# NUAGE DE SPORES (Jardin de Spores) : derive comme brouillard_froid + degats continus comme
+	# bassin_toxique - combine les deux idiomes deja prouves, aucune nouveaute de mouvement.
+	var _spore_cloud: bool = false
+	var _spore_r: float = 220.0
+	var _spore_dir: Vector2 = Vector2.RIGHT
+	var _spore_retarget_t: float = 0.0
+	var _spore_dps: float = 5.0
+	var _spore_sprite: Sprite2D = null
+	var _spore_suppressed_t: float = 0.0
+
+	# PLANTE LUMINEUSE (Jardin de Spores) : DwellZone dediee -> dissipe les nuages de spores
+	# voisins, meme idiome que radiateur (dissipe le brouillard) / vanne_drainage.
+	var _light_plant: bool = false
+	var _light_plant_r: float = 180.0
+	var _light_plant_cd: float = 15.0
+	var _light_plant_cd_t: float = 0.0
+	var _light_plant_zone: DwellZone = null
+
+	# ===== 03/10, refonte decor "Forge Finale" (plan 15 maps, maps 13-15, nouveau biome
+	# "citadelle"). Memes idiomes que ci-dessus. =====
+
+	# PORTE DE SECURITE ORBITALE (Pont Orbital) : reutilise EXACTEMENT _cycle, comme
+	# porte_automatique (Secteur Tech). Pas de controle manuel (simplification deja faite pour
+	# vanne_refroidissement/le "contre-effet" - meme principe).
+
+	# ZONE DE DEPRESSURISATION (Pont Orbital) : aspire le joueur PERIODIQUEMENT vers son centre -
+	# meme idiome que _push (Secteur Tech "impulsion") mais direction INVERSEE (vers soi, pas loin).
+	var _depress: bool = false
+	var _depress_t: float = 0.0
+	var _depress_r: float = 200.0
+	var _depress_warn: Sprite2D = null   # 04/10, WEAK signale par le patron : l'aspiration et son
+	                                      # VFX arrivaient dans la MEME frame, aucune alarme avant
+	var _depress_force: float = 220.0
+
+	# ZONE PUSH/PULL (Anneau de Gravite) : pousse ou attire en CONTINU selon la phase - minuteur
+	# INDEPENDANT (_grav_phase_on/_grav_phase_t, 04/10) plutot que de partager _cycle (voir le
+	# commentaire dans _ready : partager _cycle masquait le sprite pendant la moitie "attire").
+	var _grav_zone: bool = false
+	var _grav_r: float = 180.0
+	var _grav_force: float = 60.0
+	var _grav_phase_on: bool = true
+	var _grav_phase_t: float = 0.0
+	var _grav_on_dur: float = 4.0
+	var _grav_off_dur: float = 4.0
+
+	# EMETTEUR DE LASER ROTATIF (Anneau de Gravite) : meme idiome que bras_presseur/jet_de_cryo
+	# (GroundZone en ligne spawnee a intervalle), mais l'angle AVANCE a chaque tir -> balayage
+	# qui tourne au fil des activations, sans vrai objet "laser continu" a animer.
+	var _rot_laser: bool = false
+	var _rot_laser_t: float = 0.0
+	var _rot_laser_angle: float = 0.0
+
+	# PILIER D'ENERGIE (Chambre de la Forge) : destruction-hook qui repousse les ennemis proches
+	# avant de se detruire normalement - reutilise le nudge de _on_dwell_filled ("terminal").
+	var _pillar: bool = false
+
+	# SEGMENT DE MUR MODULAIRE (Chambre de la Forge) : reutilise EXACTEMENT _cycle avec un
+	# "block" solide (pas 0 comme les zones de sol) - simplification assumee dans le plan : un
+	# mur qui apparait/disparait, pas une vraie reconfiguration dynamique de la geometrie de
+	# l'arene (chantier a part entiere, hors scope decor).
+
 	# --- CAPACITEUR: neutral sweeping beam (see the DECOR entry for the design intent) ---
 	var _beam: bool = false
 	var _beam_dir: Vector2 = Vector2.RIGHT   # ONE fixed cardinal, chosen at build from the seed
@@ -464,6 +1071,7 @@ class Prop extends StaticBody2D:
 
 	func _ready() -> void:
 		hp = float(def.get("hp", 60.0))
+		_hp_start = hp
 		_awaken = String(def.get("awaken", ""))
 		_boom = bool(def.get("boom", false))
 		_shoot_r = float(def.get("shoot", 0.0))
@@ -479,6 +1087,7 @@ class Prop extends StaticBody2D:
 			# a slow red pulse ring reads as "this is producing enemies — take it out"
 			_beacon_pulse = _glow_sprite(Color(1.0, 0.3, 0.2), float(def.get("sz", 120.0)) * 1.6, 0.0)
 			add_child(_beacon_pulse)
+			_core_child(_beacon_pulse, Color(1.0, 0.3, 0.2))
 		_beam = bool(def.get("beam", false))
 		if _beam:
 			_beam_dmg = float(def.get("beam_dmg", 45.0))
@@ -507,6 +1116,7 @@ class Prop extends StaticBody2D:
 			# persistent field ring so the zone READS on the ground (violet = distinct from magenta beam)
 			_slow_ring = _glow_sprite(Color(0.55, 0.4, 1.0), _slow_r * 2.0, 0.16)
 			add_child(_slow_ring)
+			_core_child(_slow_ring, Color(0.55, 0.4, 1.0))
 		_aura = String(def.get("aura", ""))
 		if _aura != "":
 			_aura_r = float(def.get("aura_r", 160.0))
@@ -517,9 +1127,278 @@ class Prop extends StaticBody2D:
 				"heal": Color(0.35, 1.0, 0.5)}.get(_aura, Color.WHITE)
 			_aura_ring = _glow_sprite(arc_col, _aura_r * 2.0, 0.18)
 			add_child(_aura_ring)
+			_core_child(_aura_ring, arc_col)
 		_shatter = bool(def.get("shatter", false))
+		_push = bool(def.get("push", false))
+		if _push:
+			_push_cd = float(def.get("push_cd", 3.2)); _push_force = float(def.get("push_force", 380.0))
+			_push_r = float(def.get("push_r", 260.0)); _push_t = randf() * _push_cd
+			_push_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
+			_push_ring = _glow_sprite(Color(0.5, 0.9, 1.0), _push_r * 2.0, 0.14)
+			add_child(_push_ring)
+			_core_child(_push_ring, Color(0.5, 0.9, 1.0))
+		_guard = bool(def.get("guard", false))
+		if _guard:
+			_guard_r = float(def.get("guard_r", 170.0)); _guard_cd = float(def.get("guard_cd", 3.5))
+			_guard_force = float(def.get("guard_force", 300.0)); _guard_t = randf() * _guard_cd
+			_guard_ring = _glow_sprite(Palette.CYAN, _guard_r * 2.0, 0.14)
+			add_child(_guard_ring)
+			_core_child(_guard_ring, Palette.CYAN)
+		_dwell = bool(def.get("dwell", false))
+		if _dwell:
+			_dwell_force = float(def.get("dwell_force", 260.0))
+			_dwell_zone = DwellZone.new()
+			_dwell_zone.radius = float(def.get("dwell_r", 100.0))
+			_dwell_zone.fill_time = float(def.get("dwell_time", 1.2))
+			_dwell_zone.col = Palette.CYAN
+			_dwell_zone.filled.connect(_on_dwell_filled)
+			add_child(_dwell_zone)
+		_spot = bool(def.get("spot", false))
+		if _spot:
+			_spot_r = float(def.get("spot_r", 340.0)); _spot_boost = float(def.get("spot_boost", 0.55))
+			_spot_hold = float(def.get("spot_hold", 3.0))
+			_spot_beam = _mk_beam(6)
+			_spot_beam.width = 10.0
+			_spot_beam.default_color = Color(0.4, 0.9, 1.0, 0.35)
+		_cycle = bool(def.get("cycle", false))
+		if _cycle:
+			_cycle_on = float(def.get("cycle_on", 6.0)); _cycle_off = float(def.get("cycle_off", 3.0))
+			_cycle_t = _cycle_on
+		_convey = bool(def.get("convey", false))
+		if _convey:
+			_convey_r = float(def.get("convey_r", 200.0)); _convey_cd = float(def.get("convey_cd", 2.2))
+			_convey_dist = float(def.get("convey_dist", 90.0)); _convey_t = randf() * _convey_cd
+			_convey_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
+		_conveyor = bool(def.get("conveyor", false))
+		if _conveyor:
+			_conveyor_r = float(def.get("conveyor_r", 150.0))
+			_conveyor_speed = float(def.get("conveyor_speed", 60.0))
+			_conveyor_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
+			add_to_group("tech_convoyeur")
+		_console = bool(def.get("console", false))
+		if _console:
+			_console_r = float(def.get("console_r", 400.0))
+			_console_stop_dur = float(def.get("console_stop_dur", 8.0))
+			_console_cd = float(def.get("console_cd", 25.0))
+			_console_zone = DwellZone.new()
+			_console_zone.radius = float(def.get("dwell_r", 90.0))
+			_console_zone.fill_time = float(def.get("dwell_time", 1.0))
+			_console_zone.col = Palette.CYAN
+			_console_zone.filled.connect(_on_console_filled)
+			add_child(_console_zone)
+		_presser = bool(def.get("presser", false))
+		if _presser:
+			_presser_len = float(def.get("presser_len", 240.0))
+			_presser_dmg = float(def.get("presser_dmg", 15.0))
+			_presser_stun = float(def.get("presser_stun", 0.5))
+			_presser_t = randf_range(8.0, 15.0)
+			_presser_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2(1, 1).normalized(), Vector2(1, -1).normalized()][int(skill_roll * 4.0) % 4]
+		_valve = bool(def.get("valve", false))
+		if _valve:
+			_valve_r = float(def.get("valve_r", 150.0))
+			_valve_cd = float(def.get("valve_cd", 30.0))
+			_valve_zone = DwellZone.new()
+			_valve_zone.radius = float(def.get("dwell_r", 90.0))
+			_valve_zone.fill_time = float(def.get("dwell_time", 1.0))
+			_valve_zone.col = Palette.CYAN
+			_valve_zone.filled.connect(_on_valve_filled)
+			add_child(_valve_zone)
+		_overheat = bool(def.get("overheat", false))
+		if _overheat:
+			_overheat_max = float(def.get("overheat_max", 260.0))
+			_overheat_t = randf_range(0.0, 2.0)
+		_dropzone = bool(def.get("dropzone", false))
+		if _dropzone:
+			_dropzone_t = randf_range(10.0, 18.0)
+		_rail = bool(def.get("rail", false))
+		if _rail:
+			_rail_span = float(def.get("rail_span", 220.0))
+			_rail_speed = float(def.get("rail_speed", 15.0))
+			_rail_dir = [Vector2.RIGHT, Vector2.DOWN][int(skill_roll * 2.0) % 2]
+		_ice_patch = bool(def.get("ice_patch", false))
+		if _ice_patch:
+			_ice_patch_r = float(def.get("ice_patch_r", 130.0))
+			_ice_patch_amt = float(def.get("ice_patch_amt", 0.8))
+			# 04/10, GAP signale par le patron : plaque_de_glace n'avait AUCUN effet visuel (pas
+			# meme le glow de base, aucune cle "glow" dans sa DECOR entry) - la glisse etait
+			# invisible a l'ecran. Meme idiome que _slow_ring (anneau pulsant sur le rayon reel).
+			_ice_patch_ring = _glow_sprite(Color(0.65, 0.88, 1.0), _ice_patch_r * 2.0, 0.16)
+			add_child(_ice_patch_ring)
+			_core_child(_ice_patch_ring, Color(0.65, 0.88, 1.0))
+		_capsule = bool(def.get("capsule", false))
+		_cryo_jet = bool(def.get("cryo_jet", false))
+		if _cryo_jet:
+			_cryo_jet_r = float(def.get("cryo_jet_r", 70.0))
+			_cryo_jet_stun = float(def.get("cryo_jet_stun", 1.0))
+			_cryo_jet_t = randf_range(6.0, 12.0)
+		_fog = bool(def.get("fog", false))
+		if _fog:
+			_fog_r = float(def.get("fog_r", 260.0))
+			_fog_dir = Vector2.RIGHT.rotated(randf() * TAU)
+			_fog_retarget_t = randf_range(4.0, 8.0)
+			if _sprite != null:
+				_sprite.visible = false   # le nuage procedural est le seul visuel, pas l'icone de base
+			_fog_sprite = _glow_sprite(Color(0.85, 0.92, 1.0), _fog_r * 2.2, 0.42)
+			add_child(_fog_sprite)
+			_core_child(_fog_sprite, Color(0.85, 0.92, 1.0))
+			add_to_group("cryo_fog")
+		_defroster = bool(def.get("defroster", false))
+		if _defroster:
+			_defroster_r = float(def.get("defroster_r", 180.0))
+			_defroster_ring = _glow_sprite(Color(1.0, 0.6, 0.2), _defroster_r * 2.0, 0.0)
+			add_child(_defroster_ring)
+			_core_child(_defroster_ring, Color(1.0, 0.6, 0.2))
+		_ice_spike = bool(def.get("ice_spike", false))
+		if _ice_spike:
+			_ice_spike_t = randf_range(5.0, 10.0)
+		_thermal = bool(def.get("thermal", false))
+		if _thermal:
+			_thermal_r = float(def.get("thermal_r", 150.0))
+			_thermal_cd = float(def.get("thermal_cd", 25.0))
+			_thermal_zone = DwellZone.new()
+			_thermal_zone.radius = float(def.get("dwell_r", 90.0))
+			_thermal_zone.fill_time = float(def.get("dwell_time", 1.0))
+			_thermal_zone.col = Palette.CYAN
+			_thermal_zone.filled.connect(_on_thermal_filled)
+			add_child(_thermal_zone)
+		_fragile_ice = bool(def.get("fragile_ice", false))
+		if _fragile_ice:
+			_fragile_ice_t = randf_range(10.0, 20.0)
+		_toxic_pool = bool(def.get("toxic_pool", false))
+		if _toxic_pool:
+			_toxic_r = float(def.get("toxic_r", 150.0))
+			_toxic_dps = float(def.get("toxic_dps", 6.0))
+			add_to_group("reacteur_toxic")
+			# 04/10, GAP signale par le patron : bassin_toxique infligeait des degats CONTINUS sans
+			# le moindre avertissement (pas de glow du tout). Priorite sur les 4 GAP trouves : c'est
+			# le seul qui punit le joueur sans jamais le prevenir.
+			_toxic_ring = _glow_sprite(Color(0.3, 1.0, 0.3), _toxic_r * 2.0, 0.18)
+			add_child(_toxic_ring)
+			_core_child(_toxic_ring, Color(0.3, 1.0, 0.3))
+		_drain = bool(def.get("drain", false))
+		if _drain:
+			_drain_r = float(def.get("drain_r", 250.0))
+			_drain_zone = DwellZone.new()
+			_drain_zone.radius = float(def.get("dwell_r", 90.0))
+			_drain_zone.fill_time = float(def.get("dwell_time", 1.0))
+			_drain_zone.col = Palette.CYAN
+			_drain_zone.filled.connect(_on_drain_filled)
+			add_child(_drain_zone)
+		_wind = bool(def.get("wind", false))
+		if _wind:
+			_wind_r = float(def.get("wind_r", 220.0))
+			_wind_speed = float(def.get("wind_speed", 50.0))
+			_wind_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
+			add_to_group("reacteur_wind")
+		_wind_console = bool(def.get("wind_console", false))
+		if _wind_console:
+			_wind_console_r = float(def.get("wind_console_r", 400.0))
+			_wind_console_zone = DwellZone.new()
+			_wind_console_zone.radius = float(def.get("dwell_r", 90.0))
+			_wind_console_zone.fill_time = float(def.get("dwell_time", 1.0))
+			_wind_console_zone.col = Palette.CYAN
+			_wind_console_zone.filled.connect(_on_wind_console_filled)
+			add_child(_wind_console_zone)
+		_vent_grate = bool(def.get("vent_grate", false))
+		if _vent_grate:
+			_vent_grate_t = randf_range(7.0, 14.0)
+		_alt_zone = bool(def.get("alt_zone", false))
+		if _alt_zone:
+			_alt_zone_r = float(def.get("alt_zone_r", 100.0))
+			_alt_zone_dps = float(def.get("alt_zone_dps", 10.0))
+			_alt_warn_ring = _glow_sprite(Color(1.0, 0.55, 0.2), _alt_zone_r * 2.0, 0.0)
+			add_child(_alt_warn_ring)
+			_core_child(_alt_warn_ring, Color(1.0, 0.55, 0.2))
+			_cycle = true   # reutilise EXACTEMENT le on/off de _cycle (voir DECOR : cycle_on/off)
+			_cycle_on = float(def.get("cycle_on", 5.0)); _cycle_off = float(def.get("cycle_off", 5.0))
+			_cycle_t = _cycle_on
+		_unstable_crystal = bool(def.get("unstable_crystal", false))
+		if _unstable_crystal:
+			_crystal_zone = DwellZone.new()
+			_crystal_zone.radius = float(def.get("dwell_r", 70.0))
+			_crystal_zone.fill_time = 0.15   # "ramasse au contact" - quasi instantane
+			_crystal_zone.col = Color(0.8, 1.0, 0.2)
+			_crystal_zone.filled.connect(_on_crystal_armed)
+			add_child(_crystal_zone)
+		_energy_pulse = bool(def.get("energy_pulse", false))
+		if _energy_pulse:
+			_energy_pulse_t = randf_range(6.0, 10.0)
+		_sticky = bool(def.get("sticky", false))
+		if _sticky:
+			_sticky_r = float(def.get("sticky_r", 150.0))
+			_sticky_mult = float(def.get("sticky_mult", 0.45))
+			# 04/10, GAP signale par le patron : sol_collant n'avait aucun effet visuel.
+			_sticky_ring = _glow_sprite(Color(0.55, 0.3, 0.6), _sticky_r * 2.0, 0.16)
+			add_child(_sticky_ring)
+			_core_child(_sticky_ring, Color(0.55, 0.3, 0.6))
+		_bio_residue = bool(def.get("bio_residue", false))
+		if _bio_residue:
+			_bio_residue_r = float(def.get("bio_residue_r", 150.0))
+			_bio_residue_slow = float(def.get("bio_residue_slow", 0.6))
+			_bio_residue_pull = float(def.get("bio_residue_pull", 40.0))
+			# 04/10, GAP signale par le patron : residu_biomecanique n'avait aucun effet visuel.
+			# Teinte legerement distincte de sol_collant (plus vert) pour rester lisible si les 2
+			# se chevauchent un jour sur la meme carte.
+			_bio_residue_ring = _glow_sprite(Color(0.45, 0.55, 0.3), _bio_residue_r * 2.0, 0.16)
+			add_child(_bio_residue_ring)
+			_core_child(_bio_residue_ring, Color(0.45, 0.55, 0.3))
+		_tentacle = bool(def.get("tentacle", false))
+		if _tentacle:
+			_tentacle_t = randf_range(6.0, 12.0)
+		_spore_cloud = bool(def.get("spore_cloud", false))
+		if _spore_cloud:
+			_spore_r = float(def.get("spore_r", 220.0))
+			_spore_dps = float(def.get("spore_dps", 5.0))
+			_spore_dir = Vector2.RIGHT.rotated(randf() * TAU)
+			_spore_retarget_t = randf_range(4.0, 8.0)
+			if _sprite != null:
+				_sprite.visible = false
+			_spore_sprite = _glow_sprite(Color(0.55, 0.9, 0.35), _spore_r * 2.2, 0.38)
+			add_child(_spore_sprite)
+			_core_child(_spore_sprite, Color(0.55, 0.9, 0.35))
+			add_to_group("ruche_spores")
+		_light_plant = bool(def.get("light_plant", false))
+		if _light_plant:
+			_light_plant_r = float(def.get("light_plant_r", 180.0))
+			_light_plant_zone = DwellZone.new()
+			_light_plant_zone.radius = float(def.get("dwell_r", 90.0))
+			_light_plant_zone.fill_time = float(def.get("dwell_time", 1.0))
+			_light_plant_zone.col = Color(0.55, 1.0, 0.4)
+			_light_plant_zone.filled.connect(_on_light_plant_filled)
+			add_child(_light_plant_zone)
+		_depress = bool(def.get("depress", false))
+		if _depress:
+			_depress_t = randf_range(10.0, 18.0)
+			_depress_r = float(def.get("depress_r", 200.0))
+			_depress_force = float(def.get("depress_force", 220.0))
+			_depress_warn = _glow_sprite(Color(1.0, 0.25, 0.15), _depress_r * 2.0, 0.0)
+			add_child(_depress_warn)
+			_core_child(_depress_warn, Color(1.0, 0.25, 0.15))
+		_grav_zone = bool(def.get("grav_zone", false))
+		if _grav_zone:
+			_grav_r = float(def.get("grav_r", 180.0))
+			_grav_force = float(def.get("grav_force", 60.0))
+			# 04/10, vrai bug signale par le patron : reutiliser _cycle (partage avec les murs/portes
+			# qui DOIVENT disparaitre) pour le seul rythme pousse/attire masquait AUSSI le sprite et
+			# desactivait le collider pendant toute la moitie "attire" (_cycle pilote les deux sans
+			# distinction, voir le bloc "if _cycle:" plus bas) alors que la force s'applique
+			# justement cette moitie-la. Minuteur INDEPENDANT, ne touche jamais sprite/collider.
+			_grav_on_dur = float(def.get("cycle_on", 4.0)); _grav_off_dur = float(def.get("cycle_off", 4.0))
+			_grav_phase_t = _grav_on_dur
+		_rot_laser = bool(def.get("rot_laser", false))
+		if _rot_laser:
+			_rot_laser_t = randf_range(3.0, 6.0)
+			_rot_laser_angle = randf() * TAU
+		_pillar = bool(def.get("pillar", false))
 		# props that need a per-frame tick
-		set_process(_awaken != "" or _shoot_r > 0.0 or _boom or _beam or _beacon or _pylon or _slow or _aura != "")
+		set_process(_awaken != "" or _shoot_r > 0.0 or _boom or _beam or _beacon or _pylon or _slow
+			or _aura != "" or _push or _guard or _spot or _cycle or _convey
+			or _conveyor or _console or _presser or _valve or _overheat or _dropzone or _rail
+			or _ice_patch or _cryo_jet or _fog or _defroster or _ice_spike or _thermal or _fragile_ice
+			or _toxic_pool or _drain or _wind or _wind_console or _vent_grate or _alt_zone
+			or _unstable_crystal or _energy_pulse
+			or _sticky or _bio_residue or _tentacle or _spore_cloud or _light_plant
+			or _depress or _grav_zone or _rot_laser)
 		var tex: Texture2D = load("res://assets/decor/%s.png" % String(def.get("f", "g20")))
 		var th: float = maxf(1.0, float(tex.get_height()))
 		var sc: float = rand_scale * (float(def.get("sz", 110.0)) / th)
@@ -561,12 +1440,16 @@ class Prop extends StaticBody2D:
 			var gc: Color = Palette.CYAN
 			if glow == "green": gc = Color(0.4, 1.0, 0.5)
 			elif glow == "orange": gc = Color(1.0, 0.55, 0.2)
-			add_child(_glow_sprite(gc, maxf(spanx, spany) * 0.9, 0.5))
+			var base_glow: Sprite2D = _glow_sprite(gc, maxf(spanx, spany) * 0.9, 0.5)
+			add_child(base_glow)
+			_core_child(base_glow, gc)
 
 		# a destructible crate MAY hold a competence -> warm gold tell so the player breaks it
 		if bool(def.get("destruct", false)) and skill_roll < float(def.get("skill", 0.0)):
 			_skill = true
-			add_child(_glow_sprite(Palette.BONUS, maxf(spanx, spany) * 1.05, 0.7))
+			var skill_glow: Sprite2D = _glow_sprite(Palette.BONUS, maxf(spanx, spany) * 1.05, 0.7)
+			add_child(skill_glow)
+			_core_child(skill_glow, Palette.BONUS)
 
 		# collision: blocks the player (mask 8) and bullets; enemies avoid via Game.cover_list.
 		# "block" overrides the footprint fraction — arche uses a wider one so it reads as SOLID
@@ -578,6 +1461,7 @@ class Prop extends StaticBody2D:
 		col.shape = shape
 		col.position = Vector2(0.0, spany * 0.12)   # centre the collider on the base, not the top
 		add_child(col)
+		_cycle_col = col   # QUAI : bascule disabled/visible sur son propre cycle, voir _process
 		add_to_group("cover")
 		collision_layer = 8   # blocks the player physically (broad-phase, free) regardless of cover_list
 		collision_mask = 0
@@ -598,6 +1482,16 @@ class Prop extends StaticBody2D:
 		s.z_index = -1
 		return s
 
+	## 04/10, mise a niveau VFX (demande du patron, "effets speciaux vraiment nuls") : chaque anneau
+	## ambiant du decor (toxique, glace, collant, alerte...) n'etait qu'UN SEUL cercle plat -> ajoute
+	## un "coeur" plus petit et plus clair, EN ENFANT du halo (pas un frere) pour heriter directement
+	## de sa pulsation de modulate deja en place (zero changement a la logique _process existante).
+	## Diametre-parametre de 51.2 (= 128*0.4) donne une echelle LOCALE de 0.4 une fois composee avec
+	## celle du parent -> le coeur fait toujours 40% du halo, quel que soit le rayon de ce dernier
+	## (voir le calcul : echelle_globale = echelle_parent * echelle_locale).
+	func _core_child(halo: Sprite2D, color: Color) -> void:
+		halo.add_child(_glow_sprite(color.lerp(Color.WHITE, 0.5), 51.2, 1.8))
+
 	## Only runs on props that need it (see set_process in _ready): CARCASSES watch for the player
 	## walking close (the wreck IS the sleeping robot and stands up), TURRETS shoot at the player.
 	func _process(delta: float) -> void:
@@ -612,7 +1506,7 @@ class Prop extends StaticBody2D:
 		# --- hostile turret: fires ONLY along its baked barrel, and only into its own arc ---
 		# The cannon is part of the 3/4 drawing and can't turn, so we never fake a tracking shot:
 		# walk into the cone it actually covers and it opens up, straight down the tube.
-		if _shoot_r > 0.0:
+		if _shoot_r > 0.0 and not _hacked:
 			_shoot_t -= delta
 			if _shoot_t <= 0.0 and dist < _shoot_r:
 				var to_plr: Vector2 = (_plr.global_position - global_position).normalized()
@@ -625,6 +1519,34 @@ class Prop extends StaticBody2D:
 							# +90 deg: the muzzle sheet's flame is drawn pointing UP
 							game.spawn_vfx("muzzle", mz, _cannon.angle() + PI * 0.5, 0.42,
 								Color(1.0, 0.7, 0.4))
+		elif _hacked:
+			# PIRATEE : meme canon FIXE, meme cone — mais elle cherche un ennemi dedans au lieu du
+			# joueur. spawn_enemy_bolt ne touche QUE le joueur (EnemyProjectile filtre le groupe
+			# "player"), donc degat direct + un trait visuel plutot qu'un nouveau type de projectile.
+			_shoot_t -= delta
+			if _shoot_t <= 0.0:
+				var mz2: Vector2 = global_position + _muzzle
+				var best_e: Node2D = null
+				var best_d: float = _shoot_r * _shoot_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if not (e is Node2D) or not e.has_method("take_damage"):
+						continue
+					if "alive" in e and not e.alive:
+						continue
+					var to_e: Vector2 = (e as Node2D).global_position - mz2
+					var d: float = to_e.length_squared()
+					if d >= best_d or to_e.length() <= 1.0:
+						continue
+					if absf(_cannon.angle_to(to_e.normalized())) <= _arc:
+						best_d = d
+						best_e = e
+				if best_e != null:
+					_shoot_t = _shoot_cd
+					best_e.take_damage(_shoot_dmg * 1.6)   # "supercharged" now that c'est le tien
+					if game.has_method("_streak"):
+						game._streak(mz2 + _cannon * 60.0, _cannon, Color(0.5, 1.0, 1.6), 120.0, 5.0, 0.14)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("muzzle", mz2, _cannon.angle() + PI * 0.5, 0.42, Color(0.5, 1.0, 1.6))
 
 		# --- beacon: emit an enemy on a fixed cadence while the player is in range ---
 		if _beacon:
@@ -658,6 +1580,448 @@ class Prop extends StaticBody2D:
 					if e is Node2D and "field_slow" in e:
 						if global_position.distance_squared_to((e as Node2D).global_position) <= r2s:
 							e.field_slow = minf(e.field_slow, _slow_mult)
+
+		# --- IMPULSION (Gravite faible) : pousse joueur+ennemis dans un axe fixe, a intervalle ---
+		if _push and dist < 1300.0:
+			if _push_ring != null:
+				_push_ring.modulate.a = 0.10 + 0.10 * absf(sin(Time.get_ticks_msec() * 0.0025))
+			_push_t -= delta
+			if _push_t <= 0.0:
+				_push_t = _push_cd
+				# 🚨 Player.gd ECRASE velocity chaque frame (velocity = target_vel, jamais additif) :
+				# un += ici serait efface avant meme de bouger le mecha d'un pixel. Nudge direct de
+				# global_position, comme pour les ennemis juste en dessous.
+				if dist < _push_r:
+					_plr.global_position += _push_dir * (_push_force * 0.12)
+				var r2p: float = _push_r * _push_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2p:
+						(e as Node2D).global_position += _push_dir * (_push_force * 0.12)
+				if game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, _push_r / 95.0, Color(0.5, 0.9, 1.0))
+
+		# --- AIMANT (Casse magnetique) : QUAND le joueur est pres, repousse les ennemis proches —
+		# un outil defensif de positionnement, jamais une invincibilite ni un vol d'XP/ferraille.
+		if _guard:
+			if _guard_ring != null:
+				_guard_ring.modulate.a = (0.22 if dist < _guard_r else 0.10)
+			if dist < _guard_r:
+				_guard_t -= delta
+				if _guard_t <= 0.0:
+					_guard_t = _guard_cd
+					var r2g: float = _guard_r * _guard_r
+					for e in get_tree().get_nodes_in_group("enemies"):
+						if e is Node2D:
+							var away: Vector2 = (e as Node2D).global_position - global_position
+							var d2: float = away.length_squared()
+							if d2 <= r2g and d2 > 1.0:
+								(e as Node2D).global_position += away.normalized() * (_guard_force * 0.12)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, _guard_r / 95.0, Palette.CYAN)
+
+		# --- ARCHIVES (Archives-machines) : marque periodiquement l'ennemi le plus proche pour
+		# l'auto-visee (priority_boost), jamais de bonus de degats ni d'attaque du decor.
+		if _spot and dist < _spot_r + 200.0:
+			if _spot_marked != null:
+				if not is_instance_valid(_spot_marked) or not _spot_marked.alive:
+					_spot_marked = null
+				else:
+					_spot_t -= delta
+					if _spot_t <= 0.0:
+						_spot_marked.priority_boost = 0.0   # le hold expire : priorite normale
+						_spot_marked = null
+			if _spot_marked == null:
+				var best: Enemy = null
+				var bd: float = _spot_r * _spot_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Enemy and (e as Enemy).alive:
+						var d: float = global_position.distance_squared_to((e as Node2D).global_position)
+						if d < bd:
+							bd = d; best = e
+				if best != null:
+					_spot_marked = best
+					_spot_marked.priority_boost = _spot_boost
+					_spot_t = _spot_hold
+			if _spot_beam != null:
+				if _spot_marked != null and is_instance_valid(_spot_marked):
+					# top_level=true (voir _mk_beam) : points en coordonnees MONDE, comme _tick_beam
+					# juste plus bas — to_local() serait fausse ici (pas d'ancrage sur le parent).
+					_spot_beam.points = PackedVector2Array([global_position, _spot_marked.global_position])
+					_spot_beam.visible = true
+				else:
+					_spot_beam.visible = false
+
+		# --- QUAI (Quai de chargement) : caisse-ecran qui alterne presente/absente sur un cycle fixe ---
+		if _cycle:
+			_cycle_t -= delta
+			if _cycle_t <= 0.0:
+				_cycle_present = not _cycle_present
+				_cycle_t = _cycle_on if _cycle_present else _cycle_off
+				if _sprite != null:
+					_sprite.visible = _cycle_present
+				if _cycle_col != null:
+					_cycle_col.disabled = not _cycle_present
+
+		# --- CONVOYEUR (Chaine de fonderie) : deplace les ennemis proches d'une courte distance,
+		# le long d'un axe fixe. Nudge additive de global_position uniquement (jamais velocity/
+		# desired_vel) : chaque ennemi redérive son mouvement depuis sa position courante la frame
+		# suivante (meme precedent que le comportement "pusher" deja en jeu, Enemy.gd).
+		if _convey and dist < 1300.0:
+			_convey_t -= delta
+			if _convey_t <= 0.0:
+				_convey_t = _convey_cd
+				var r2c: float = _convey_r * _convey_r
+				var moved: bool = false
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2c:
+						(e as Node2D).global_position += _convey_dir * _convey_dist
+						moved = true
+				if moved and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, _convey_r / 140.0, Color(1.0, 0.6, 0.2))
+
+		# --- CONVOYEUR SOL (Hall d'Assemblage) : pousse le joueur ET les ennemis en continu, sauf
+		# si une console voisine l'a coupe. Nudge direct de global_position (jamais velocity, voir
+		# la note IMPULSION plus haut), mais applique CHAQUE frame au lieu d'un burst a intervalle.
+		if _conveyor:
+			if _conveyor_stop_t > 0.0:
+				_conveyor_stop_t -= delta
+			else:
+				var cv_step: Vector2 = _conveyor_dir * _conveyor_speed * delta
+				if dist < _conveyor_r:
+					_plr.global_position += cv_step
+				var r2cv: float = _conveyor_r * _conveyor_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2cv:
+						(e as Node2D).global_position += cv_step
+				_conveyor_vfx_t -= delta
+				if _conveyor_vfx_t <= 0.0 and game != null and game.has_method("spawn_vfx"):
+					_conveyor_vfx_t = 1.5
+					const FxKit = preload("res://scenes/FxKit.gd")
+					FxKit.conveyor_pulse(game, global_position + _conveyor_dir * (_conveyor_r * 0.5), Color(1.0, 0.6, 0.2), _conveyor_dir, _conveyor_r / 180.0)
+
+		# --- CONSOLE / VANNE : juste la decrementation du cooldown, le declenchement vient du
+		# signal DwellZone.filled (_on_console_filled/_on_valve_filled plus bas).
+		if _console and _console_cd_t > 0.0:
+			_console_cd_t -= delta
+		if _valve and _valve_cd_t > 0.0:
+			_valve_cd_t -= delta
+
+		# --- BRAS PRESSEUR (Hall d'Assemblage) : GroundZone en ligne a intervalle aleatoire, meme
+		# idiome que le boss _phase_crusher (Enemy.gd) qui appelle deja spawn_ground_zone depuis
+		# un timer. Construit une GroundZone directement (shape="line" n'est pas expose par
+		# Game.spawn_ground_zone, volontairement pas touche - voir le plan).
+		if _presser and dist < 1300.0:
+			_presser_t -= delta
+			if _presser_t <= 0.0:
+				_presser_t = randf_range(8.0, 15.0)
+				if game != null and game.has_method("spawn_vfx") and "enemy_layer" in game:
+					var half: Vector2 = _presser_dir * (_presser_len * 0.5)
+					var z: GroundZone = GroundZone.new()
+					z.radius = 40.0; z.delay = 1.5; z.damage = _presser_dmg
+					z.color = Color(1.0, 0.85, 0.2)
+					z.shape = "line"; z.line_from = -half; z.line_to = half
+					z.stun_duration = _presser_stun; z.fx_kind = kind
+					z.game = game; z.player = _plr
+					game.enemy_layer.add_child(z)
+					z.global_position = global_position
+
+		# --- SURCHAUFFE DU SOL (Fonderie) : re-spawn une GroundZone un peu plus grande toutes les
+		# ~2s jusqu'a un rayon max - simule une croissance SANS vraie persistance (GroundZone ne
+		# peut pas durer indefiniment, voir le plan).
+		if _overheat and dist < 1300.0:
+			_overheat_t -= delta
+			if _overheat_t <= 0.0:
+				_overheat_t = 2.0
+				_overheat_r = minf(_overheat_r + 20.0, _overheat_max)
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, _overheat_r, 0.6, 8.0, Color(1.0, 0.25, 0.05), kind)
+
+		# --- ZONE DE CHARGEMENT (Quai de chargement) : cercle telegraphie classique a intervalle,
+		# rien de nouveau au-dela d'un appel periodique a spawn_ground_zone.
+		if _dropzone and dist < 1300.0:
+			_dropzone_t -= delta
+			if _dropzone_t <= 0.0:
+				_dropzone_t = randf_range(10.0, 18.0)
+				if game != null and game.has_method("spawn_ground_zone"):
+					var off: Vector2 = Vector2(randf_range(-80.0, 80.0), randf_range(-80.0, 80.0))
+					game.spawn_ground_zone(global_position + off, 80.0, 1.5, 30.0, Color(1.0, 0.6, 0.0), kind)
+
+		# --- CONTAINER MOBILE (Quai de chargement) : translate entre 2 points sur un rail fixe.
+		# Origine capturee au premier tick (pas en _ready) pour ne jamais dependre de l'ordre
+		# position/add_child de l'appelant.
+		if _rail:
+			if not _rail_inited:
+				_rail_inited = true
+				_rail_origin = global_position
+			_rail_t += delta * _rail_speed / maxf(_rail_span, 1.0) * (1.0 if _rail_fwd else -1.0)
+			if _rail_t >= 1.0:
+				_rail_t = 1.0; _rail_fwd = false
+			elif _rail_t <= 0.0:
+				_rail_t = 0.0; _rail_fwd = true
+			global_position = _rail_origin + _rail_dir * (_rail_span * (_rail_t - 0.5))
+
+		# --- PLAQUE DE GLACE (Cryo-Voute) : glisse continue tant que le joueur reste dans le
+		# rayon, meme idiome que le champ de ralentissement (_slow) mais sur le canal dedie
+		# _patch_inertia (voir Player.gd : inertia sert deja de reglage fixe par biome).
+		if _ice_patch:
+			if _ice_patch_ring != null:
+				_ice_patch_ring.modulate.a = 0.14 + 0.06 * sin(Time.get_ticks_msec() * 0.0032)
+			if dist < _ice_patch_r and "_patch_inertia" in _plr:
+				_plr._patch_inertia = maxf(_plr._patch_inertia, _ice_patch_amt)
+
+		# --- JET DE CRYO (Cryo-Voute) : cercle classique a intervalle qui gele (stun) au lieu de
+		# frapper en ligne - meme idiome que bras_presseur (Secteur Tech).
+		if _cryo_jet and dist < 1300.0:
+			_cryo_jet_t -= delta
+			if _cryo_jet_t <= 0.0:
+				_cryo_jet_t = randf_range(6.0, 12.0)
+				if game != null and game.has_method("spawn_ground_zone"):
+					var z: GroundZone = GroundZone.new()
+					z.radius = _cryo_jet_r; z.delay = 1.0; z.damage = 0.0
+					z.color = Color(0.6, 0.85, 1.0); z.stun_duration = _cryo_jet_stun; z.fx_kind = kind
+					z.game = game; z.player = _plr
+					game.enemy_layer.add_child(z)
+					z.global_position = global_position
+
+		# --- BROUILLARD FROID (Serres Gelees) : derive en ligne droite, change de direction a
+		# intervalle aleatoire - seule vraie nouveaute de mouvement de cette phase (container_mobile
+		# restait sur un rail a 2 points fixes). Reste dans l'arene de jeu (meme clamp que le joueur).
+		if _fog:
+			_fog_retarget_t -= delta
+			if _fog_retarget_t <= 0.0:
+				_fog_retarget_t = randf_range(4.0, 8.0)
+				_fog_dir = Vector2.RIGHT.rotated(randf() * TAU)
+			global_position += _fog_dir * 18.0 * delta
+			if game != null and "arena" in game:
+				global_position.x = clampf(global_position.x, game.arena.position.x, game.arena.end.x)
+				global_position.y = clampf(global_position.y, game.arena.position.y, game.arena.end.y)
+			if _fog_sprite != null:
+				_fog_sprite.modulate.a = 0.42 * _fog_alpha_mult
+			_fog_alpha_mult = minf(1.0, _fog_alpha_mult + delta * 0.3)   # recupere lentement hors radiateur
+
+		# --- RADIATEUR (Serres Gelees) : a portee, dissipe localement le brouillard le plus
+		# proche - meme idiome que console_convoyeur qui parcourt un groupe de props voisins.
+		if _defroster:
+			var _defroster_active: bool = false
+			for f in get_tree().get_nodes_in_group("cryo_fog"):
+				if f is Node2D and "_fog_alpha_mult" in f:
+					if global_position.distance_to((f as Node2D).global_position) <= _defroster_r:
+						f._fog_alpha_mult = 0.0
+						_defroster_active = true
+			if _defroster_ring != null:
+				var target_a: float = (0.22 + 0.06 * sin(Time.get_ticks_msec() * 0.01)) if _defroster_active else 0.0
+				_defroster_ring.modulate.a = lerpf(_defroster_ring.modulate.a, target_a, 0.2)
+
+		# --- PIC DE GLACE (Serres Gelees) : cercle classique a intervalle, meme idiome que
+		# bras_presseur/surchauffe_sol, pas de nouveaute au-dela d'un ralentissement court.
+		if _ice_spike and dist < 1300.0:
+			_ice_spike_t -= delta
+			if _ice_spike_t <= 0.0:
+				_ice_spike_t = randf_range(5.0, 10.0)
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, 55.0, 1.2, 12.0, Color(0.7, 0.9, 1.0), kind)
+				if dist < 55.0 and "field_slow" in _plr:
+					_plr.field_slow = minf(_plr.field_slow, 0.5)
+
+		# --- BORNE THERMIQUE / GLACE FRAGILE : juste la decrementation du cooldown pour la borne
+		# (le declenchement vient du signal DwellZone.filled, _on_thermal_filled plus bas) ; pour
+		# la glace fragile, un simple timer qui bascule la collision partagee en permanent.
+		if _thermal and _thermal_cd_t > 0.0:
+			_thermal_cd_t -= delta
+		if _fragile_ice and not _fragile_broken:
+			_fragile_ice_t -= delta
+			if _fragile_ice_t <= 0.0:
+				_fragile_broken = true
+				if _cycle_col != null and _cycle_col.shape is CircleShape2D:
+					(_cycle_col.shape as CircleShape2D).radius = maxf(60.0, block_r)
+				if _sprite != null:
+					_sprite.modulate = Color(0.55, 0.65, 0.78)   # glace sombre/effondree, lecture claire
+				if game != null and game.has_method("impact_fx"):
+					game.impact_fx(global_position, Color(0.6, 0.8, 1.0), kind, Vector2.ZERO, 1.2)
+
+		# --- BASSIN TOXIQUE (Bassins Toxiques) : degats continus tant que le joueur reste dans
+		# le rayon, meme idiome que plaque_de_glace mais degat au lieu de glisse. Une vanne de
+		# drainage proche peut le suspendre (voir _on_drain_filled).
+		if _toxic_pool:
+			if _toxic_ring != null:
+				_toxic_ring.modulate.a = (0.08 if _toxic_suppressed_t > 0.0 else 0.18) + 0.07 * sin(Time.get_ticks_msec() * 0.004)
+			if _toxic_suppressed_t > 0.0:
+				_toxic_suppressed_t -= delta
+			elif dist < _toxic_r and _plr.has_method("take_damage"):
+				_plr.take_damage(_toxic_dps * delta, global_position)
+
+		# --- VANNE DE DRAINAGE : juste la decrementation du cooldown, le declenchement vient du
+		# signal DwellZone.filled (_on_drain_filled plus bas).
+		if _drain and _drain_cd_t > 0.0:
+			_drain_cd_t -= delta
+
+		# --- POCHE DE VENT (Salle des Turbines, simplifiee en zone locale) : pousse le joueur ET
+		# les ennemis en continu, meme idiome que convoyeur_sol (Secteur Tech).
+		if _wind:
+			var wind_step: Vector2 = _wind_dir * _wind_speed * delta
+			if dist < _wind_r:
+				_plr.global_position += wind_step
+			var r2w: float = _wind_r * _wind_r
+			for e in get_tree().get_nodes_in_group("enemies"):
+				if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2w:
+					(e as Node2D).global_position += wind_step
+
+		# --- CONSOLE DE VENT : juste la decrementation du cooldown, le declenchement vient du
+		# signal DwellZone.filled (_on_wind_console_filled plus bas).
+		if _wind_console and _wind_console_cd_t > 0.0:
+			_wind_console_cd_t -= delta
+
+		# --- GRILLE DE VENTILATION (Salle des Turbines) : cercle classique a intervalle, meme
+		# idiome que bras_presseur/pic_de_glace - stun (projection approchee) au lieu de ligne.
+		if _vent_grate and dist < 1300.0:
+			_vent_grate_t -= delta
+			if _vent_grate_t <= 0.0:
+				_vent_grate_t = randf_range(7.0, 14.0)
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, 55.0, 1.0, 10.0, Color(1.0, 0.7, 0.2), kind)
+
+		# --- ZONE ALTERNANTE (Noyau Fissure) : reutilise le on/off de _cycle pour le rythme
+		# sure/danger ; degats continus seulement pendant la phase "presente" (danger).
+		if _alt_zone:
+			if _alt_warn_ring != null:
+				if not _cycle_present and _cycle_t <= 1.0:
+					var warn_urg: float = 1.0 - clampf(_cycle_t / 1.0, 0.0, 1.0)
+					var ablink: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.001 * (6.0 + warn_urg * 40.0))
+					_alt_warn_ring.modulate.a = warn_urg * ablink * 0.6
+				else:
+					_alt_warn_ring.modulate.a = 0.0
+			if _cycle_present and dist < _alt_zone_r and _plr.has_method("take_damage"):
+				_plr.take_damage(_alt_zone_dps * delta, global_position)
+
+		# --- CRISTAL D'ENERGIE INSTABLE (Noyau Fissure) : une fois arme (DwellZone au contact),
+		# explose apres un court delai - meme idiome que surchauffe_sol pour le timer.
+		if _unstable_crystal and _crystal_armed:
+			_crystal_t -= delta
+			if _crystal_t <= 0.0:
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, 100.0, 0.3, 25.0, Color(0.8, 1.0, 0.2), kind)
+				call_deferred("queue_free")
+
+		# --- PULSE D'ENERGIE (Noyau Fissure) : anneau qui "s'etend" - meme idiome que
+		# surchauffe_sol (respawn une GroundZone un peu plus grande a chaque tick).
+		if _energy_pulse and dist < 1300.0:
+			_energy_pulse_t -= delta
+			if _energy_pulse_t <= 0.0:
+				_energy_pulse_t = randf_range(6.0, 10.0)
+				if game != null and game.has_method("spawn_ground_zone"):
+					for ring in 3:   # 3 anneaux successifs qui s'eloignent, cf. "pulse qui s'etend"
+						game.spawn_ground_zone(global_position, 60.0 + float(ring) * 50.0,
+							0.4 + float(ring) * 0.2, 12.0, Color(0.8, 1.0, 0.2), kind)
+
+		# --- SOL COLLANT (Veines Vivantes) : ralentit le joueur en continu - reutilise field_slow
+		# directement, meme idiome que le champ de ralentissement _slow deja en jeu.
+		if _sticky:
+			if _sticky_ring != null:
+				_sticky_ring.modulate.a = 0.14 + 0.06 * sin(Time.get_ticks_msec() * 0.0028)
+			if dist < _sticky_r and "field_slow" in _plr:
+				_plr.field_slow = minf(_plr.field_slow, _sticky_mult)
+
+		# --- RESIDU BIOMECANIQUE (Couvoir Mecanique) : ralentit le joueur (meme canal field_slow
+		# que _sticky) ET attire en continu les ennemis proches vers son centre - meme math que
+		# _guard/AIMANT mais direction inversee (vers soi, pas loin) et sans cooldown (piege
+		# organique permanent, pas une pulsation).
+		if _bio_residue:
+			if _bio_residue_ring != null:
+				_bio_residue_ring.modulate.a = 0.14 + 0.06 * sin(Time.get_ticks_msec() * 0.0028 + 1.7)
+			if dist < _bio_residue_r and "field_slow" in _plr:
+				_plr.field_slow = minf(_plr.field_slow, _bio_residue_slow)
+			if dist < 1300.0:
+				var r2b: float = _bio_residue_r * _bio_residue_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D:
+						var to_center: Vector2 = global_position - (e as Node2D).global_position
+						var d2b: float = to_center.length_squared()
+						if d2b <= r2b and d2b > 1.0:
+							(e as Node2D).global_position += to_center.normalized() * (_bio_residue_pull * delta)
+
+		# --- EMERGENCE DE TENTACULE (Veines Vivantes) : cercle classique a intervalle, meme
+		# idiome que bras_presseur/pic_de_glace/grille_ventilation.
+		if _tentacle and dist < 1300.0:
+			_tentacle_t -= delta
+			if _tentacle_t <= 0.0:
+				_tentacle_t = randf_range(6.0, 12.0)
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, 70.0, 1.0, 12.0, Color(0.5, 0.2, 0.7), kind)
+
+		# --- NUAGE DE SPORES (Jardin de Spores) : derive comme brouillard_froid + degats continus
+		# comme bassin_toxique - combine deux idiomes deja prouves, aucune nouveaute.
+		if _spore_cloud:
+			_spore_retarget_t -= delta
+			if _spore_retarget_t <= 0.0:
+				_spore_retarget_t = randf_range(4.0, 8.0)
+				_spore_dir = Vector2.RIGHT.rotated(randf() * TAU)
+			global_position += _spore_dir * 14.0 * delta
+			if game != null and "arena" in game:
+				global_position.x = clampf(global_position.x, game.arena.position.x, game.arena.end.x)
+				global_position.y = clampf(global_position.y, game.arena.position.y, game.arena.end.y)
+			if _spore_suppressed_t > 0.0:
+				_spore_suppressed_t -= delta
+			elif dist < _spore_r and _plr.has_method("take_damage"):
+				_plr.take_damage(_spore_dps * delta, global_position)
+			if _spore_sprite != null:
+				_spore_sprite.modulate.a = 0.38 if _spore_suppressed_t <= 0.0 else 0.08
+
+		# --- PLANTE LUMINEUSE : juste la decrementation du cooldown, le declenchement vient du
+		# signal DwellZone.filled (_on_light_plant_filled plus bas).
+		if _light_plant and _light_plant_cd_t > 0.0:
+			_light_plant_cd_t -= delta
+
+		# --- ZONE DE DEPRESSURISATION (Pont Orbital) : aspire le joueur vers le centre a
+		# intervalle, meme idiome que _push (impulsion) mais direction inversee (vers soi).
+		if _depress and dist < 1300.0:
+			_depress_t -= delta
+			if _depress_warn != null:
+				var dwarn_urg: float = 1.0 - clampf(_depress_t / 0.7, 0.0, 1.0)
+				_depress_warn.modulate.a = dwarn_urg * (0.3 + 0.25 * sin(Time.get_ticks_msec() * 0.001 * (8.0 + dwarn_urg * 30.0)))
+			if _depress_t <= 0.0:
+				_depress_t = randf_range(10.0, 18.0)
+				if _depress_warn != null:
+					_depress_warn.modulate.a = 0.0
+				if dist < _depress_r and dist > 1.0:
+					var to_center: Vector2 = (global_position - _plr.global_position).normalized()
+					_plr.global_position += to_center * (_depress_force * 0.12)
+				if game != null and game.has_method("impact_fx"):
+					game.impact_fx(global_position, Color(1.0, 0.3, 0.2), kind, Vector2.ZERO, _depress_r / 95.0)
+
+		# --- ZONE PUSH/PULL (Anneau de Gravite) : pousse en continu en phase "push", attire en
+		# continu en phase "pull" - minuteur INDEPENDANT (_grav_phase_on), le sprite/collider reste
+		# TOUJOURS visible (04/10, corrige le bug ou l'ancien partage de _cycle le masquait
+		# justement pendant la phase ou la force s'applique). La teinte distingue les 2 phases.
+		if _grav_zone:
+			_grav_phase_t -= delta
+			if _grav_phase_t <= 0.0:
+				_grav_phase_on = not _grav_phase_on
+				_grav_phase_t = _grav_on_dur if _grav_phase_on else _grav_off_dur
+			if _sprite != null:
+				_sprite.modulate = Color(0.6, 1.0, 1.0) if _grav_phase_on else Color(1.0, 0.75, 0.55)
+			if dist < _grav_r and dist > 1.0:
+				var away: Vector2 = (_plr.global_position - global_position).normalized()
+				var grav_step: Vector2 = away * _grav_force * delta * (1.0 if _grav_phase_on else -1.0)
+				_plr.global_position += grav_step
+
+		# --- EMETTEUR DE LASER ROTATIF (Anneau de Gravite) : GroundZone en ligne a intervalle,
+		# meme idiome que bras_presseur/jet_de_cryo, mais l'angle avance a chaque tir -> le
+		# balayage tourne au fil des activations (pas un vrai laser continu anime).
+		if _rot_laser and dist < 1300.0:
+			_rot_laser_t -= delta
+			if _rot_laser_t <= 0.0:
+				_rot_laser_t = randf_range(3.0, 6.0)
+				_rot_laser_angle = fmod(_rot_laser_angle + deg_to_rad(35.0), TAU)
+				if game != null and "enemy_layer" in game:
+					var ldir: Vector2 = Vector2.RIGHT.rotated(_rot_laser_angle)
+					var lhalf: Vector2 = ldir * 220.0
+					var z: GroundZone = GroundZone.new()
+					z.radius = 35.0; z.delay = 1.0; z.damage = 18.0
+					z.color = Color(1.0, 0.75, 0.2); z.fx_kind = kind
+					z.shape = "line"; z.line_from = -lhalf; z.line_to = lhalf
+					z.game = game; z.player = _plr
+					game.enemy_layer.add_child(z)
+					z.global_position = global_position
 
 		# --- capaciteur: idle -> telegraph -> fire, on a fixed loop ---
 		# Only while the player is near enough to see it: with fixed decor there are capacitors all
@@ -695,6 +2059,117 @@ class Prop extends StaticBody2D:
 
 	## Arc pylon: forks a lightning bolt to the nearest enemy in range and damages it. Reads as a
 	## friendly-ish hazard — lead the horde past and it chips them.
+	## TERMINAL DE DELESTAGE : la jauge (DwellZone, voir _ready) vient de se remplir -> une onde
+	## unique repousse les petits ennemis proches et ouvre une fenetre de fuite. Position directe
+	## (jamais velocity, voir la note dans le bloc IMPULSION plus haut).
+	func _on_dwell_filled() -> void:
+		var r2: float = 260.0 * 260.0
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if e is Node2D:
+				var away: Vector2 = (e as Node2D).global_position - global_position
+				var d2: float = away.length_squared()
+				if d2 <= r2 and d2 > 1.0:
+					(e as Node2D).global_position += away.normalized() * _dwell_force
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Palette.CYAN, kind, Vector2.ZERO, 3.0)
+		Events.screen_shake.emit(2.5)
+
+	## CONSOLE DE CONVOYEUR (Hall d'Assemblage) : la jauge (DwellZone dediee, voir _ready) vient
+	## de se remplir -> coupe les convoyeurs proches pendant console_stop_dur. Cooldown en
+	## timestamp absolu (pas de _process dedie a ce prop, comme "terminal").
+	func _on_console_filled() -> void:
+		if _console_cd_t > 0.0:
+			return
+		_console_cd_t = _console_cd
+		var r2: float = _console_r * _console_r
+		for p in get_tree().get_nodes_in_group("tech_convoyeur"):
+			if p is Node2D and "_conveyor_stop_t" in p:
+				if global_position.distance_squared_to((p as Node2D).global_position) <= r2:
+					p._conveyor_stop_t = _console_stop_dur
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Palette.CYAN, kind, Vector2.ZERO, 2.5)
+
+	## VANNE DE REFROIDISSEMENT (Fonderie) : la jauge (DwellZone dediee, voir _ready) vient de se
+	## remplir -> ouvre une zone sure temporaire (GroundZone a 0 degat, repere visuel + petit
+	## repit). Pas de contre-effet ailleurs (hors scope, voir le plan).
+	func _on_valve_filled() -> void:
+		if _valve_cd_t > 0.0:
+			return
+		_valve_cd_t = _valve_cd
+		if game != null and game.has_method("spawn_ground_zone"):
+			game.spawn_ground_zone(global_position, _valve_r, 0.3, 0.0, Color(0.5, 0.9, 1.0), kind)
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Color(0.5, 0.9, 1.0), kind, Vector2.ZERO, _valve_r / 95.0)
+
+	## BORNE THERMIQUE (Lac de Permafrost) : la jauge (DwellZone dediee, voir _ready) vient de se
+	## remplir -> ouvre une zone sure temporaire, calque exact de _on_valve_filled (Fonderie).
+	func _on_thermal_filled() -> void:
+		if _thermal_cd_t > 0.0:
+			return
+		_thermal_cd_t = _thermal_cd
+		if game != null and game.has_method("spawn_ground_zone"):
+			game.spawn_ground_zone(global_position, _thermal_r, 0.3, 0.0, Color(1.0, 0.7, 0.3), kind)
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Color(1.0, 0.7, 0.3), kind, Vector2.ZERO, _thermal_r / 95.0)
+
+	## VANNE DE DRAINAGE (Bassins Toxiques) : suspend temporairement les bassins toxiques
+	## voisins, meme idiome que _on_console_filled (Secteur Tech) qui parcourt un groupe voisin.
+	func _on_drain_filled() -> void:
+		if _drain_cd_t > 0.0:
+			return
+		_drain_cd_t = _drain_cd
+		var r2: float = _drain_r * _drain_r
+		for p in get_tree().get_nodes_in_group("reacteur_toxic"):
+			if p is Node2D and "_toxic_suppressed_t" in p:
+				if global_position.distance_squared_to((p as Node2D).global_position) <= r2:
+					p._toxic_suppressed_t = 10.0
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Palette.CYAN, kind, Vector2.ZERO, 2.5)
+
+	## CONSOLE DE VENT (Salle des Turbines) : inverse la direction des poches de vent voisines.
+	func _on_wind_console_filled() -> void:
+		if _wind_console_cd_t > 0.0:
+			return
+		_wind_console_cd_t = _wind_console_cd
+		# 04/10, WEAK signale par le patron : le VFX de confirmation ne jouait QU'a la console, donc
+		# l'inversion de la poche de vent elle-meme etait invisible. Joue maintenant A CHAQUE poche
+		# de vent reellement inversee, en plus de la confirmation a la console.
+		var r2: float = _wind_console_r * _wind_console_r
+		for p in get_tree().get_nodes_in_group("reacteur_wind"):
+			if p is Node2D and "_wind_dir" in p:
+				if global_position.distance_squared_to((p as Node2D).global_position) <= r2:
+					p._wind_dir = -p._wind_dir
+					if game != null and game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", (p as Node2D).global_position, 0.0, 2.0, Palette.CYAN)
+		if game != null and game.has_method("spawn_vfx"):
+			game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Palette.CYAN)
+
+	## CRISTAL D'ENERGIE INSTABLE (Noyau Fissure) : le joueur l'a touche -> arme le compte a
+	## rebours avant explosion (voir le tick plus haut).
+	func _on_crystal_armed() -> void:
+		if _crystal_armed:
+			return
+		_crystal_armed = true
+		_crystal_t = 3.0
+		if _sprite != null:
+			_sprite.modulate = Color(1.6, 1.8, 0.8)   # lueur vive : "ramasse, va exploser"
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Color(0.8, 1.0, 0.2), kind, Vector2.ZERO, 1.5)
+
+	## PLANTE LUMINEUSE (Jardin de Spores) : dissipe les nuages de spores voisins, meme idiome
+	## que _on_drain_filled (Noyau Instable) / radiateur (Zone Cryo).
+	func _on_light_plant_filled() -> void:
+		if _light_plant_cd_t > 0.0:
+			return
+		_light_plant_cd_t = _light_plant_cd
+		var r2: float = _light_plant_r * _light_plant_r
+		for p in get_tree().get_nodes_in_group("ruche_spores"):
+			if p is Node2D and "_spore_suppressed_t" in p:
+				if global_position.distance_squared_to((p as Node2D).global_position) <= r2:
+					p._spore_suppressed_t = 8.0
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(global_position, Color(0.55, 1.0, 0.4), kind, Vector2.ZERO, 2.0)
+
 	func _zap_nearest() -> void:
 		var best: Node2D = null
 		var bd: float = _pylon_r * _pylon_r
@@ -715,8 +2190,8 @@ class Prop extends StaticBody2D:
 	## EMP burst on destruction: damages + knocks back every enemy nearby. The reward for breaking it.
 	func _emp_burst() -> void:
 		var pos: Vector2 = global_position
-		if game != null and game.has_method("spawn_vfx"):
-			game.spawn_vfx("shockwave", pos, 0.0, 2.0, Color(1.0, 0.95, 0.4))
+		if game != null and game.has_method("impact_fx"):
+			game.impact_fx(pos, Color(1.0, 0.95, 0.4), kind, Vector2.ZERO, 2.0)
 		Events.screen_shake.emit(6.0)
 		var r2: float = 320.0 * 320.0
 		for e in get_tree().get_nodes_in_group("enemies"):
@@ -869,7 +2344,7 @@ class Prop extends StaticBody2D:
 		if _plr != null and is_instance_valid(_plr) and _plr.has_method("take_damage"):
 			var pp: Vector2 = _plr.global_position
 			if Geometry2D.get_closest_point_to_segment(pp, a, b).distance_to(pp) <= BEAM_HALF_W + 22.0:
-				_plr.take_damage(_beam_dmg)
+				_plr.take_damage(_beam_dmg, global_position)
 				Events.screen_shake.emit(7.0)
 
 	## Fuel barrel detonation: hurts EVERYTHING in BOOM_R, the player included — the 4s fuse is
@@ -882,8 +2357,8 @@ class Prop extends StaticBody2D:
 		if game != null and is_instance_valid(game):
 			if game.has_method("death_fx"):
 				game.death_fx(pos, 2, true)      # the big lightning burst is EARNED here (rare event)
-			if game.has_method("spawn_vfx"):
-				game.spawn_vfx("shockwave", pos, 0.0, 2.4, Color(1.0, 0.6, 0.25))
+			if game.has_method("impact_fx"):
+				game.impact_fx(pos, Color(1.0, 0.6, 0.25), kind, Vector2.ZERO, 2.4)
 			for e in get_tree().get_nodes_in_group("enemies"):
 				if e is Node2D and is_instance_valid(e) and "alive" in e and e.alive:
 					if pos.distance_to((e as Node2D).global_position) <= BOOM_R and e.has_method("take_damage"):
@@ -937,21 +2412,63 @@ class Prop extends StaticBody2D:
 		# freed nodes that every enemy re-scans each frame
 		if game != null and is_instance_valid(game) and "cover_list" in game:
 			game.cover_list.erase(self)
+		# ARCHIVES : le prop peut disparaitre (destruction, dechargement de chunk) en tenant encore
+		# une marque — sinon priority_boost resterait fige sur cet ennemi pour toujours.
+		if _spot_marked != null and is_instance_valid(_spot_marked):
+			_spot_marked.priority_boost = 0.0
 
 	func take_damage(amount: float) -> void:
 		if not bool(def.get("destruct", false)):
 			return   # NATURE / carcass: indestructible (bullets already stopped by the collider)
 		hp -= amount
+		if _shoot_r > 0.0 and not _hacked and hp > 0.0 and hp <= _hp_start * HACK_THRESHOLD:
+			_hacked = true
+			hp = maxf(hp, 1.0)   # affaiblie, jamais a 0 par le coup qui declenche le piratage
+			if _sprite != null:
+				_sprite.modulate = Color(0.5, 1.4, 1.6)   # cyan — "allie", cf. la hierarchie de couleurs
+			if game != null and game.has_method("show_hint"):
+				game.show_hint("Tourelle piratée — elle tire maintenant sur les ennemis dans son cône.",
+					Color(0.5, 1.0, 1.0), 4.5)
+			return
 		if hp <= 0.0:
 			if _boom:
 				_explode()      # shooting a fuel barrel sets it off — no fuse, you chose this
 				return
 			GameState.props_destroyed += 1   # daily-quest tracking (flushed at run end)
+			if game != null and game.has_method("hint_prop_destroyed"):
+				game.hint_prop_destroyed()   # explique le decor destructible, une fois, jamais revu
 			_mark_gone(global_position)      # stays broken when this chunk streams back in
 			if _pylon:
 				_emp_burst()                 # breaking an arc pylon releases an EMP shockwave
 			if _shatter:
 				_shatter_burst()             # breaking a crystal sprays damaging shards
+			if _capsule and game != null:
+				# CAPSULE CRYOGENIQUE (Cryo-Voute) : reutilise le hook "epave" (reveil d'un
+				# ennemi), mais declenche a la DESTRUCTION plutot qu'a la proximite -> le risque
+				# du document (65% bonus via le loot normal ci-dessous / 35% ennemi en plus). Le
+				# mystere AVANT ouverture est voulu (le document le demande) ; 04/10, WEAK signale
+				# par le patron : les 2 issues etaient indiscernables APRES coup (meme shockwave
+				# neutre). Les 2 branches ont maintenant un tell distinct et immediat.
+				if randf() < 0.35 and game.has_method("awaken_enemy"):
+					game.awaken_enemy(global_position, "brute")
+					if game.has_method("impact_fx"):
+						game.impact_fx(global_position, Color(1.0, 0.2, 0.2), "decor_hit", Vector2.ZERO, 2.2)
+					if Events != null:
+						Events.screen_shake.emit(2.5)
+				elif game.has_method("impact_fx"):
+					game.impact_fx(global_position, Color(1.0, 0.85, 0.3), "decor_hit", Vector2.ZERO, 1.6)
+			if _pillar:
+				# PILIER D'ENERGIE (Chambre de la Forge) : vague d'energie qui repousse les
+				# ennemis proches - meme nudge que _on_dwell_filled ("terminal"), rayon plus large.
+				var r2pil: float = 300.0 * 300.0
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D:
+						var awayp: Vector2 = (e as Node2D).global_position - global_position
+						var d2p: float = awayp.length_squared()
+						if d2p <= r2pil and d2p > 1.0:
+							(e as Node2D).global_position += awayp.normalized() * 80.0
+				if game != null and game.has_method("impact_fx"):
+					game.impact_fx(global_position, Color(1.0, 0.85, 0.3), kind, Vector2.ZERO, 3.2)
 			if game != null:
 				if _beacon:
 					# silencing a beacon is a real objective -> a proper burst + a scrap payout so

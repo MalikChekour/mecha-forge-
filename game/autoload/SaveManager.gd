@@ -272,6 +272,76 @@ const GEAR_PULL_COST: int = 30       # cristaux
 const GEAR_UPGRADE_COST: int = 15    # noyaux per level
 const GEAR_MAX_LEVEL: int = 5
 
+## FORGE DETERMINISTE (plan direction artistique, 26/09 — validee par le patron : "en plus" de
+## l'invocation, pas a sa place ; plans issus des drops de boss ; Legendaire reste EXCLUSIF a
+## l'invocation, jamais forgeable, pour que le jackpot garde un interet). Chaque boss non-final
+## a une affinite de SLOT fixe (raison de viser tel boss plutot qu'un autre) ; le boss determine
+## aussi le PALIER de rarete du plan qu'il peut laisser tomber. endboss (Souverain, universel,
+## deja lie au chapitre final) laisse un plan de slot ALEATOIRE, au palier le plus genereux.
+const PLAN_SLOT_BY_BOSS: Dictionary = {
+	"midboss": "blindage", "crusherboss": "arme", "midboss_a": "senseur", "midboss_b": "reacteur",
+}
+const PLAN_DROP_CHANCE: float = 0.35
+# poids de rarete du PLAN (jamais legendaire — reserve a l'invocation), par boss :
+const PLAN_RARITY_WEIGHT: Dictionary = {
+	"midboss": {"commun": 70, "rare": 30}, "crusherboss": {"commun": 70, "rare": 30},
+	"midboss_a": {"rare": 55, "epique": 45}, "midboss_b": {"rare": 55, "epique": 45},
+	"endboss": {"rare": 40, "epique": 60},
+}
+
+func plans() -> Array:
+	return data.get("plans", [])
+
+func _roll_plan_rarity(boss_kind: String) -> String:
+	var weights: Dictionary = PLAN_RARITY_WEIGHT.get(boss_kind, {"commun": 100})
+	var total: int = 0
+	for w in weights.values():
+		total += int(w)
+	var r: int = randi() % maxi(1, total)
+	var acc: int = 0
+	for rarity: String in weights:
+		acc += int(weights[rarity])
+		if r < acc:
+			return rarity
+	return "commun"
+
+## Appele a la mort d'un boss (Enemy._die, rank >= 3). Rend le plan si un a ete accorde ({} sinon)
+## pour que l'appelant puisse afficher un indice — c'est un evenement rare, il merite d'etre dit.
+func grant_boss_plan(boss_kind: String) -> Dictionary:
+	if randf() > PLAN_DROP_CHANCE:
+		return {}
+	var slot: String = String(PLAN_SLOT_BY_BOSS.get(boss_kind, GEAR_SLOTS[randi() % GEAR_SLOTS.size()]))
+	var rarity: String = _roll_plan_rarity(boss_kind)
+	var plan: Dictionary = {"slot": slot, "rarity": rarity, "source": boss_kind}
+	var ps: Array = plans()
+	ps.append(plan)
+	data["plans"] = ps
+	save_data()
+	return plan
+
+## Consomme le plan a cet index : fabrique la piece EXACTE (slot + rarete garantis, pas de
+## hasard) au lieu de gear_pull() qui tire les deux. Auto-equipe si le slot est vide, comme un
+## tirage normal.
+func forge_from_plan(index: int) -> Dictionary:
+	var ps: Array = plans()
+	if index < 0 or index >= ps.size():
+		return {}
+	var plan: Dictionary = ps[index]
+	var uid: int = int(data.get("part_uid", 1))
+	data["part_uid"] = uid + 1
+	var part: Dictionary = {"uid": uid, "slot": String(plan["slot"]), "rarity": String(plan["rarity"]), "level": 1}
+	var parts: Array = gear_parts()
+	parts.append(part)
+	data["parts"] = parts
+	var eq: Dictionary = gear_equipped()
+	if not eq.has(String(part["slot"])):
+		eq[String(part["slot"])] = uid
+		data["equipped"] = eq
+	ps.remove_at(index)
+	data["plans"] = ps
+	save_data()
+	return part
+
 func gear_parts() -> Array:
 	return data.get("parts", [])
 

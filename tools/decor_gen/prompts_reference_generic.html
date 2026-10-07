@@ -1,0 +1,319 @@
+<title>Prompts Décor 15 Maps</title>
+<meta name="description" content="Liste complète et détaillée des prompts d'images nécessaires au plan de refonte des 15 maps de Mecha-Forge, organisée par biome.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0a0e14; --bg-card:#111820; --bg-card-hover:#141d26; --bg-code:#0d1319;
+    --cyan:#00d4ff; --cyan-dim:#0099bb; --orange:#ff6b1a;
+    --text:#e0e6ed; --text-dim:#8a9aaa; --text-bright:#ffffff;
+    --border:#1a2530; --border-hi:#2a3a4a;
+    --ok:#3ddc84; --todo:#ffcf4d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding-inline:16px;background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:16px;line-height:1.5}
+  h1,h2,h3,.eyebrow{font-family:'Orbitron',sans-serif}
+  code,.prompt,.tag-mono{font-family:'JetBrains Mono',monospace}
+  .wrap{max-width:980px;margin:0 auto}
+
+  header{padding-block:32px 20px;border-bottom:1px solid var(--border)}
+  h1{margin:0;font-size:clamp(1.5rem,4vw,2.1rem);font-weight:900;letter-spacing:1.5px;color:var(--text-bright);text-wrap:balance}
+  header p{margin:8px 0 0;color:var(--text-dim);max-width:70ch}
+
+  .rules{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-block:20px}
+  .rules h2{font-size:.95rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin:0 0 10px}
+  .rules ul{margin:0;padding-left:20px}
+  .rules li{margin-bottom:6px}
+  .rules .prompt{margin-top:10px}
+
+  nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(10,14,20,.94);backdrop-filter:blur(6px);
+    padding-block:12px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+  nav.toc a{color:var(--text-dim);text-decoration:none;font-size:.78rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+    padding:7px 12px;border-radius:999px;border:1px solid var(--border);white-space:nowrap}
+  nav.toc a:hover{color:var(--cyan);border-color:var(--cyan-dim)}
+
+  section.biome{padding-block:30px 10px}
+  .biome-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px;margin-bottom:6px}
+  .biome-head h2{margin:0;font-size:1.3rem;letter-spacing:1px;color:var(--text-bright)}
+  .biome-head .sub{color:var(--text-dim);font-size:.85rem}
+  .swatches{display:flex;gap:6px;margin:10px 0 4px}
+  .sw{width:22px;height:22px;border-radius:5px;border:1px solid var(--border-hi)}
+  .identity{color:var(--text-dim);font-size:.88rem;max-width:72ch;margin:6px 0 18px}
+
+  .map-h{margin:22px 0 10px;padding-left:12px;border-left:3px solid var(--cyan-dim);font-size:1rem;letter-spacing:.5px;color:var(--cyan)}
+
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px}
+  .card:hover{border-color:var(--border-hi)}
+  .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .card-head h3{margin:0;font-size:1.02rem;color:var(--text-bright)}
+  .badges{display:flex;gap:6px;flex-wrap:wrap}
+  .badge{font-size:.66rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:5px;border:1px solid var(--border-hi)}
+  .badge.done{color:var(--ok);border-color:rgba(61,220,132,.4)}
+  .badge.todo{color:var(--todo);border-color:rgba(255,207,77,.4)}
+  .badge.kind{color:var(--text-dim)}
+
+  .prompt{background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:.84rem;
+    line-height:1.55;color:var(--text);white-space:pre-wrap;position:relative}
+
+  .copy-row{display:flex;justify-content:flex-end;margin-top:8px}
+  button.copy{background:transparent;border:1px solid var(--border-hi);color:var(--text-dim);font:600 .72rem/1 'Rajdhani',sans-serif;
+    letter-spacing:.5px;text-transform:uppercase;padding:7px 12px;border-radius:6px;cursor:pointer}
+  button.copy:hover{color:var(--cyan);border-color:var(--cyan-dim)}
+  button.copy.copied{color:var(--ok);border-color:rgba(61,220,132,.5)}
+
+  .ref-note{font-size:.78rem;color:var(--text-dim);margin-top:6px}
+
+  footer{padding:30px 0 40px;color:var(--text-dim);font-size:.8rem;border-top:1px solid var(--border);margin-top:20px}
+
+  @media (max-width:480px){
+    .card-head{flex-direction:column;align-items:flex-start}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>PROMPTS DÉCOR — LES 15 MAPS</h1>
+    <p>Liste complète des images à générer pour le plan de refonte (5 biomes, 15 maps). 9 déjà implémentées en placeholder dans le jeu (Secteur Tech), 24 restent à générer : 4 textures de sol + 20 nouveaux décors interactifs.</p>
+  </header>
+
+  <div class="rules">
+    <h2>Règle à répéter sur CHAQUE prompt de décor (pas les textures de sol)</h2>
+    <ul>
+      <li>Joins l'image <code>game/assets/decor/g27.png</code> comme référence de style avant de coller le prompt.</li>
+      <li>Vue 3/4 en plongée (comme une tourelle vue depuis au-dessus), rendu peint numérique, pas photoréaliste.</li>
+      <li><strong>Fond entièrement transparent</strong>, pas d'ombre portée intégrée, pas de texte, pas de watermark.</li>
+      <li>Objet unique, centré, silhouette nette — c'est une icône de jeu, pas une illustration de scène.</li>
+    </ul>
+    <div class="prompt" id="style-common">Study this reference prop art carefully: a top-down 3/4 isometric view of a sci-fi industrial machine, painted digital concept-art style, soft directional lighting, slightly stylized (not photorealistic), crisp clean silhouette, PURE TRANSPARENT background, no ground shadow baked in, no text, no watermark. Match this exact rendering style and framing for a NEW prop described below.</div>
+    <div class="copy-row"><button class="copy" data-target="style-common">Copier</button></div>
+    <p class="ref-note">Pour les 4 textures de sol : vue du dessus à 90° (pas 3/4), seamless/tuilable, aucun objet isolé — uniquement la texture. Détail dans chaque prompt.</p>
+  </div>
+
+  <nav class="toc">
+    <a href="#tech">Secteur Tech</a>
+    <a href="#cryo">Zone Cryo</a>
+    <a href="#reacteur">Noyau Instable</a>
+    <a href="#ruche">Biomécanique</a>
+    <a href="#citadelle">Forge Finale</a>
+  </nav>
+
+  <section class="biome" id="tech">
+    <div class="biome-head"><h2>Biome 1 — Secteur Tech (Usine)</h2><span class="sub">Maps 1-3 · déjà implémentées en jeu</span></div>
+    <div class="swatches"><div class="sw" style="background:#00d4ff"></div><div class="sw" style="background:#ff6b1a"></div><div class="sw" style="background:#2a3a4a"></div></div>
+    <p class="identity">Cyberpunk industriel, dalles métalliques sombres, circuits lumineux cyan/orange, vapeur, machines. Déjà la texture de sol existante du jeu (biome "tech") — aucune nouvelle texture nécessaire.</p>
+
+    <h3 class="map-h">Map 1 — Hall d'Assemblage</h3>
+    <div class="card"><div class="card-head"><h3>Convoyeur sol</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p1">A short straight section of an industrial conveyor belt set into a factory floor: metal rollers on each end, a dark rubber belt surface with faint directional chevron markings, a thin glowing ORANGE strip along both edges. Seen from the same 3/4 top-down angle.</div>
+      <div class="copy-row"><button class="copy" data-target="p1">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Console de convoyeur</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p2">A standalone factory control console on a sturdy metal pedestal: angled top panel with a glowing CYAN screen showing simple readouts, a few physical buttons, antenna stub on top. Same 3/4 top-down angle.</div>
+      <div class="copy-row"><button class="copy" data-target="p2">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Bras presseur</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p3">A heavy industrial hydraulic PRESS ARM mounted on a floor pedestal: a thick articulated metal arm ending in a flat square press head, hydraulic pistons along its length, a warning ORANGE glow strip near the press head. Same 3/4 top-down angle, arm resting/raised.</div>
+      <div class="copy-row"><button class="copy" data-target="p3">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 2 — Fonderie des Pistons</h3>
+    <div class="card"><div class="card-head"><h3>Piston hydraulique</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p4">A vertical industrial hydraulic PISTON column rising from a floor base: a wide metal cylinder base, a narrower polished piston rod extending upward, hydraulic hoses wrapped around the base, a thin CYAN accent light ring at the base. Same 3/4 top-down angle.</div>
+      <div class="copy-row"><button class="copy" data-target="p4">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Vanne de refroidissement</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p5">An industrial coolant VALVE station: a round metal wheel-valve mounted on a pipe junction with two curved pipes feeding into it, a small gauge, a faint CYAN frost/steam glow around the valve wheel. Same 3/4 top-down angle.</div>
+      <div class="copy-row"><button class="copy" data-target="p5">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Surchauffe du sol</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p6">A floor HEAT VENT grate set flush into the ground: a metal grille with glowing ORANGE-RED heat lines radiating from the vents, faint heat-shimmer, no vertical structure (lies flat on the ground). Same top-down angle as the reference, but flatter/lower profile.</div>
+      <div class="copy-row"><button class="copy" data-target="p6">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 3 — Quai de Chargement</h3>
+    <div class="card"><div class="card-head"><h3>Porte automatique</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p7">A heavy industrial sliding BULKHEAD DOOR set into a frame: two thick metal door panels that meet in the middle, diagonal hazard stripes near the seam, a small CYAN status light above the frame. Same 3/4 top-down angle, shown CLOSED.</div>
+      <div class="copy-row"><button class="copy" data-target="p7">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Zone de chargement</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p8">A factory LOADING MARKER on the floor: a square hazard-striped floor plate (yellow/black stripes) with a small overhead gantry hook hanging just above it, faint ORANGE warning glow. Same 3/4 top-down angle.</div>
+      <div class="copy-row"><button class="copy" data-target="p8">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Container mobile</h3><div class="badges"><span class="badge done">Fait (placeholder)</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="p9">A compact industrial CARGO CONTAINER on a small rail-wheel base: a metal box with corrugated side panels, faded stencil markings, small wheels visible at the bottom resting on a short rail track segment. Same 3/4 top-down angle.</div>
+      <div class="copy-row"><button class="copy" data-target="p9">Copier</button></div>
+    </div>
+  </section>
+
+  <section class="biome" id="cryo">
+    <div class="biome-head"><h2>Biome 2 — Zone Cryo</h2><span class="sub">Maps 4-6 · tout à faire</span></div>
+    <div class="swatches"><div class="sw" style="background:#a8d8e8"></div><div class="sw" style="background:#ffffff"></div><div class="sw" style="background:#5a7a8a"></div></div>
+    <p class="identity">Laboratoire cryogénique blanc/bleu, givre sur métal, capsules de stase, vapeur froide, cristaux de glace.</p>
+
+    <div class="card"><div class="card-head"><h3>Texture de sol — Zone Cryo</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Texture de sol</span></div></div>
+      <div class="prompt" id="t1">Top-down seamless tileable floor texture: frosted industrial laboratory flooring, blue-grey metal plates covered in a light layer of frost, thin ice cracks running between the plates, cold blue-white reflections, a few darker damp patches, cryogenic high-tech lab atmosphere. Palette: icy blue, off-white, steel grey. No text, no logo, no character, no isolated 3D object — floor texture only, strictly top-down 90° angle, edges that tile seamlessly with no visible seam.</div>
+      <div class="copy-row"><button class="copy" data-target="t1">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 4 — Cryo-Voûte</h3>
+    <div class="card"><div class="card-head"><h3>Capsule cryogénique</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n1">A vertical cryogenic stasis capsule: ovoid white/pale-blue metal shell, a frosted viewport at the center hinting at a blue glow inside, frosted coolant pipes winding along the sides, a small blinking control panel at the base. Same 3/4 top-down angle as the reference, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n1">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Plaque de glace</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif (sol)</span></div></div>
+      <div class="prompt" id="n14">A patch of smooth slick ice set into the floor: a roughly circular sheet of pale blue ice with subtle internal cracks and a faint reflective sheen, slightly raised above the surrounding floor level, cold mist wisping at its edges. Flat top-down ground-hazard framing (like a pool decal, not an upright object), transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n14">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 5 — Serres Gelées</h3>
+    <div class="card"><div class="card-head"><h3>Radiateur</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n2">An industrial de-icing radiator unit on a stand: metal body with visible heating fins, warm orange-red glow radiating between the fins, a small nozzle breathing a faint heat-shimmer, deliberate warm contrast against the icy-blue surroundings. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n2">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Pic de glace</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n15">A sharp ice spike bursting upward from the ground: a cluster of jagged translucent blue-white ice crystals erupting from a cracked floor opening, a faint cyan glow at the crack where it emerged. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n15">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 6 — Lac de Permafrost</h3>
+    <div class="card"><div class="card-head"><h3>Borne thermique</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n3">A portable de-icing beacon planted in the ice: a squat metal column topped with an orange/red emitter dome, the ice around its base slightly melted into a halo, a frosted power cable trailing on the ground. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n3">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Trou de glace effondrée</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif (sol)</span></div></div>
+      <div class="prompt" id="n16">A hole in broken ice flooring: jagged ice shards ringing a dark opening that reveals black water below, fracture lines radiating outward across the surrounding ice. Flat top-down ground-hazard framing, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n16">Copier</button></div>
+    </div>
+  </section>
+
+  <section class="biome" id="reacteur">
+    <div class="biome-head"><h2>Biome 3 — Noyau Instable</h2><span class="sub">Maps 7-9 · tout à faire</span></div>
+    <div class="swatches"><div class="sw" style="background:#39ff14"></div><div class="sw" style="background:#3a3a3a"></div><div class="sw" style="background:#ff6b1a"></div></div>
+    <p class="identity">Réacteur nucléaire instable, tuyaux de vapeur, pulsations d'énergie, liquides radioactifs verts, chaleur.</p>
+
+    <div class="card"><div class="card-head"><h3>Texture de sol — Noyau Instable</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Texture de sol</span></div></div>
+      <div class="prompt" id="t2">Top-down seamless tileable floor texture: industrial reactor platform, dark rusted metal, metal grating, green radioactive corrosion seeping between the plates, glowing green veins pulsing beneath the surface (hinting at hidden piping/cabling), unstable toxic atmosphere. Palette: toxic green, charcoal grey, warning orange accents. No text, no logo, no isolated object — floor texture only, strictly top-down 90° angle, seamless tiling.</div>
+      <div class="copy-row"><button class="copy" data-target="t2">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 7 — Bassins Toxiques</h3>
+    <div class="card"><div class="card-head"><h3>Vanne de drainage</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n4">A large industrial wheel-valve mounted on a corroded pipe junction: worn red metal valve wheel, a few drops of toxic green liquid seeping at the joint, a small pressure gauge on the side. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n4">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Bassin de liquide toxique</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif (sol)</span></div></div>
+      <div class="prompt" id="n17">A pool of toxic radioactive liquid set into the floor: murky glowing green liquid with a faintly bubbling surface, a corroded metal rim around the pool, wisps of toxic vapor rising off the surface. Flat top-down ground-hazard framing, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n17">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 8 — Salle des Turbines</h3>
+    <div class="card"><div class="card-head"><h3>Console de contrôle du vent</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n5">A sturdy industrial control console on a reinforced base (built to withstand strong air currents): angled screen showing an animated-style glowing green wind-direction arrow, a manual control lever, aerodynamic ribbed housing. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n5">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Turbine géante</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor (arrière-plan)</span></div></div>
+      <div class="prompt" id="n18">A giant industrial turbine fan built into the wall or floor of a reactor room, seen partially: a massive circular fan housing with visible rotating blades, warning stripes around the rim, a faint motion-blur suggestion on the blades. Same 3/4 top-down angle, transparent background, larger scale than a normal prop.</div>
+      <div class="copy-row"><button class="copy" data-target="n18">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Grille de ventilation</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif (sol)</span></div></div>
+      <div class="prompt" id="n19">A floor steam-vent grate set flush into the ground: a metal grille with a faint wisp of steam just beginning to rise through the slats, a thin warning ring painted around it. Flat top-down ground-hazard framing, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n19">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 9 — Noyau Fissuré</h3>
+    <div class="card"><div class="card-head"><h3>Cristal d'énergie instable</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n6">A raw energy crystal hovering slightly above the ground: angular green-yellow electric facets, internal glowing cracks pulsing faster and faster (reads as unstable), a few small energy particles breaking off it. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n6">Copier</button></div>
+    </div>
+  </section>
+
+  <section class="biome" id="ruche">
+    <div class="biome-head"><h2>Biome 4 — Biomécanique</h2><span class="sub">Maps 10-12 · tout à faire</span></div>
+    <div class="swatches"><div class="sw" style="background:#9b30ff"></div><div class="sw" style="background:#39ff8f"></div><div class="sw" style="background:#1a0d26"></div></div>
+    <p class="identity">Architecture organique-métallique, parois vivantes qui pulsent, lumières bioluminescentes vertes/violettes, spores.</p>
+
+    <div class="card"><div class="card-head"><h3>Texture de sol — Biomécanique</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Texture de sol</span></div></div>
+      <div class="prompt" id="t3">Top-down seamless tileable floor texture: hybrid organic-metallic surface, pulsing biomechanical flesh/carapace, purple and green bioluminescent veins running beneath a semi-translucent membrane, organic segmented texture (no rigid tiles, more like layered skin plates). Palette: bioluminescent purple, acid green, organic black. No text, no logo, no isolated object — floor texture only, strictly top-down 90° angle, seamless tiling.</div>
+      <div class="copy-row"><button class="copy" data-target="t3">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 10 — Couvoir Mécanique</h3>
+    <div class="card"><div class="card-head"><h3>Cocon</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n7">A biomechanical cocoon resting on the ground: semi-translucent purple organic membrane stretched over a framework of metallic ribs, pulsing internal glow (green or purple, hinting at what it holds), slightly moist/organic surface. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n7">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 11 — Veines Vivantes</h3>
+    <div class="card"><div class="card-head"><h3>Tentacule mécanique — émergence</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n8">A tentacle emergence point in the ground: a circular organic-metallic crack in the floor with the tip of a segmented tentacle just beginning to emerge (articulated metal sheathed in purple organic tissue), shown right before it fully surges out. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n8">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Sol collant</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif (sol)</span></div></div>
+      <div class="prompt" id="n20">A patch of sticky biomechanical residue on the ground: a glistening dark purple-green puddle with a slightly raised, tacky-looking surface, thin organic strands stretching up from it like thick mucus, a faint sickly glow. Flat top-down ground-hazard framing, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n20">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 12 — Jardin de Spores</h3>
+    <div class="card"><div class="card-head"><h3>Plante lumineuse</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n9">A medium-sized bioluminescent plant: twisted metallic-organic stem, a large glowing emerald-green bulb/flower at the top emitting a soft light, a few luminous spores floating around it. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n9">Copier</button></div>
+    </div>
+  </section>
+
+  <section class="biome" id="citadelle">
+    <div class="biome-head"><h2>Biome 5 — Forge Finale</h2><span class="sub">Maps 13-15 · tout à faire</span></div>
+    <div class="swatches"><div class="sw" style="background:#d4af37"></div><div class="sw" style="background:#3a7bff"></div><div class="sw" style="background:#0a0a14"></div></div>
+    <p class="identity">Architecture grandiose orbitale, dalles d'énergie, lumières dorées et bleues, epic final.</p>
+
+    <div class="card"><div class="card-head"><h3>Texture de sol — Forge Finale</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Texture de sol</span></div></div>
+      <div class="prompt" id="t4">Top-down seamless tileable floor texture: grandiose orbital architecture, golden energy tiles set into dark metal, glowing blue circuits tracing geometric patterns between the tiles, premium/ceremonial finish (this is the final biome). Palette: gold, electric blue, deep black. No text, no logo, no isolated object — floor texture only, strictly top-down 90° angle, seamless tiling.</div>
+      <div class="copy-row"><button class="copy" data-target="t4">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 13 — Pont Orbital</h3>
+    <div class="card"><div class="card-head"><h3>Porte de sécurité orbitale</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n10">A two-panel security door closing at the center, premium gold/electric-blue finish (distinct from the raw industrial look of the other biomes), viewing ports along the seam, a glowing status light above the frame. Same 3/4 top-down angle, transparent background, shown CLOSED.</div>
+      <div class="copy-row"><button class="copy" data-target="n10">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 14 — Anneau de Gravité</h3>
+    <div class="card"><div class="card-head"><h3>Émetteur de laser rotatif</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n11">A laser-emitting turret mounted on a circular base at the center of a platform: gold/electric-blue body with a rotating barrel, a thin dotted orange line suggesting its sweep trajectory, a glowing front lens. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n11">Copier</button></div>
+    </div>
+
+    <h3 class="map-h">Map 15 — Chambre de la Forge</h3>
+    <div class="card"><div class="card-head"><h3>Pilier d'énergie</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n12">A massive, imposing pillar (the single grandest piece of decor in the game): golden column engraved with glowing blue circuits pulsing from bottom to top, wide base anchored to the ground, top radiating a soft golden glow — must read as a key landmark of the final arena. Same 3/4 top-down angle, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n12">Copier</button></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>Segment de mur modulaire</h3><div class="badges"><span class="badge todo">À faire</span><span class="badge kind">Décor interactif</span></div></div>
+      <div class="prompt" id="n13">A modular arena wall segment (built to slide and reconfigure mid-fight): sturdy gold/electric-blue wall panel with visible mechanical grooves along the edges (implying it can slide), a glowing line running along the top edge. Shown front-facing like a wall panel, transparent background.</div>
+      <div class="copy-row"><button class="copy" data-target="n13">Copier</button></div>
+    </div>
+  </section>
+
+  <footer>Référence de style pour tous les décors interactifs : <code>game/assets/decor/g27.png</code>. Les textures de sol n'ont pas besoin d'image de référence (vue du dessus à 90°, pas 3/4). Une fois générées, dépose les fichiers dans <code>tools/decor_gen/</code> pour que je les intègre dans <code>assets/decor/</code>.</footer>
+</div>
+
+<script>
+document.querySelectorAll('button.copy').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const el = document.getElementById(btn.dataset.target);
+    const text = el.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    btn.textContent = 'Copié';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 1500);
+  });
+});
+</script>

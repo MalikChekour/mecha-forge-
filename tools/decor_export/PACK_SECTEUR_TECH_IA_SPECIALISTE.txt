@@ -1,0 +1,179 @@
+===============================================================================
+PACK DE GENERATION D'IMAGES — DECOR DE JEU "MECHA-FORGE" (SECTEUR TECH)
+Destine a une IA specialiste en generation d'images. Lire ENTIEREMENT avant de
+generer quoi que ce soit : les regles ci-dessous s'appliquent a CHACUNE des
+9 images demandees plus bas.
+===============================================================================
+
+CONTEXTE
+--------
+Ce sont des elements de decor pour un jeu video 2D vu de dessus (top-down),
+style action/arcade, biome industriel "Secteur Tech" (usine/fonderie/quai de
+chargement). Ces 9 images remplacent des images provisoires (placeholders)
+deja utilisees dans le jeu : chaque image sera integree telle quelle dans le
+moteur, redimensionnee automatiquement, sans retouche manuelle possible
+derriere. C'est pourquoi les regles techniques ci-dessous sont strictes : une
+image qui ne les respecte pas ne pourra pas etre utilisee et devra etre
+regeneree.
+
+===============================================================================
+REGLES TECHNIQUES OBLIGATOIRES (lire avant chaque generation)
+===============================================================================
+
+1. FORMAT DE SORTIE
+   - PNG avec une VRAIE couche alpha transparente (transparence native du
+     fichier), PAS un damier gris/blanc dessine, PAS un fond blanc uni, PAS un
+     fond d'une autre couleur unie. Le fond doit etre réellement transparent
+     au sens informatique du terme (canal alpha = 0 autour du sujet).
+   - Resolution minimale conseillee : 1024x1024 pixels (carre). Une image plus
+     grande est acceptable, plus petite que 768x768 ne l'est pas.
+   - Jamais de JPG (pas de transparence possible dans ce format).
+
+2. CADRAGE ET COMPOSITION
+   - UN SEUL objet par image. Jamais de scene, jamais de second plan, jamais
+     d'autres objets secondaires autour du sujet principal.
+   - Le sujet doit etre CENTRE dans le cadre, avec une marge vide d'environ
+     15-20% de chaque cote (haut/bas/gauche/droite). Ne jamais laisser le
+     sujet toucher ou depasser les bords de l'image : il sera recadre/redimensionne
+     automatiquement et un sujet coupe au bord produira un rendu casse en jeu.
+   - PAS de texte, PAS de watermark, PAS de signature, PAS de logo, PAS
+     d'interface (pas de barre de vie, pas de HUD, pas de cadre decoratif).
+   - PAS d'ombre portee dessinee sous l'objet (le moteur de jeu ajoute sa
+     propre ombre automatiquement par-dessus ; une ombre deja presente dans
+     l'image créerait un doublon visuel moche).
+
+3. DEUX CATEGORIES D'IMAGES — chaque prompt ci-dessous precise sa categorie,
+   le traitement est DIFFERENT selon la categorie :
+
+   CATEGORIE A — "Objet debout" (vue 3/4 plongeante)
+     Un objet mecanique/industriel vu depuis au-dessus et legerement de cote,
+     comme si on regardait une tourelle ou une machine posee au sol depuis un
+     point de vue en hauteur a ~45-60 degres. L'objet a du VOLUME (hauteur
+     visible), pas juste une forme plate.
+
+   CATEGORIE B — "Danger de sol" (vue du dessus, quasi a plat)
+     Un element qui est au RAS DU SOL (une grille, une plaque) : pas de
+     volume vertical important, vu presque perpendiculairement depuis
+     au-dessus, comme un decalque pose sur le sol. Ne pas dessiner de
+     perspective 3/4 pour ces elements-la : c'est plat.
+
+4. STYLE VISUEL A RESPECTER SUR TOUTES LES IMAGES
+   - Rendu "concept-art peint numeriquement", PAS photorealiste, PAS
+     cartoon/chibi, PAS pixel-art.
+   - Eclairage directionnel doux venant du HAUT-GAUCHE sur chaque image (pour
+     que toutes les images aient une direction de lumiere coherente entre
+     elles une fois mises cote a cote dans le jeu).
+   - Silhouette nette et lisible, meme en tres petit (l'image sera affichee a
+     une taille reduite dans le jeu — evitez les details fins qui
+     disparaitraient en miniature).
+   - Finition "science-fiction industrielle" : metal gris-bleu acier, panneaux,
+     rivets, tuyaux, lumieres neon/emissives selon la couleur precisee dans
+     chaque prompt. Ambiance usine/fonderie/quai de chargement — plus brute et
+     moins premium que d'autres biomes du jeu (pas d'or, pas de finition
+     ceremonielle ici).
+   - Une image de reference de style est jointe a ce pack
+     (reference_style.png) : si votre outil accepte une image de reference,
+     joignez-la systematiquement pour toutes les images de CATEGORIE A.
+     DESCRIPTION DE LA REFERENCE (si vous ne pouvez pas charger le fichier) :
+     une tourelle de defense industrielle, vue 3/4 plongeante, metal gris-bleu
+     acier avec rivets et panneaux, rendu peint numerique avec ombres douces,
+     silhouette tres nette, fond entierement transparent.
+
+5. COULEURS — respecter STRICTEMENT la couleur d'accentuation indiquee dans
+   chaque prompt (cyan electrique ou orange avertissement) : c'est le code
+   couleur qui permet au joueur d'identifier le type d'element en un coup
+   d'oeil dans le jeu. Ne pas improviser une autre couleur d'accent.
+
+6. NOMMAGE DES FICHIERS EN SORTIE — merci de nommer chaque image exactement
+   comme indique entre crochets [nom_fichier.png] au debut de chaque prompt
+   ci-dessous, pour que l'integration dans le jeu soit directe.
+
+===============================================================================
+LES 9 IMAGES A GENERER
+===============================================================================
+
+--- [convoyeur_sol.png] — CATEGORIE A — Couleur d'accent : orange ---
+A short straight section of an industrial conveyor belt set into a factory
+floor: metal rollers visible at each end, a dark rubber belt surface with
+faint directional chevron markings along its length, a thin glowing ORANGE
+strip running along both edges of the belt. Top-down 3/4 perspective view,
+matching the reference image's camera angle. Single object, centered, pure
+transparent background, no shadow, no text.
+
+--- [console_convoyeur.png] — CATEGORIE A — Couleur d'accent : cyan ---
+A standalone factory control console mounted on a sturdy metal pedestal: an
+angled top panel displaying a glowing CYAN screen with simple readout
+graphics, a few physical buttons below the screen, a short antenna stub on
+top. Top-down 3/4 perspective view, matching the reference image's camera
+angle. Single object, centered, pure transparent background, no shadow, no
+text.
+
+--- [bras_presseur.png] — CATEGORIE A — Couleur d'accent : orange ---
+A heavy industrial hydraulic press arm mounted on a floor pedestal: a thick
+articulated metal arm ending in a flat square press head, visible hydraulic
+pistons running along the arm's length, a warning ORANGE glow strip near the
+press head. Shown in a resting/raised position (not mid-strike). Top-down
+3/4 perspective view, matching the reference image's camera angle. Single
+object, centered, pure transparent background, no shadow, no text.
+
+--- [piston_hydraulique.png] — CATEGORIE A — Couleur d'accent : cyan ---
+A vertical industrial hydraulic piston column rising from a floor base: a
+wide metal cylinder forming the base, a narrower polished piston rod
+extending upward out of it, hydraulic hoses wrapped around the base, a thin
+CYAN accent light ring glowing at the base. Top-down 3/4 perspective view,
+matching the reference image's camera angle. Single object, centered, pure
+transparent background, no shadow, no text.
+
+--- [vanne_refroidissement.png] — CATEGORIE A — Couleur d'accent : cyan ---
+An industrial coolant valve station: a round metal wheel-valve mounted at a
+pipe junction, two curved pipes feeding into the junction from below, a
+small pressure gauge mounted on the side, a faint CYAN frost/steam glow
+surrounding the valve wheel. Top-down 3/4 perspective view, matching the
+reference image's camera angle. Single object, centered, pure transparent
+background, no shadow, no text.
+
+--- [surchauffe_sol.png] — CATEGORIE B (danger de sol) — Couleur d'accent : orange-rouge ---
+A floor heat-vent grate set flush into the ground: a flat metal grille with
+glowing ORANGE-RED heat lines radiating outward from the vents, a faint
+heat-shimmer effect around it. NO vertical structure at all — this object
+lies completely flat on the ground, like a floor decal. Viewed from
+DIRECTLY ABOVE, almost flat/orthographic, NOT the 3/4 angle used for upright
+objects. Single object, centered, pure transparent background, no shadow, no
+text.
+
+--- [porte_automatique.png] — CATEGORIE A — Couleur d'accent : cyan ---
+A heavy industrial sliding bulkhead door set into a frame: two thick metal
+door panels meeting in the middle, diagonal hazard stripes painted near the
+seam where they meet, a small glowing CYAN status light mounted above the
+frame. Shown fully CLOSED (both panels meeting, no gap). Top-down 3/4
+perspective view, matching the reference image's camera angle. Single
+object, centered, pure transparent background, no shadow, no text.
+
+--- [zone_chargement.png] — CATEGORIE A — Couleur d'accent : orange ---
+A factory loading marker on the floor: a square hazard-striped floor plate
+(alternating yellow and black diagonal stripes) with a small overhead gantry
+hook hanging down just above the plate's center, a faint ORANGE warning
+glow around the plate's edges. Top-down 3/4 perspective view, matching the
+reference image's camera angle. Single object, centered, pure transparent
+background, no shadow, no text.
+
+--- [container_mobile.png] — CATEGORIE A — Couleur d'accent : (aucune, metal neutre avec marquages uses) ---
+A compact industrial cargo container mounted on a small rail-wheel base: a
+metal box with corrugated side panels, faded stencil-style markings on the
+sides, small wheels visible at the bottom resting on a short segment of
+rail track. Top-down 3/4 perspective view, matching the reference image's
+camera angle. Single object, centered, pure transparent background, no
+shadow, no text.
+
+===============================================================================
+RECAPITULATIF — CE QUI FERA ECHOUER UNE IMAGE (a vérifier avant de livrer)
+===============================================================================
+[ ] Fond transparent reel (pas blanc, pas gris, pas un damier dessine)
+[ ] Un seul objet, rien d'autre dans le cadre
+[ ] Objet centre avec de la marge, rien de coupe au bord
+[ ] Aucun texte, watermark, signature, logo, HUD
+[ ] Aucune ombre portee dessinee sous l'objet
+[ ] Bon cadrage selon la categorie (3/4 pour A, vue de dessus plate pour B)
+[ ] Couleur d'accent respectee
+[ ] Nom de fichier correct
+===============================================================================

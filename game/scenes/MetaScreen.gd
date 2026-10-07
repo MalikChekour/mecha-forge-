@@ -3,12 +3,30 @@ class_name MetaScreen
 ## End-of-run screen: optional revive (watch-ad stub), then the persistent talent shop
 ## (spend banked scrap) and a Replay button. This is the between-runs retention loop.
 
+## Game.gd n'a pas de class_name -> acces a CHAPTERS via le script preload (meme pattern que les
+## tests _test_decor_cryo.gd/_test_decor_phase2.gd).
+const GameScript = preload("res://scenes/Game.gd")
+
 var game: Node
 var died: bool = false
 var _revive_ok: bool = false
 var _new_record: bool = false
 var _home: bool = false     # true = launch HUB (JOUER + meta), not the end-of-run screen
 var _doubled: bool = false  # rewarded-ad scrap doubling claimed for this run (once only)
+var _revive_screen: bool = false   # the "MECHA DETRUIT / une seconde chance" prompt is up
+
+## 🚨 BUG-02 (rapport QA 28/09) : sur un sous-ecran long (ARSENAL avec beaucoup d'armes +
+## competences), le bouton RETOUR en bas de la ScrollContainer existe et le defilement
+## fonctionne, mais la molette y avance a peine de quelques pixels par cran dans l'export
+## HTML5 — reproduit : ~15 grands scrolls pour l'atteindre. Un joueur qui ne pense pas a
+## tirer la barre de defilement se retrouve donc bloque, sans le moindre retour possible
+## (et Echap ne faisait RIEN). On cable ici un raccourci fiable, independant du scroll.
+func _unhandled_input(event: InputEvent) -> void:
+	if _revive_screen:
+		return   # cet ecran n'a pas de "retour" — Echap n'y ferait rien de sense
+	if event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_back()
 
 func setup(g: Node, d: bool, revive_available: bool) -> void:
 	game = g
@@ -75,23 +93,38 @@ class HudTabFrame extends Control:
 		var pts: PackedVector2Array = PackedVector2Array([
 			Vector2(c, 0.0), Vector2(w, 0.0), Vector2(w, h - c),
 			Vector2(w - c, h), Vector2(0.0, h), Vector2(0.0, c)])
-		var fill: Color = Color(0.02, 0.05, 0.07, 0.72)
+		
+		# Holographic fill
+		var fill: Color = Color(0.01, 0.08, 0.12, 0.85)
 		if hovered:
-			fill = Color(accent.r * 0.30, accent.g * 0.30, accent.b * 0.30, 0.80)
+			fill = Color(0.05, 0.25, 0.4, 0.95)
 		if held:
-			fill = Color(accent.r * 0.48, accent.g * 0.48, accent.b * 0.48, 0.88)
+			fill = Color(0.1, 0.35, 0.5, 1.0)
 		draw_colored_polygon(pts, fill)
+		
+		# Scanlines inside
+		var sc_color: Color = Color(accent.r, accent.g, accent.b, 0.15)
+		for y in range(4, int(h), 4):
+			draw_line(Vector2(2, y), Vector2(w-2, y), sc_color, 1.0)
+
+		# Glowing borders
 		var outline: PackedVector2Array = pts.duplicate()
 		outline.append(pts[0])
-		draw_polyline(outline, Color(accent.r, accent.g, accent.b, 1.0 if held else 0.9), line_w, true)
-		# marques d'angle (la signature du style)
+		var border_color: Color = Color(accent.r, accent.g, accent.b, 1.0)
+		draw_polyline(outline, border_color, line_w, true)
+		# Outer glow
+		draw_polyline(outline, Color(accent.r, accent.g, accent.b, 0.4), line_w * 3.0, true)
+		draw_polyline(outline, Color(accent.r, accent.g, accent.b, 0.15), line_w * 6.0, true)
+
+		# Corner marks
 		var t: float = maxf(4.0, c * 0.75)
 		var m: float = maxf(3.0, c * 0.45)
-		var lw: float = maxf(1.0, line_w * 0.7)
-		draw_line(Vector2(m, m + t), Vector2(m, m), accent, lw, true)
-		draw_line(Vector2(m, m), Vector2(m + t, m), accent, lw, true)
-		draw_line(Vector2(w - m, h - m - t), Vector2(w - m, h - m), accent, lw, true)
-		draw_line(Vector2(w - m, h - m), Vector2(w - m - t, h - m), accent, lw, true)
+		var lw: float = maxf(2.0, line_w)
+		var mc: Color = Color(1.0, 1.0, 1.0, 0.9) # Bright white corners
+		draw_line(Vector2(m, m + t), Vector2(m, m), mc, lw, true)
+		draw_line(Vector2(m, m), Vector2(m + t, m), mc, lw, true)
+		draw_line(Vector2(w - m, h - m - t), Vector2(w - m, h - m), mc, lw, true)
+		draw_line(Vector2(w - m, h - m), Vector2(w - m - t, h - m), mc, lw, true)
 
 const HOME_BASE: float = 720.0                             # cote de reference
 const F_TITLE: String = "res://assets/fonts/Orbitron-Variable.ttf"
@@ -141,6 +174,24 @@ func _intro_pop(c: Control, delay: float, from_scale: float) -> void:
 	t.tween_property(c, "modulate:a", 1.0, 0.24).set_delay(delay)
 	t.tween_property(c, "scale", Vector2.ONE, 0.34).set_delay(delay) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## 05/10, refonte UI hologramme : glissement laissant venir le PANNEAU ENTIER depuis le
+## cote, EN PLUS du pop ci-dessus (jamais a la place). Ici on anime bien position.x, mais
+## sans le risque decrit plus haut : le delta est applique APRES la mise en page (le
+## process_frame a deja laisse le conteneur poser sa position finale dans target_x), donc
+## si un redimensionnement survient pendant l'anim, le conteneur re-ecrit juste la position
+## FINALE correcte par-dessus -- au pire l'anim est coupee court, jamais corrompue.
+func _intro_slide(c: Control, delay: float, from_dx: float) -> void:
+	await get_tree().process_frame
+	if not is_instance_valid(c):
+		return
+	var target_x: float = c.position.x
+	c.position.x = target_x + from_dx
+	var t: Tween = c.create_tween()
+	t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	t.tween_interval(delay)
+	t.tween_property(c, "position:x", target_x, 0.38) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 ## Punch elastique : le bouton s'ecrase puis depasse legerement avant de se caler.
 func _punch(c: Control) -> void:
@@ -205,8 +256,13 @@ func _build_home() -> void:
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(art)
+	var bbc: BackBufferCopy = BackBufferCopy.new()
+	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	add_child(bbc)
 	var veil: ColorRect = ColorRect.new()
-	veil.color = Color(0.03, 0.05, 0.08, 0.30)
+	veil.material = ShaderMaterial.new()
+	veil.material.shader = load("res://shaders/ui_blur.gdshader")
+	veil.color = Color.WHITE
 	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
 	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(veil)
@@ -342,7 +398,8 @@ func _build_home() -> void:
 		cap.text = "SANS FIN  ·  %s" % String(GameState.diff().get("name", "NORMAL"))
 	else:
 		var nb: int = SaveManager.chapters_cleared_count()
-		cap.text = "CAMPAGNE  ·  %d / 5 chapitres" % clampi(nb, 0, 5)
+		var total_ch: int = GameScript.CHAPTERS.size()
+		cap.text = "CAMPAGNE  ·  %d / %d chapitres" % [clampi(nb, 0, total_ch), total_ch]
 	cap.add_theme_font_size_override("font_size", maxi(15, int(14.0 * vk)))          # plancher lisibilite
 	cap.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
 	cap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -450,9 +507,11 @@ func _play_story() -> void:
 func _chip(text: String, icol: Color, k: float, plus: bool = false) -> Control:
 	var p: PanelContainer = PanelContainer.new()
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
-	sb.bg_color = Color(0.05, 0.08, 0.12, 0.88)
+	sb.bg_color = Color(0.04, 0.08, 0.12, 0.88)
 	sb.set_corner_radius_all(int(10.0 * k))
-	sb.border_color = Color(0.25, 0.4, 0.48); sb.set_border_width_all(maxi(1, int(2.0 * k)))
+	# 05/10, refonte UI hologramme : liseré cyan neon + halo au lieu du gris plat d'origine.
+	sb.border_color = Color(0.15, 0.85, 1.0, 0.75); sb.set_border_width_all(maxi(1, int(2.0 * k)))
+	sb.shadow_color = Color(0.15, 0.85, 1.0, 0.25); sb.shadow_size = int(6.0 * k)
 	sb.content_margin_left = 11.0 * k; sb.content_margin_right = 11.0 * k
 	sb.content_margin_top = 5.0 * k; sb.content_margin_bottom = 5.0 * k
 	p.add_theme_stylebox_override("panel", sb)
@@ -527,6 +586,7 @@ func _on_play() -> void:
 
 func _clear() -> void:
 	_screen_home = false      # un sous-ecran s'affiche : plus de relayout de l'accueil
+	_revive_screen = false    # reinitialise a chaque ecran ; _build_revive() le remet a true
 	for c in get_children():
 		c.queue_free()
 
@@ -548,14 +608,24 @@ func _scaffold(min_w: float = 540.0) -> VBoxContainer:
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(art)
+		var bbc: BackBufferCopy = BackBufferCopy.new()
+		bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+		add_child(bbc)
 		var veil: ColorRect = ColorRect.new()
-		veil.color = Color(0.02, 0.03, 0.05, 0.80)   # assombri : ici c'est le CONTENU qui doit primer
+		veil.material = ShaderMaterial.new()
+		veil.material.shader = load("res://shaders/ui_blur.gdshader")
+		veil.color = Color.WHITE
 		veil.set_anchors_preset(Control.PRESET_FULL_RECT)
 		veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(veil)
 	else:
+		var bbc: BackBufferCopy = BackBufferCopy.new()
+		bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+		add_child(bbc)
 		var bg: ColorRect = ColorRect.new()
-		bg.color = Color(0.04, 0.045, 0.07, 0.88)
+		bg.material = ShaderMaterial.new()
+		bg.material.shader = load("res://shaders/ui_blur.gdshader")
+		bg.color = Color.WHITE
 		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 		add_child(bg)
 	# A CenterContainer alone overflows off both edges once the content is taller than the viewport.
@@ -580,6 +650,9 @@ func _scaffold(min_w: float = 540.0) -> VBoxContainer:
 	v.custom_minimum_size = Vector2(minf(min_w * uk, vps.x - 44.0 * uk), 0)
 	v.add_theme_constant_override("separation", int(12.0 * uk))
 	center.add_child(v)
+	v.modulate.a = 0.0
+	_intro_pop(v, 0.0, 0.92)
+	_intro_slide(v, 0.0, 48.0 * uk)   # 05/10 : glissement lateral, retirer cette ligne seule pour revenir en arriere
 	return v
 
 func _title(v: VBoxContainer, text: String, color: Color, size: int = 40) -> void:
@@ -607,6 +680,7 @@ func _big_button(v: VBoxContainer, text: String, cb: Callable, color: Color = Co
 # --- revive prompt (death only, once per run) ---
 func _build_revive() -> void:
 	_clear()
+	_revive_screen = true
 	var v: VBoxContainer = _scaffold()
 	_title(v, "MECHA DÉTRUIT", Color(1.0, 0.5, 0.4))
 	_title(v, "Une seconde chance ?", Color(0.85, 0.9, 1.0), 22)
@@ -674,6 +748,21 @@ func _build_shop() -> void:
 		_title(v, "+%d POINTS de competence" % int(game.get("last_sp")), Color(1.0, 0.85, 0.35), 24)
 	if not _home and game != null and int(game.get("last_crystals")) > 0:
 		_title(v, "+%d cristaux gagnes" % int(game.get("last_crystals")), Color(0.8, 0.6, 1.0), 20)
+	if not _home and game != null and game.player != null and is_instance_valid(game.player) and game.player.has_method("weapons"):
+		var ws2 = game.player.weapons()
+		if ws2 != null:
+			var owned: Array = ws2.owned_weapons()
+			if not owned.is_empty():
+				var names: Array = []
+				for wid in owned:
+					names.append(String(wid).capitalize())
+				_title(v, "Armes de cette run : " + ", ".join(names), Color(0.7, 0.85, 1.0), 15)
+		var passives: Dictionary = game.get("_passives") if game != null else {}
+		var total_picks: int = 0
+		for k in passives:
+			total_picks += int(passives[k])
+		if total_picks > 0:
+			_title(v, "%d amelioration(s) prise(s) cette partie" % total_picks, Color(0.7, 0.85, 1.0), 15)
 	_currency_row(v)
 
 	# 🚨 REJOUER etait en 5e position, SOUS LA LIGNE DE FLOTTAISON (3 crans de molette pour
@@ -801,6 +890,10 @@ func _build_arsenal() -> void:
 	var v: VBoxContainer = _scaffold(640.0)
 	_title(v, "ARSENAL", Color(0.7, 0.9, 1.0))
 	_title(v, "Arme de depart      • %d points" % SaveManager.sp(), Color(1.0, 0.85, 0.35), 22)
+	# Rapport Manus 26/09 : "un bandeau +3 POINTS (3/j) suggere une attribution quotidienne,
+	# sans en expliquer l'origine" — verifie contre Game.gd : les points s'acquierent a la FIN
+	# de chaque partie (echelle avec la difficulte), le bouton du bas n'est qu'un supplement pub.
+	_title(v, "Gagnés à la fin de chaque partie (plus à haute difficulté)", Color(0.6, 0.65, 0.75), 14)
 	# 🚨 L'ARSENAL est desormais PROPRE AU CHASSIS : chaque mecha a sa gamme de 5 armes et une
 	# signature qu'il est le seul a booster. Lister les 9 armes ici laissait acheter une arme
 	# que le mecha equipe ne sait pas manier — et qui serait silencieusement remplacee au
@@ -979,7 +1072,9 @@ Armes : %s      signature : %s" % [
 			b.pressed.connect(_equip_mech.bind(id))
 		else:
 			var cost: int = int(mech["cost"])
-			b.text = str(cost)
+			# Rapport Manus 26/09 (identite/lisibilite) : "les couts 1400 et 1800 ne precisent
+			# pas leur devise" — verifie contre la ligne du dessous : c'est bien meta_scrap (ferraille).
+			b.text = "%d ferraille" % cost
 			b.disabled = int(SaveManager.data.get("meta_scrap", 0)) < cost
 			b.pressed.connect(_buy_mech.bind(id, cost))
 		row.add_child(b)
@@ -1075,7 +1170,10 @@ func _build_daily() -> void:
 			b.text = _reward_text(def.get("reward", {}))
 			b.pressed.connect(_claim_quest.bind(i))
 		else:
-			b.text = "en cours"
+			# Rapport Manus (x2, 26/09) : "les recompenses des quetes ne sont pas affichees" —
+			# ce n'etait vrai QUE tant que la quete n'etait pas finie ; le joueur ne savait donc
+			# jamais pour quoi il jouait avant l'avoir deja terminee.
+			b.text = _reward_text(def.get("reward", {}))
 			b.disabled = true
 		row.add_child(b)
 		v.add_child(row)
@@ -1143,6 +1241,55 @@ func _build_gear() -> void:
 	var sp: Control = Control.new()
 	sp.custom_minimum_size = Vector2(0, 12)
 	v.add_child(sp)
+	# FORGE DETERMINISTE (plan direction artistique, 26/09) : plans obtenus sur les boss (voir
+	# Enemy._die -> SaveManager.grant_boss_plan), consommables ici pour fabriquer la piece EXACTE
+	# (slot + rarete garantis, jamais de hasard) — vient EN PLUS de l'invocation ci-dessous,
+	# ne la remplace pas. Legendaire reste volontairement hors de portee des plans.
+	var boss_plans: Array = SaveManager.plans()
+	if not boss_plans.is_empty():
+		_title(v, "PLANS  (forge deterministe)", Color(0.85, 0.75, 1.0), 22)
+		for i in boss_plans.size():
+			var plan: Dictionary = boss_plans[i]
+			var prow: HBoxContainer = HBoxContainer.new()
+			prow.add_theme_constant_override("separation", 10)
+			var plbl: Label = Label.new()
+			plbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var pslot: String = String(plan.get("slot", ""))
+			var prarity: String = String(plan.get("rarity", "commun"))
+			plbl.text = "%s   —   %s" % [String(SaveManager.GEAR_SLOT_NAMES.get(pslot, pslot)),
+				String(SaveManager.GEAR_RARITY_NAMES.get(prarity, prarity))]
+			plbl.add_theme_font_size_override("font_size", Palette.fs(18))
+			plbl.add_theme_color_override("font_color", RARITY_COL.get(prarity, Color.WHITE))
+			prow.add_child(plbl)
+			var pb: Button = Button.new()
+			pb.custom_minimum_size = Vector2(140, 48)
+			pb.text = "FORGER"
+			pb.pressed.connect(_forge_plan.bind(i))
+			prow.add_child(pb)
+			v.add_child(prow)
+		var psp: Control = Control.new()
+		psp.custom_minimum_size = Vector2(0, 10)
+		v.add_child(psp)
+	# Rapport Manus 26/09 : "quelle est la probabilite de chaque rarete ?" / "les doublons
+	# sont-ils convertis automatiquement ?" — jamais affiche nulle part. Construit depuis les
+	# VRAIES constantes (GEAR_RARITY_WEIGHT), jamais un chiffre fige qui pourrait diverger du
+	# reglage reel si l'equilibrage change.
+	var odds_total: int = 0
+	for w2 in SaveManager.GEAR_RARITY_WEIGHT:
+		odds_total += int(w2)
+	var odds_str: String = "Chances : "
+	for i2 in SaveManager.GEAR_RARITIES.size():
+		var rn: String = String(SaveManager.GEAR_RARITY_NAMES.get(SaveManager.GEAR_RARITIES[i2], ""))
+		var pct: float = 100.0 * float(SaveManager.GEAR_RARITY_WEIGHT[i2]) / maxf(1.0, float(odds_total))
+		odds_str += "%s %d%%" % [rn, int(round(pct))]
+		if i2 < SaveManager.GEAR_RARITIES.size() - 1:
+			odds_str += "  ·  "
+	_title(v, odds_str, Color(0.6, 0.65, 0.75), 14)
+	# 🚨 verifie contre SaveManager.gear_pull()/gear_salvage() avant d'ecrire ceci : les doublons
+	# ne sont PAS convertis automatiquement (gear_pull ne deduplique jamais) — c'est le bouton
+	# RECYCLER (gear_salvage, pieces non equipees) qui le fait, a la main.
+	_title(v, "Une pièce en trop ? RECYCLER la convertit en noyaux (bouton sur chaque pièce non équipée)",
+		Color(0.6, 0.65, 0.75), 14)
 	var can_pull: bool = int(SaveManager.data.get("crystals", 0)) >= SaveManager.GEAR_PULL_COST
 	if can_pull:
 		_big_button(v, "INVOQUER une piece  (%d cristaux)" % SaveManager.GEAR_PULL_COST, _gear_pull, Color(0.5, 0.35, 0.8))
@@ -1164,6 +1311,11 @@ func _gear_pull_ad() -> void:
 
 func _gear_pull() -> void:
 	var p: Dictionary = SaveManager.gear_pull()
+	Audio.sfx("levelup" if not p.is_empty() else "click")
+	_build_gear()
+
+func _forge_plan(index: int) -> void:
+	var p: Dictionary = SaveManager.forge_from_plan(index)
 	Audio.sfx("levelup" if not p.is_empty() else "click")
 	_build_gear()
 
@@ -1205,7 +1357,10 @@ func _build_gear_slot(slot: String) -> void:
 			bu.text = "MAX"
 			bu.disabled = true
 		else:
-			bu.text = "+%d nx" % SaveManager.GEAR_UPGRADE_COST
+			# 🚨 Rapport Manus 26/09 : "nx apparait dans le cout d'une amelioration, role et
+			# origine non expliques" — "nx" n'est PAS une devise, c'est "cores" (noyaux, deja
+			# nomme ailleurs) mal libelle. Le champ debite est bien SaveManager.data["cores"].
+			bu.text = "+%d noyaux" % SaveManager.GEAR_UPGRADE_COST
 			bu.disabled = int(SaveManager.data.get("cores", 0)) < SaveManager.GEAR_UPGRADE_COST
 			bu.pressed.connect(func() -> void:
 				Audio.sfx("levelup" if SaveManager.gear_upgrade(uid) else "click"); _build_gear_slot(slot))

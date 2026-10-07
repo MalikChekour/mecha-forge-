@@ -45,20 +45,28 @@ func ui_theme() -> Theme:
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var k: float = clampf(minf(vp.x, vp.y) / 720.0, 0.85, 1.7)
 	var th: Theme = Theme.new()
-	var base: Color = Color(0.35, 0.62, 0.78)
+	# 05/10, refonte UI hologramme : theme bouton generique cyan+verre, remplace l'ancien gris plat.
+	var base: Color = Color(0.15, 0.85, 1.0)
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
-	sb.bg_color = Color(0.03, 0.06, 0.09, 0.82)
-	sb.set_corner_radius_all(0)
-	sb.border_color = base
+	sb.bg_color = Color(0.04, 0.08, 0.12, 0.85)
+	sb.set_corner_radius_all(int(8.0 * k))
+	sb.border_color = Color(base.r, base.g, base.b, 0.75)
 	sb.set_border_width_all(maxi(1, int(2.0 * k)))
+	sb.shadow_color = Color(base.r, base.g, base.b, 0.25)
+	sb.shadow_size = int(6.0 * k)
 	sb.content_margin_left = 16.0 * k; sb.content_margin_right = 16.0 * k
 	sb.content_margin_top = 9.0 * k; sb.content_margin_bottom = 9.0 * k
 	var hov: StyleBoxFlat = sb.duplicate()
 	hov.bg_color = Color(base.r * 0.30, base.g * 0.30, base.b * 0.30, 0.88)
+	hov.border_color = Color(base.r, base.g, base.b, 1.0)
+	hov.shadow_color = Color(base.r, base.g, base.b, 0.45)
+	hov.shadow_size = int(10.0 * k)
 	var pre: StyleBoxFlat = sb.duplicate()
 	pre.bg_color = Color(base.r * 0.48, base.g * 0.48, base.b * 0.48, 0.94)
+	pre.border_color = Color(1.0, 1.0, 1.0, 0.9)
 	var dis: StyleBoxFlat = sb.duplicate()
 	dis.bg_color = Color(0.05, 0.06, 0.08, 0.55); dis.border_color = Color(0.20, 0.25, 0.30)
+	dis.shadow_size = 0
 	th.set_stylebox("normal", "Button", sb)
 	th.set_stylebox("hover", "Button", hov)
 	th.set_stylebox("pressed", "Button", pre)

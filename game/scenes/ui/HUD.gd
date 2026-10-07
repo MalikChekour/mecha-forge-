@@ -31,6 +31,9 @@ var _xp_bg: ColorRect
 var _od_fill: ColorRect
 var _od_bg: ColorRect
 var _od_lbl: Label
+var _hp_lbl: Label      # libelle "VIE" a droite de la barre (rapport Manus 26/09, P1)
+var _xp_lbl: Label      # libelle "XP"
+var _bar_od_lbl: Label  # libelle "SURCHARGE" — nom distinct de _od_lbl ("SURCHARGE PRETE")
 var _od_btn: Button       # tactile trigger for Overdrive (mobile) — pulses when ready
 var _menu_btn: Button     # opens the in-run settings panel
 var _timer_lbl: Label
@@ -40,9 +43,40 @@ var _draft_root: Control
 var _card_btns: Array[Button] = []
 var _hurt: TextureRect    # red vignette — damage feedback + low-HP pulse
 var _stick: Control       # virtual move-stick ring (touch)
+var _aim_stick: Control   # virtual aim-stick ring (touch, right half of screen)
 var _bar_w: float = 360.0
 var _last_hp: float = -1.0
 var _hurt_flash: float = 0.0
+var _hp_overlay: Control   # 05/10, refonte UI hologramme : cadre + segments par-dessus la barre de vie
+var _hud_glass: Panel      # 05/10 : "verre depoli" derriere horloge + stats
+
+## Cadre holographique + decoupe en segments par-dessus la barre de vie (demande du patron, 05/10 :
+## "barre segmentee style tech/armure" au lieu d'un simple rectangle plein). Dessine PAR-DESSUS
+## _hp_bg/_hp_fill sans jamais toucher leur logique de remplissage (_update_hp() reste inchange,
+## continue de redimensionner _hp_fill.size.x) - un calque visuel en plus, rien d'autre. Meme astuce
+## de "faux glow" (polyligne repetee a alpha decroissante) que HudTabFrame dans MetaScreen.gd, mais
+## copiee ici plutot qu'importee : ce fichier a deja sa propre recette holographique independante
+## (_render_draft() plus bas), meme convention qu'avant.
+class HpSegments extends Control:
+	const ACCENT: Color = Color(0.15, 0.85, 1.0)
+	var segments: int = 8
+	func _draw() -> void:
+		var w: float = size.x
+		var h: float = size.y
+		if w <= 0.0 or h <= 0.0:
+			return
+		var pts: PackedVector2Array = PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w, h), Vector2(0, h), Vector2(0, 0)])
+		draw_polyline(pts, Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.18), 6.0)
+		draw_polyline(pts, Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.45), 3.0)
+		draw_polyline(pts, Color(ACCENT.r, ACCENT.g, ACCENT.b, 1.0), 1.4)
+		for i in range(1, segments):
+			var x: float = w * float(i) / float(segments)
+			draw_line(Vector2(x, 1.0), Vector2(x, h - 1.0), Color(0.0, 0.0, 0.0, 0.55), 2.0)
+		var cl: float = minf(7.0, minf(w, h) * 0.35)
+		draw_line(Vector2(0, cl), Vector2(0, 0), Color(1, 1, 1, 0.9), 2.0)
+		draw_line(Vector2(0, 0), Vector2(cl, 0), Color(1, 1, 1, 0.9), 2.0)
+		draw_line(Vector2(w - cl, h), Vector2(w, h), Color(1, 1, 1, 0.9), 2.0)
+		draw_line(Vector2(w, h), Vector2(w, h - cl), Color(1, 1, 1, 0.9), 2.0)
 
 ## Echelle d'interface commune (meme formule que Palette.fs / MetaScreen._ui_k).
 func _k() -> float:
@@ -92,6 +126,8 @@ func _process(delta: float) -> void:
 	_update_hurt(delta)
 	if _stick != null:
 		_stick.queue_redraw()
+	if _aim_stick != null:
+		_aim_stick.queue_redraw()
 
 ## RETOUR DE DEGATS. Constat des testeurs : « sur une douzaine de captures ou la vie tombe de
 ## 100 % a 8 %, aucune image ne me dit que j'encaisse ». L'onde de blessure existante est CYAN,
@@ -127,12 +163,38 @@ func _on_menu_pressed() -> void:
 	if player != null and "game" in player and player.game != null and player.game.has_method("show_settings"):
 		player.game.show_settings()
 
+## Meme recette holographique que _render_draft() plus bas (cyan neon, coins arrondis, halo) -
+## centralisee ici (05/10) pour que le cadre horloge/stats reste visuellement identique au reste.
+func _holo_style(bg_a: float = 0.85, corner: float = 10.0) -> StyleBoxFlat:
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.08, 0.12, bg_a)
+	sb.border_width_left = 2; sb.border_width_right = 2
+	sb.border_width_top = 2; sb.border_width_bottom = 2
+	sb.border_color = Color(0.15, 0.85, 1.0, 0.8)
+	sb.corner_radius_top_left = corner; sb.corner_radius_top_right = corner
+	sb.corner_radius_bottom_left = corner; sb.corner_radius_bottom_right = corner
+	sb.shadow_color = Color(0.15, 0.85, 1.0, 0.3)
+	sb.shadow_size = 10
+	return sb
+
 func _rect(parent: Node, col: Color) -> ColorRect:
 	var c: ColorRect = ColorRect.new()
 	c.color = col
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(c)
 	return c
+
+## Petit libelle nomme une barre du bandeau (VIE/XP/SURCHARGE) — position calculee en _relayout.
+func _bar_label(txt: String, col: Color) -> Label:
+	var l: Label = Label.new()
+	l.text = txt
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	l.add_theme_constant_override("outline_size", 4)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(l)
+	return l
 
 ## Vignette radiale rouge, sans shader : un GradientTexture2D en remplissage radial,
 ## transparent au centre et opaque sur les bords.
@@ -170,10 +232,20 @@ func _build() -> void:
 	_topbar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_hp_bg = _rect(_root, Color(0.22, 0.05, 0.05, 0.9))
 	_hp_fill = _rect(_root, Color(0.92, 0.26, 0.2, 1))
+	_hp_overlay = HpSegments.new()
+	_hp_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_hp_overlay)
 	_xp_bg = _rect(_root, Color(0.05, 0.12, 0.2, 0.9))
 	_xp_fill = _rect(_root, Color(0.15, 0.85, 1, 1))
 	_od_bg = _rect(_root, Color(0.22, 0.14, 0.03, 0.9))
 	_od_fill = _rect(_root, Color(1.0, 0.72, 0.16, 1))
+
+	# 🚨 Rapport de test Manus (26/09, P1) : « le joueur doit deduire qu'une barre correspond a
+	# la vie, une autre a l'XP et une autre probablement a une energie » — les 3 barres du
+	# bandeau n'etaient jamais nommees. Un mot court a droite de chacune, pas une refonte.
+	_hp_lbl = _bar_label("VIE", Color(1.0, 0.55, 0.5))
+	_xp_lbl = _bar_label("XP", Color(0.55, 0.9, 1.0))
+	_bar_od_lbl = _bar_label("SURCHARGE", Color(1.0, 0.82, 0.4))
 
 	_od_lbl = Label.new()
 	_od_lbl.add_theme_color_override("font_color", Color(1, 0.78, 0.25))
@@ -183,6 +255,13 @@ func _build() -> void:
 	_od_lbl.visible = false
 	_od_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_od_lbl)
+
+	# 05/10, refonte UI hologramme : conteneur "verre depoli" derriere horloge+stats, cree AVANT
+	# les 2 labels pour etre plus bas dans l'ordre des enfants (= dessine derriere, jamais dessus).
+	_hud_glass = Panel.new()
+	_hud_glass.add_theme_stylebox_override("panel", _holo_style(0.5, 8.0))
+	_hud_glass.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_hud_glass)
 
 	_timer_lbl = Label.new()
 	_timer_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -227,6 +306,14 @@ func _build() -> void:
 	_stick.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_stick)
+
+	# --- anneau du stick de visee (patron, 25/09) : meme logique, cote droit de l'ecran ---
+	var ar: AimStickRing = AimStickRing.new()
+	ar.hud = self
+	_aim_stick = ar
+	_aim_stick.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_aim_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_aim_stick)
 
 	# --- SURCHARGE : gros bouton ancre EN BAS A DROITE ---
 	# Deux testeurs sur quatre l'ont dit illisible alors que c'est la SEULE action manuelle
@@ -284,6 +371,9 @@ func _relayout() -> void:
 	_hp_bg.size = Vector2(_bar_w, hp_h)
 	_hp_fill.position = _hp_bg.position
 	_hp_fill.size = Vector2(_bar_w, hp_h)
+	_hp_overlay.position = _hp_bg.position
+	_hp_overlay.size = _hp_bg.size
+	_hp_overlay.queue_redraw()
 	_xp_bg.position = Vector2(pad, top + hp_h + gap)
 	_xp_bg.size = Vector2(_bar_w, xp_h)
 	_xp_fill.position = _xp_bg.position
@@ -292,6 +382,19 @@ func _relayout() -> void:
 	_od_bg.size = Vector2(_bar_w, od_h)
 	_od_fill.position = _od_bg.position
 	_od_fill.size = Vector2(0, od_h)
+
+	# libelles a droite de chaque barre — memes lignes, meme hauteur que leur barre respective.
+	# Largeur dispo calculee jusqu'au bord ecran (pas une largeur fixe) : jamais de debordement
+	# meme sur un telephone etroit ou _bar_w mange deja 56 % de la largeur en portrait.
+	var lbl_x: float = pad + _bar_w + 8.0 * k
+	var lbl_fs: float = maxf(10.0, 11.0 * k)
+	var lbl_w: float = maxf(40.0, vp.x - lbl_x - pad)
+	for pair in [[_hp_lbl, _hp_bg], [_xp_lbl, _xp_bg], [_bar_od_lbl, _od_bg]]:
+		var lbl: Label = pair[0]
+		var bg: ColorRect = pair[1]
+		lbl.add_theme_font_size_override("font_size", lbl_fs)
+		lbl.position = Vector2(lbl_x, bg.position.y - (lbl_fs - bg.size.y) * 0.5)
+		lbl.size = Vector2(lbl_w, maxf(bg.size.y, lbl_fs))
 
 	# OPTIONS : ancre en haut a DROITE, cible tactile >= 48 dp
 	var mb: Vector2 = Vector2(maxf(118.0, 134.0 * k), maxf(48.0, 44.0 * k))
@@ -323,6 +426,13 @@ func _relayout() -> void:
 		_timer_lbl.size = Vector2(mid_w, 0)
 		_stat_lbl.position = Vector2(mid_x, top + float(Palette.fs(24)) * 1.15)
 		_stat_lbl.size = Vector2(mid_w, 0)
+	var glass_pad: float = 6.0 * k
+	var th: float = float(Palette.fs(24)) * 1.22
+	var sh: float = float(Palette.fs(14)) * 1.35
+	var glass_w: float = (vp.x * 0.6) if portrait else mid_w
+	var glass_x: float = ((vp.x - glass_w) * 0.5) if portrait else mid_x
+	_hud_glass.position = Vector2(glass_x - glass_pad, _timer_lbl.position.y - glass_pad * 0.5)
+	_hud_glass.size = Vector2(glass_w + glass_pad * 2.0, th + sh + glass_pad)
 	# « SURCHARGE PRETE » va a GAUCHE sous les barres, le protocole occupe la ligne suivante
 	_od_lbl.position = Vector2(pad, cur)
 	cur += float(Palette.fs(14)) * 1.35
@@ -382,9 +492,27 @@ func _render_draft() -> void:
 	var row_gap: float = 12.0 * k
 	var mar: float = 20.0 * k
 
-	var panel: ColorRect = ColorRect.new()
-	panel.color = Color(0.06, 0.08, 0.14, 0.97)
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	# 1. Full-screen blur overlay
+	var bg_blur: ColorRect = ColorRect.new()
+	bg_blur.material = ShaderMaterial.new()
+	bg_blur.material.shader = load("res://shaders/ui_blur.gdshader")
+	bg_blur.color = Color.WHITE
+	bg_blur.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg_blur.mouse_filter = Control.MOUSE_FILTER_STOP
+	_draft_root.add_child(bg_blur)
+
+	# 2. Holographic panel for the draft
+	var panel: Panel = Panel.new()
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.08, 0.12, 0.85)
+	sb.border_width_left = 2; sb.border_width_right = 2
+	sb.border_width_top = 2; sb.border_width_bottom = 2
+	sb.border_color = Color(0.15, 0.85, 1.0, 0.8) # Neon cyan border
+	sb.corner_radius_top_left = 12; sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_left = 12; sb.corner_radius_bottom_right = 12
+	sb.shadow_color = Color(0.15, 0.85, 1.0, 0.3)
+	sb.shadow_size = 15
+	panel.add_theme_stylebox_override("panel", sb)
 	_draft_root.add_child(panel)
 
 	var vb: VBoxContainer = VBoxContainer.new()
@@ -402,15 +530,35 @@ func _render_draft() -> void:
 	for i in cards.size():
 		var b: Button = Button.new()
 		var is_evo: bool = bool(cards[i].get("evo", false))
+		var is_hybrid: bool = bool(cards[i].get("hybrid", false))
 		b.text = ("BANNIR : " if _banish_mode else "") + String(cards[i].get("name", "?"))
 		b.custom_minimum_size = Vector2(0, row_h)
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.add_theme_font_size_override("font_size", Palette.fs(17))
+		
+		# Holographic card styling
+		var btn_sb: StyleBoxFlat = StyleBoxFlat.new()
+		btn_sb.bg_color = Color(0.02, 0.05, 0.1, 0.7)
+		btn_sb.border_width_left = 1; btn_sb.border_width_right = 1
+		btn_sb.border_width_top = 1; btn_sb.border_width_bottom = 1
+		btn_sb.border_color = Color(0.2, 0.6, 0.8, 0.4)
+		btn_sb.corner_radius_top_left = 4; btn_sb.corner_radius_bottom_right = 4
+		b.add_theme_stylebox_override("normal", btn_sb)
+		
+		var btn_sb_hover: StyleBoxFlat = btn_sb.duplicate()
+		btn_sb_hover.bg_color = Color(0.1, 0.25, 0.4, 0.8)
+		btn_sb_hover.border_color = Color(0.15, 0.85, 1.0, 1.0)
+		btn_sb_hover.shadow_color = Color(0.15, 0.85, 1.0, 0.5)
+		btn_sb_hover.shadow_size = 8
+		b.add_theme_stylebox_override("hover", btn_sb_hover)
+		b.add_theme_stylebox_override("pressed", btn_sb_hover)
 		if is_evo and not _banish_mode:
 			b.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))   # gold evolution
+		elif is_hybrid and not _banish_mode:
+			b.add_theme_color_override("font_color", Color(0.75, 0.5, 1.0))   # violet fusion hybride
 		var idx: int = i
 		if _banish_mode:
-			b.disabled = is_evo   # evolutions can't be banished
+			b.disabled = is_evo or is_hybrid   # evolutions/fusions can't be banished
 			b.pressed.connect(func() -> void: banish_requested.emit(idx))
 		else:
 			b.pressed.connect(func() -> void: _pick(idx))
@@ -483,3 +631,25 @@ class StickRing extends Control:
 		draw_arc(o, r, 0.0, TAU, 48, Color(0.55, 0.85, 1.0, 0.55), 3.0, true)
 		draw_circle(o + v * r, r * 0.36, Color(0.65, 0.9, 1.0, 0.40))
 		draw_arc(o + v * r, r * 0.36, 0.0, TAU, 32, Color(0.8, 0.95, 1.0, 0.85), 3.0, true)
+
+## Anneau du stick de visee manuelle (patron, 25/09 : "orienter la visee manuellement en
+## ajoutant un deuxieme joystick, meme si la visee est automatique"). Meme geometrie que
+## StickRing mais teinte chaude (orange), pour le distinguer du stick de deplacement (bleu) au
+## premier coup d'oeil ; s'illumine encore plus fort pendant que le override manuel est actif
+## (Player._aim_stick_active) pour confirmer que le doigt prend bien le pas sur l'auto-visee.
+class AimStickRing extends Control:
+	var hud: HUD
+	func _draw() -> void:
+		if hud == null or hud.player == null or not is_instance_valid(hud.player):
+			return
+		var p: Player = hud.player
+		if p._aim_stick_id == -1:
+			return
+		var o: Vector2 = p._aim_stick_origin
+		var v: Vector2 = p._aim_stick_vec
+		var r: float = 80.0
+		var a: float = 0.85 if p._aim_stick_active else 0.45   # brighter once past the deadzone
+		draw_circle(o, r, Color(1.0, 0.55, 0.3, 0.10 * a))
+		draw_arc(o, r, 0.0, TAU, 48, Color(1.0, 0.65, 0.35, 0.6 * a), 3.0, true)
+		draw_circle(o + v * r, r * 0.36, Color(1.0, 0.7, 0.4, 0.40 * a))
+		draw_arc(o + v * r, r * 0.36, 0.0, TAU, 32, Color(1.0, 0.8, 0.5, 0.9 * a), 3.0, true)

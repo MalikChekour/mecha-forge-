@@ -10,10 +10,17 @@ var visuals_hidden: bool = false
 const WEAPON_ORDER: Array[String] = ["autocannon", "missilepod", "railgun", "plasma", "sabre",
 	"disperseur", "ricochet", "disque", "faisceau",
 	"vulcan", "hydra", "annihilator", "singularity", "tempest",
-	"deflagrateur", "carambole", "guillotine", "rayon_spectre"]
+	"deflagrateur", "carambole", "guillotine", "rayon_spectre",
+	"rail_nova", "frelon"]
 const MAX_LEVEL: int = 5   # a weapon at MAX + its required passive can EVOLVE
 const EVOLVED: Array[String] = ["vulcan", "hydra", "annihilator", "singularity", "tempest",
 	"deflagrateur", "carambole", "guillotine", "rayon_spectre"]
+## HYBRIDES (plan de refonte, 29/09) : fusion de DEUX armes de base MAX (WeaponSystem.merge_weapons,
+## Game.HYBRID_RULES) plutot qu'evolution d'une seule. Paires choisies pour que les 7 chassis a
+## arsenal restreint (GameState.MECHS) aient chacun acces a AU MOINS une hybridation :
+## rail_nova (railgun+plasma) couvre VORTEX/TITAN/BRUISER/PYLONE/CERCLIER ; frelon (missilepod+
+## ricochet) couvre BLUESTRIKE/VANQUISHER.
+const HYBRID: Array[String] = ["rail_nova", "frelon"]
 
 # FAISCEAU : pas de projectile — un rayon continu qui balaie (voir _do_beam).
 # portee = longueur du rayon, demi_largeur = tolerance laterale du couloir touche.
@@ -25,7 +32,7 @@ const BEAM: Dictionary = {
 const SPREAD: Dictionary = {"disperseur": 38.0, "deflagrateur": 46.0}
 # duree de vie du projectile : c'est elle qui donne la PORTEE COURTE de la gerbe.
 const LIFE: Dictionary = {"disperseur": 0.34, "deflagrateur": 0.40, "disque": 1.7, "guillotine": 2.0}
-const BOUNCES: Dictionary = {"ricochet": 3, "carambole": 6}
+const BOUNCES: Dictionary = {"ricochet": 3, "carambole": 6, "frelon": 3}
 const BOOMERANG: Array[String] = ["disque", "guillotine"]
 # MELEE forms: no projectile — they sweep an arc around the mech (see _do_melee).
 # reach = radius, arc = full sweep angle. Tempest is the evolution: a full 360° storm.
@@ -50,6 +57,7 @@ const COOLDOWNS: Dictionary = {
 	"deflagrateur": 0.72, "carambole": 0.58, "guillotine": 0.80, "rayon_spectre": 0.42,
 	"vulcan": 0.12, "hydra": 0.66, "annihilator": 0.85, "singularity": 0.66,
 	"sabre": 0.5, "tempest": 0.42,
+	"rail_nova": 0.95, "frelon": 0.80,
 }
 
 const BASE_MULT: Dictionary = {
@@ -58,6 +66,7 @@ const BASE_MULT: Dictionary = {
 	"deflagrateur": 0.50, "carambole": 1.40, "guillotine": 1.7, "rayon_spectre": 1.0,
 	"vulcan": 1.5, "hydra": 1.9, "annihilator": 3.2, "singularity": 2.0,
 	"sabre": 1.7, "tempest": 2.6,   # melee: hits every foe in the arc, but you must be in their face
+	"rail_nova": 1.8, "frelon": 1.35,
 }
 
 const COLORS: Dictionary = {
@@ -70,6 +79,8 @@ const COLORS: Dictionary = {
 	"vulcan": Color(1.0, 0.85, 0.3), "hydra": Color(1.0, 0.5, 0.2),
 	"annihilator": Color(0.55, 0.92, 1.0), "singularity": Color(0.85, 0.4, 1.0),
 	"sabre": Color(0.35, 0.95, 1.0), "tempest": Color(0.6, 1.0, 1.0),   # incandescent cyan blade
+	"rail_nova": Color(0.5, 0.6, 1.0),    # cyan (railgun) + violet (plasma)
+	"frelon": Color(0.85, 0.8, 0.3),      # orange (missilepod) + vert (ricochet)
 }
 
 const SPEEDS: Dictionary = {
@@ -77,6 +88,7 @@ const SPEEDS: Dictionary = {
 	"disperseur": 760.0, "ricochet": 700.0, "disque": 620.0,
 	"deflagrateur": 800.0, "carambole": 760.0, "guillotine": 700.0,
 	"vulcan": 950.0, "hydra": 500.0, "annihilator": 1800.0, "singularity": 560.0,
+	"rail_nova": 950.0, "frelon": 600.0,
 }
 
 const PIERCE: Dictionary = {
@@ -84,11 +96,13 @@ const PIERCE: Dictionary = {
 	"disperseur": 0, "ricochet": 0, "disque": 20,
 	"deflagrateur": 1, "carambole": 0, "guillotine": 30,
 	"vulcan": 2, "hydra": 0, "annihilator": 30, "singularity": 0,
+	"rail_nova": 4,
 }
 
 const HOMING: Dictionary = {
 	"autocannon": false, "missilepod": true, "railgun": false, "plasma": false,
 	"vulcan": false, "hydra": true, "annihilator": false, "singularity": false,
+	"frelon": true,
 }
 
 # DARK-PREMIUM per-weapon MUZZLE/CAST effect (id -> [vfx_id, scale]). Each weapon spawns ITS OWN
@@ -102,12 +116,15 @@ const MUZZLE_FX: Dictionary = {
 	"faisceau": ["aaa_charge", 0.5], "rayon_spectre": ["aaa_charge", 0.62],
 	"railgun": ["aaa_muzzle", 0.44], "annihilator": ["aaa_muzzle", 0.56],# electric forward flash
 	"plasma": ["aaa_charge", 0.4], "singularity": ["aaa_charge", 0.52],  # plasma charge bloom
+	"rail_nova": ["aaa_muzzle", 0.62], "frelon": ["fire_blast", 0.42],
 }
 
 const AOE: Dictionary = {
 	"missilepod": 60.0, "plasma": 74.0,
 	"deflagrateur": 34.0,
 	"hydra": 80.0, "singularity": 130.0,
+	"rail_nova": 55.0,   # perce (railgun) + explose a chaque ennemi perce (plasma) — combinaison
+	                     # deja eprouvee en prod par deflagrateur (aoe+pierce simultanes)
 }
 
 const MULTISHOT: Dictionary = {   # projectiles fired per shot, spread around aim
@@ -211,6 +228,25 @@ func replace_weapon(old_id: String, new_id: String) -> void:
 	_install(new_id, slot, is_primary)
 	_weapons[new_id]["level"] = MAX_LEVEL   # an evolved weapon starts strong
 
+## FUSION (plan de refonte, 29/09) : combine DEUX armes de base MAX en une seule arme hybride,
+## calquee sur replace_weapon() mais liberant les DEUX slots d'origine pour n'en reinstaller
+## qu'UN SEUL (id_a) — libere donc un slot actif net, contrairement a une evolution (1-pour-1).
+func merge_weapons(id_a: String, id_b: String, new_id: String) -> void:
+	if not _weapons.has(id_a) or not _weapons.has(id_b) or _weapons.has(new_id):
+		return
+	var wa: Dictionary = _weapons[id_a]
+	var slot: int = int(wa.get("slot", 0))
+	var is_primary: bool = bool(wa.get("is_primary", slot == 0))
+	for old_id in [id_a, id_b]:
+		var w: Dictionary = _weapons[old_id]
+		for k in ["sprite", "shadow", "muzzle"]:
+			var n: Variant = w.get(k)
+			if n != null:
+				(n as Node).queue_free()
+		_weapons.erase(old_id)
+	_install(new_id, slot, is_primary)
+	_weapons[new_id]["level"] = MAX_LEVEL   # une arme hybride demarre a pleine puissance
+
 ## ------- EMPRUNT TEMPORAIRE "BUTIN DE GUERRE" (patron, 23/09) -------------------------------
 ## Un boss tue laisse une arme a emprunter quelques secondes, pleine puissance. Reutilise
 ## replace_weapon() TEL QUEL — le chemin deja eprouve par l'evolution, aucune nouvelle
@@ -264,6 +300,8 @@ static func _asset_path(id: String) -> String:
 		"ricochet", "carambole": return "res://assets/weapons/missilepod.png"
 		"disque", "guillotine": return "res://assets/weapons/railgun.png"
 		"faisceau", "rayon_spectre": return "res://assets/weapons/plasmacaster.png"
+		"rail_nova": return "res://assets/weapons/railgun.png"
+		"frelon": return "res://assets/weapons/missilepod.png"
 		_: return "res://assets/weapons/%s.png" % id
 
 func _create_sprite(id: String, is_primary: bool) -> Sprite2D:
@@ -282,6 +320,9 @@ func _create_sprite(id: String, is_primary: bool) -> Sprite2D:
 		s.scale = Vector2(0.5, 0.5)
 	if EVOLVED.has(id):
 		s.self_modulate = Color(1.7, 1.4, 0.6)   # evolved weapons glow gold
+		s.scale *= 1.15
+	elif HYBRID.has(id):
+		s.self_modulate = Color(1.5, 0.9, 1.7)   # hybrid weapons glow violet — distinct de l'or evolue
 		s.scale *= 1.15
 	else:
 		s.self_modulate = Color(1.3, 1.35, 1.5)
@@ -302,9 +343,10 @@ func _create_shadow_sprite(weapon_sprite: Sprite2D) -> Sprite2D:
 func _create_muzzle_sprite(id: String) -> Sprite2D:
 	var muzzle: Sprite2D = Sprite2D.new()
 	var color: Color = _col(id)
-	var tex: Texture2D = Tex.glow(color, 40)
+	var tex: Texture2D = Tex.muzzle_tex()
 	muzzle.texture = tex
-	muzzle.scale = Vector2(0.45, 0.45)
+	muzzle.offset = Vector2(tex.get_width() * 0.35, 0)
+	muzzle.scale = Vector2(0.8, 0.7)
 	muzzle.modulate = Color(0.2, 0.2, 0.2)
 	muzzle.z_index = 7
 	var mat: CanvasItemMaterial = CanvasItemMaterial.new()
@@ -472,6 +514,11 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 	var dmg_mult: float = float(BASE_MULT.get(id, 1.0)) * (1.0 + (lvl - 1) * 0.25)
 	if id == _sig:
 		dmg_mult *= SIG_DMG      # arme signature du chassis
+	# VORTEX "aligner" (plan de differenciation, prototype B — valide 26/09) : +6%/pile jusqu'a
+	# 5 (chaine d'alignement, cf. Player.align_dmg_mult/vortex_align_stack). No-op a 1.0 pour les
+	# 4 autres chassis (les piles ne s'accumulent que si base_chassis == "vortex", cf. Player).
+	if _player.has_method("align_dmg_mult"):
+		dmg_mult *= _player.align_dmg_mult()
 	# VFX grow with the weapon's level so every level-up is visibly stronger — the addictive part.
 	# Each weapon grows the way that fits it: AoE weapons blast WIDER, and every weapon's muzzle,
 	# bolt and impact scale up together (see fx_scale flowing through the projectile to impact_fx).
@@ -487,6 +534,7 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		fired.emit(muzzle_world)
 		return
 	var pspeed: float = float(_player.proj_speed_mult) if "proj_speed_mult" in _player else 1.0
+	pspeed *= float(_player.biome_proj_speed) if "biome_proj_speed" in _player else 1.0   # Gravite faible
 	var psize: float = float(_player.size_mult) if "size_mult" in _player else 1.0
 	var params: Dictionary = {
 		"dmg": base_dmg * dmg_mult,
@@ -501,6 +549,10 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		"life": float(LIFE.get(id, 2.0)),                    # portee courte de la gerbe
 		"bounces": int(BOUNCES.get(id, 0)),                  # ricochet
 		"boomerang": BOOMERANG.has(id),                      # disque
+		# plan de differenciation des chassis (26/09) : identite du tireur, lue par
+		# Projectile pour VORTEX (chaine d'alignement) et par Enemy.take_damage pour
+		# BRUISER (piles de brisure) — vide et sans effet pour les 3 autres chassis.
+		"chassis": String(_player.base_chassis) if "base_chassis" in _player else "",
 	}
 	if AOE.has(id):
 		# blast radius grows with level: an AoE weapon LITERALLY covers more ground each level.
@@ -518,6 +570,11 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		var a0: float = aim.angle() - spread * (count - 1) * 0.5
 		for i in count:
 			game.spawn_shot(muzzle_world, Vector2.from_angle(a0 + spread * i), params)
+	# VANQUISHER "diviser le feu" (prototype E) : NE touche rien au flux ci-dessus, ajoute juste
+	# un second tir independant apres coup — uniquement sur sa signature, pour ne rien changer
+	# aux 4 autres chassis (voir _vanquisher_second_shot pour le detail du ciblage).
+	if id == _sig and _sig == "ricochet" and "base_chassis" in _player and _player.base_chassis == "vanquisher":
+		_vanquisher_second_shot(muzzle_world, aim, params, game)
 	# each weapon casts its OWN dark-premium effect (distinct shape + its accent colour).
 	# For a TIP-anchored arm-cannon (VORTEX) the flash is the LOCAL child sprite that stays glued to
 	# the moving mech; a world-space bloom here would be left behind while walking (the "décalage"),
@@ -535,6 +592,42 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		game.spawn_vfx(String(mfx[0]), muzzle_world + aim * 10.0, rot, float(mfx[1]) * fx_scale, acc)
 	fired.emit(muzzle_world)
 
+## VANQUISHER "diviser le feu" : cible un ennemi HORS de l'axe du tir principal quand possible
+## (diviser le feu, pas juste doubler les degats dans la meme direction) ; a defaut, le plus
+## proche dans la portee ; a defaut de tout, le meme axe que le tir principal — les deux canons
+## tirent toujours, meme si un seul point est menace pour l'instant.
+const VANQUISHER_2ND_DMG: float = 0.4       # specialiste : 35-50%
+const VANQUISHER_2ND_RANGE: float = 480.0   # specialiste : "ciblage automatique limite a une distance"
+
+func _vanquisher_second_shot(muzzle_world: Vector2, main_aim: Vector2, params: Dictionary, game: Node) -> void:
+	var ppos: Vector2 = Vector2(_player.global_position)
+	var range_sq: float = VANQUISHER_2ND_RANGE * VANQUISHER_2ND_RANGE
+	var off_axis: Node2D = null
+	var off_axis_d: float = range_sq
+	var closest: Node2D = null
+	var closest_d: float = range_sq
+	for e in _player.get_tree().get_nodes_in_group("enemies"):
+		if not (e is Enemy) or not (e as Enemy).alive:
+			continue
+		var to: Vector2 = (e as Node2D).global_position - ppos
+		var d: float = to.length_squared()
+		if d >= range_sq:
+			continue
+		if d < closest_d:
+			closest_d = d
+			closest = e
+		if to.length() > 1.0 and to.normalized().dot(main_aim) < 0.85 and d < off_axis_d:
+			off_axis_d = d
+			off_axis = e
+	var target: Node2D = off_axis if off_axis != null else closest
+	var aim2: Vector2 = main_aim
+	if target != null:
+		aim2 = ((target as Node2D).global_position - muzzle_world).normalized()
+	var p2: Dictionary = params.duplicate()
+	p2["dmg"] = float(params.get("dmg", 0.0)) * VANQUISHER_2ND_DMG
+	p2["color"] = Color(params.get("color", Color.WHITE)).lightened(0.35)   # tracant distinct
+	game.spawn_shot(muzzle_world, aim2, p2)
+
 ## FAISCEAU : un rayon continu part de la bouche vers la visee et touche TOUT ce qui se
 ## trouve dans un couloir etroit, jusqu'a sa portee. C'est l'archetype "laser" qui manquait :
 ## pas de projectile a esquiver, mais il faut rester aligne sur la cible.
@@ -542,6 +635,14 @@ func _do_beam(id: String, dmg: float, game: Node, muzzle: Vector2, fx_scale: flo
 	var d: Dictionary = BEAM[id]
 	var reach: float = float(d["portee"])
 	var half: float = float(d["demi_largeur"])
+	# PYLONE (27/09) : ancrage immobile -> Faisceau UNIQUEMENT, portee + trait plus net.
+	# 🚨 jamais toucher `dmg` ici : "signaler l'activation, pas inventer un pouvoir" (deja
+	# la regle retenue cette session pour Surcharge) s'applique pareil a l'ancrage.
+	var _pylone_anchored: bool = "base_chassis" in _player and String(_player.base_chassis) == "pylone" \
+		and "anchored" in _player and bool(_player.anchored)
+	if id == "faisceau" and _pylone_anchored:
+		reach *= 1.35
+		half *= 0.6
 	var aim: Vector2 = Vector2.RIGHT
 	if "aim_dir" in _player:
 		aim = Vector2(_player.aim_dir)
@@ -561,7 +662,7 @@ func _do_beam(id: String, dmg: float, game: Node, muzzle: Vector2, fx_scale: flo
 			continue
 		var is_crit: bool = randf() < cc
 		var hit: float = dmg * (cm if is_crit else 1.0)
-		(e as Enemy).take_damage(hit)
+		(e as Enemy).take_damage(hit, String(_player.base_chassis) if "base_chassis" in _player else "", id)
 		Events.damage_dealt.emit((e as Node2D).global_position, int(hit), is_crit)
 	# --- RENDU : un COMPOSITE, jamais un trait ------------------------------------
 	# Le rayon est une PLANCHE ANIMEE etiree sur toute sa longueur (elle vit et scintille
@@ -626,7 +727,7 @@ func _do_melee(id: String, dmg: float, game: Node) -> void:
 			continue
 		var is_crit: bool = randf() < crit_chance
 		var out: float = dmg * (crit_mult if is_crit else 1.0)
-		(e as Enemy).take_damage(out)
+		(e as Enemy).take_damage(out, String(_player.base_chassis) if "base_chassis" in _player else "", id)
 		Events.damage_dealt.emit(ep, int(out), is_crit)
 		if is_crit:
 			Audio.sfx("crit", 0.1)

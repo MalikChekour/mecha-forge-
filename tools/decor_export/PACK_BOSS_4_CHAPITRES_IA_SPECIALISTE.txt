@@ -1,0 +1,216 @@
+===============================================================================
+PACK DE GENERATION D'IMAGES — 4 BOSS DE JEU "MECHA-FORGE"
+Destine a une IA specialiste en generation d'images. Lire ENTIEREMENT avant de
+generer quoi que ce soit : les regles ci-dessous s'appliquent a CHACUNE des
+16 images demandees plus bas (4 boss x 4 orientations).
+===============================================================================
+
+CONTEXTE
+--------
+Ce sont des sprites de PERSONNAGES (boss de fin de niveau) pour un jeu video 2D
+vu de dessus (top-down), style action/arcade. Chaque boss est un mecha/creature
+imposant, affronte par le joueur a la fin d'un niveau. Chaque image sera
+integree telle quelle dans le moteur du jeu, redimensionnee automatiquement,
+sans retouche manuelle possible derriere.
+
+IMPORTANT - POURQUOI 4 IMAGES FIXES PAR BOSS (PAS UNE ANIMATION) : le moteur
+accepte soit une bande d'animation (plusieurs poses de marche alignees dans un
+seul fichier), soit une simple image fixe par orientation. Une bande
+d'animation generee par IA produit presque toujours des poses incoherentes
+entre elles (personnage qui change de forme/taille d'une case a l'autre) et
+rend le sprite inutilisable. On demande donc ICI une image FIXE par
+orientation (une pose "prete au combat", pas en train de marcher) : c'est
+beaucoup plus fiable a generer correctement du premier coup.
+
+===============================================================================
+REGLES TECHNIQUES OBLIGATOIRES (lire avant chaque generation)
+===============================================================================
+
+1. FORMAT DE SORTIE
+   - PNG avec une VRAIE couche alpha transparente (transparence native du
+     fichier), PAS un damier gris/blanc dessine, PAS un fond blanc uni, PAS un
+     fond d'une autre couleur unie. Le fond doit etre réellement transparent
+     au sens informatique du terme (canal alpha = 0 autour du sujet).
+   - Resolution CARREE obligatoire (largeur == hauteur exactement), minimum
+     768x768, idealement 1024x1024. Une image non carree sera rejetee par le
+     moteur (l'orientation ne serait pas lisible correctement).
+   - Jamais de JPG (pas de transparence possible dans ce format).
+
+2. CADRAGE ET COMPOSITION
+   - UN SEUL personnage par image. Jamais de scene, jamais de decor, jamais
+     d'arriere-plan, jamais d'autre personnage ou allie dans le cadre.
+   - Le personnage doit etre CENTRE dans le cadre, debout/pose de combat
+     neutre (PAS en train d'attaquer, PAS a mi-mouvement de marche), avec une
+     marge vide d'environ 10-15% de chaque cote. Ne jamais laisser le
+     personnage toucher ou depasser les bords de l'image.
+   - PAS de texte, PAS de watermark, PAS de signature, PAS de logo, PAS
+     d'interface (pas de barre de vie, pas de HUD).
+   - PAS d'ombre portee dessinee sous le personnage (le moteur de jeu ajoute
+     sa propre ombre automatiquement).
+
+3. LES 4 ORIENTATIONS — chaque boss a besoin des 4 vues suivantes, TOUJOURS LA
+   MEME POSE DE COMBAT NEUTRE, seule l'orientation du corps change (comme un
+   personnage qui pivote sur place, vu depuis une camera fixe en leger
+   plongee/top-down) :
+   - "front"  : le personnage fait FACE a la camera (on voit son torse/visage)
+   - "back"   : le personnage tourne le DOS a la camera (on voit son dos)
+   - "left"   : le personnage est vu de PROFIL, oriente vers la GAUCHE
+   - "right"  : le personnage est vu de PROFIL, oriente vers la DROITE
+   Gardez la MEME echelle, la MEME silhouette generale et le MEME niveau de
+   detail sur les 4 images d'un meme boss — ce sont 4 vues du MEME personnage,
+   pas 4 personnages differents.
+
+4. STYLE VISUEL A RESPECTER SUR TOUTES LES IMAGES
+   - Rendu "concept-art peint numeriquement", PAS photorealiste, PAS
+     cartoon/chibi, PAS pixel-art.
+   - Eclairage directionnel doux venant du HAUT-GAUCHE.
+   - Silhouette tres nette et lisible, meme en petit (le sprite sera affiche a
+     taille reduite en jeu) : evitez les details fins qui disparaitraient en
+     miniature, privilegiez une silhouette de BOSS massive et imposante,
+     clairement plus grande/plus menacante qu'un ennemi normal.
+   - Finition "science-fiction industrielle" : metal, panneaux, rivets,
+     lumieres neon/emissives selon la couleur precisee dans chaque prompt.
+
+5. COULEURS — respecter STRICTEMENT la palette indiquee dans chaque prompt :
+   c'est l'identite visuelle du biome dont ce boss est le gardien final.
+
+6. NOMMAGE DES FICHIERS EN SORTIE — nommer chaque image exactement comme
+   indique entre crochets [nom_fichier.png] au debut de chaque prompt.
+
+===============================================================================
+LES 4 BOSS x 4 ORIENTATIONS = 16 IMAGES A GENERER
+===============================================================================
+
+-------------------------------------------------------------------------------
+BOSS 1/4 — "LE CRYARQUE" — gardien de la Zone Cryo (laboratoire cryogenique)
+Palette : bleu glace / blanc, accents cyan electrique
+-------------------------------------------------------------------------------
+Description commune aux 4 vues : a massive frost-armored mech boss, towering
+and imposing, pale blue-white metal plating covered in frost rime and thin
+ice crystal growths along the shoulders and back, glowing cyan energy core
+visible at the chest/center of the torso, thin wisps of cold mist leaking
+from joint vents, sharp angular ice-crystal spikes protruding from the
+shoulders like a crown, heavy armored legs built for a top-down action game.
+Neutral combat-ready standing pose, not mid-attack.
+
+--- [cryoboss_walk_front.png] — vue de FACE ---
+(description commune ci-dessus) Facing directly toward the camera.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [cryoboss_walk_back.png] — vue de DOS ---
+(description commune ci-dessus) Facing directly away from the camera, back
+turned to viewer.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [cryoboss_walk_left.png] — vue de PROFIL GAUCHE ---
+(description commune ci-dessus) Shown in full side profile, facing left.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [cryoboss_walk_right.png] — vue de PROFIL DROIT ---
+(description commune ci-dessus) Shown in full side profile, facing right.
+Single character, centered, pure transparent background, no shadow, no text.
+
+-------------------------------------------------------------------------------
+BOSS 2/4 — "LE FULGURANT" — gardien du Noyau Instable (reacteur en surchauffe)
+Palette : metal sombre, accents vert energie + orange avertissement
+-------------------------------------------------------------------------------
+Description commune aux 4 vues : a massive reactor-core mech boss, towering
+and imposing, dark industrial metal plating with black-and-orange warning
+stripes across the armor, a large glowing green energy core exposed at the
+center of the chest like a cracked reactor window, thin crackling green
+energy arcs running along the arms and shoulders, faint green light leaking
+from joint seams, heavy armored legs built for a top-down action game.
+Neutral combat-ready standing pose, not mid-attack.
+
+--- [reacteurboss_walk_front.png] — vue de FACE ---
+(description commune ci-dessus) Facing directly toward the camera.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [reacteurboss_walk_back.png] — vue de DOS ---
+(description commune ci-dessus) Facing directly away from the camera, back
+turned to viewer.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [reacteurboss_walk_left.png] — vue de PROFIL GAUCHE ---
+(description commune ci-dessus) Shown in full side profile, facing left.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [reacteurboss_walk_right.png] — vue de PROFIL DROIT ---
+(description commune ci-dessus) Shown in full side profile, facing right.
+Single character, centered, pure transparent background, no shadow, no text.
+
+-------------------------------------------------------------------------------
+BOSS 3/4 — "LA MATRIARCHE" — gardienne de la Ruche (chambre biomecanique)
+Palette : chitine sombre, accents violet/vert bioluminescent
+-------------------------------------------------------------------------------
+Description commune aux 4 vues : a massive insectoid hive-queen boss, towering
+and imposing, dark organic chitin-plated exoskeleton fused with mechanical
+armor segments, glowing purple-green bioluminescent veins pulsing just under
+the surface of the chitin, bioluminescent egg-sac-like pods clustered along
+the back, faintly glowing compound-eye-like clusters on the head, four
+powerful insectoid limbs built for a top-down action game, reads as a
+"mother of the hive" silhouette — wider and more organic than a pure mech.
+Neutral combat-ready standing pose, not mid-attack.
+
+--- [rucheboss_walk_front.png] — vue de FACE ---
+(description commune ci-dessus) Facing directly toward the camera.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [rucheboss_walk_back.png] — vue de DOS ---
+(description commune ci-dessus) Facing directly away from the camera, back
+turned to viewer.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [rucheboss_walk_left.png] — vue de PROFIL GAUCHE ---
+(description commune ci-dessus) Shown in full side profile, facing left.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [rucheboss_walk_right.png] — vue de PROFIL DROIT ---
+(description commune ci-dessus) Shown in full side profile, facing right.
+Single character, centered, pure transparent background, no shadow, no text.
+
+-------------------------------------------------------------------------------
+BOSS 4/4 — "L'ARCANGE" — gardien de la Citadelle Orbitale (Forge Finale)
+Palette : dore + bleu electrique, finition ceremonielle/premium
+-------------------------------------------------------------------------------
+Description commune aux 4 vues : a massive angelic-knight mech boss, the most
+majestic and imposing of the four, gleaming gold armor plating with electric
+blue glowing trim lines running along every edge, ornate ceremonial engravings
+across the chestplate, a radiant halo-like ring of soft blue energy floating
+behind the head/shoulders like a crown, large armored shoulder pieces shaped
+like folded mechanical wings, heavy armored legs built for a top-down action
+game, reads as the grandest, most regal boss of the four — final guardian of
+the campaign. Neutral combat-ready standing pose, not mid-attack.
+
+--- [citadelleboss_walk_front.png] — vue de FACE ---
+(description commune ci-dessus) Facing directly toward the camera.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [citadelleboss_walk_back.png] — vue de DOS ---
+(description commune ci-dessus) Facing directly away from the camera, back
+turned to viewer.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [citadelleboss_walk_left.png] — vue de PROFIL GAUCHE ---
+(description commune ci-dessus) Shown in full side profile, facing left.
+Single character, centered, pure transparent background, no shadow, no text.
+
+--- [citadelleboss_walk_right.png] — vue de PROFIL DROIT ---
+(description commune ci-dessus) Shown in full side profile, facing right.
+Single character, centered, pure transparent background, no shadow, no text.
+
+===============================================================================
+RECAPITULATIF — CE QUI FERA ECHOUER UNE IMAGE (a verifier avant de livrer)
+===============================================================================
+[ ] Image CARREE (largeur == hauteur exactement)
+[ ] Fond transparent reel (pas blanc, pas gris, pas un damier dessine)
+[ ] Un seul personnage, rien d'autre dans le cadre (pas de decor)
+[ ] Personnage centre avec de la marge, rien de coupe au bord
+[ ] Pose de combat neutre (PAS en train d'attaquer, PAS a mi-marche)
+[ ] Aucun texte, watermark, signature, logo, HUD
+[ ] Aucune ombre portee dessinee sous le personnage
+[ ] Les 4 vues d'un meme boss montrent BIEN LE MEME personnage (silhouette/
+    echelle/details coherents), seule l'orientation change
+[ ] Couleur/palette respectee pour ce boss
+[ ] Nom de fichier correct (16 fichiers au total : 4 boss x 4 orientations)
+===============================================================================

@@ -7,6 +7,7 @@ var level: int = 1
 var xp: int = 0
 var xp_to_next: int = 5
 var kills: int = 0
+var kills_by_weapon: Dictionary = {}   # weapon id -> kill count this run (evolution "kills" condition)
 var props_destroyed: int = 0   # decor broken this run (daily-quest tracking)
 var scrap: int = 0
 var run_xp_mult: float = 1.0     # passif +EXP (Koga Ninja Scroll) — reset chaque partie
@@ -40,6 +41,10 @@ var difficulty: int = 1       # index into DIFFICULTY (default NORMAL)
 # --- SANS FIN (endless) : the endboss stops being an ending and becomes a milestone. Waves keep
 # coming with a permanent escalation per wave; the run ends only when the player dies.
 var endless: bool = false
+## Banc headless `-- --mech=<id>` (Game.gd) : force un chassis EN MEMOIRE SEULEMENT, jamais ecrit
+## dans SaveManager.data (voir la note pres du parsing de l'argument -> ce champ a remplace une
+## 1ere version qui contaminait le vrai fichier de sauvegarde). "" = pas de forçage, cas normal.
+var debug_force_mech: String = ""
 var endless_wave: int = 0     # endbosses put down this run
 
 ## Set by REJOUER: the next scene load drops straight into a run instead of the hub. Deliberately
@@ -192,7 +197,34 @@ const MECHS: Array = [
 		"sig_muzzle": ["aaa_beam", 0.44],
 		"ligne": "SUPPRESSION CONTINUE — deux canons, aucun répit.",
 		"desc": "Chassis d'assaut à double canon et pod de missiles. Ne laisse jamais l'ennemi se regrouper."},
+	## PYLONE / CERCLIER (27/09, rapport "concepts visuels" — P2, apres differenciation des 5
+	## chassis ci-dessus, deja faite). RESKIN deliberement : reprennent les planches de titan/
+	## vanquisher (RENDER_CHASSIS plus bas) au lieu d'un nouveau bake Meshy — aucune depense
+	## d'image/3D IA sans validation prealable. Mecanique reelle propre a chacun malgre le
+	## sprite partage (voir Player.gd "pylone"/"cerclier" et Projectile.gd pour le disque).
+	{"id": "pylone", "name": "PYLÔNE", "cost": 1600,
+		"weapons": ["faisceau"], "hp": 28.0, "dmg": 1.05, "speed": 0.86, "crit": 0.05,
+		"arsenal": ["faisceau", "autocannon", "railgun", "plasma", "disque"],
+		"signature": "faisceau", "accent": Color(1.0, 0.78, 0.25),
+		"sig_muzzle": ["aaa_beam", 0.48],
+		"ligne": "ANCRAGE — immobile, le faisceau s'allonge et se resserre.",
+		"desc": "Tient un couloir a l'arret : rester immobile ~0,5s deploie l'ancrage, portee et precision du Faisceau augmentent. Bouger le rompt aussitot."},
+	{"id": "cerclier", "name": "CERCLIER", "cost": 1600,
+		"weapons": ["disque"], "hp": 18.0, "dmg": 1.08, "speed": 1.10, "crit": 0.12,
+		"arsenal": ["disque", "autocannon", "railgun", "plasma", "faisceau"],
+		"signature": "disque", "accent": Color(0.55, 1.0, 0.35),
+		"sig_muzzle": ["fire_blast", 0.40],
+		"ligne": "RELANCE — le premier retour du Disque repart une fois.",
+		"desc": "Chassis bas et circulaire. A son premier retour, le Disque peut repartir une fois vers une cible proche, a degats reduits."},
 ]
+
+## RESKIN (27/09) : id de MECHS -> chassis dont on reutilise les planches deja bakees (voir la
+## note ci-dessus). base_chassis (mecanique/sauvegarde) reste l'id reel ; SEUL le rendu visuel
+## est reroute ici. Un id absent de ce dict se rend avec ses propres planches (cas normal).
+const RENDER_CHASSIS: Dictionary = {
+	"pylone": "titan",
+	"cerclier": "vanquisher",
+}
 
 ## 🚨 CHASSIS ECARTES, et pourquoi — a lire avant d'en rajouter un.
 ## Le depot contient dix autres mechas. Verification faite CADRE PAR CADRE (8 images x 4
@@ -235,6 +267,7 @@ func reset() -> void:
 	xp = 0
 	xp_to_next = 5
 	kills = 0
+	kills_by_weapon = {}
 	props_destroyed = 0
 	scrap = 0
 	run_xp_mult = 1.0
@@ -281,8 +314,12 @@ func add_scrap(amount: int) -> void:
 	scrap += amount
 	Events.scrap_collected.emit(amount)
 
-func add_kill(pos: Vector2, rank: int) -> void:
+func add_kill(pos: Vector2, rank: int, weapon_id: String = "") -> void:
 	kills += 1
+	# weapon_id vide = tue par une source non-arme (aura/drone/lame/orbe, brasier plasma,
+	# tourelle capturee...) : ne credite AUCUNE arme plutot que de deviner. Voulu, pas un oubli.
+	if weapon_id != "":
+		kills_by_weapon[weapon_id] = int(kills_by_weapon.get(weapon_id, 0)) + 1
 	score += int(round((10 + rank * 40) * float(diff().get("score", 1.0))))   # rank & difficulty weighted
 	add_overdrive(0.055 + rank * 0.03)
 	Events.enemy_killed.emit(pos, rank)

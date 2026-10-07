@@ -1,6 +1,8 @@
 extends Area2D
 class_name Enemy
 
+const StackPips = preload("res://actors/StackPips.gd")   # voir la note dans Player.gd
+
 var game: Node
 var player: Node2D
 var kind: String = "brute"
@@ -11,6 +13,16 @@ var speed: float = 90.0
 var contact_dmg: float = 8.0
 var rank: int = 0
 var alive: bool = true
+## BRUISER "briser l'armure" (plan de differenciation des chassis, prototype C — 26/09).
+## +4%/pile aux degats de TOUTES sources, jusqu'a 5 (+20%) ; moitie moins efficace contre les
+## rangs >= 3 (boss), comme demande par le specialiste ("reduire le bonus contre les boss").
+## Se vide UNE pile a la fois (pas d'un coup) si Bruiser arrete de toucher pendant 2s.
+const BRISURE_STACK_DUR: float = 2.0
+const BRISURE_PER_STACK: float = 0.04
+var _brisure_stacks: int = 0
+var _brisure_t: float = 0.0
+var _last_weapon_id: String = ""   # derniere arme trackee a avoir touche -> GameState.add_kill
+var _brisure_pips: StackPips
 var is_final: bool = false       # the endboss: its death = run victory
 var _hp_bg: Line2D
 var _hp_fill: Line2D
@@ -26,6 +38,20 @@ var _charging: bool = false
 var _charge_t: float = 0.0
 var ogive: bool = false          # BOSS a ogives : gros projectiles lents explosifs
 var barrage: bool = false        # variante 10-min : salve de 3 en eventail + tir radial periodique
+## PHASES DE BOSS (plan de refonte, 29/09 : boss a 3 phases SUR MESURE). Remplace l'ancien
+## bool `_phase2` (un seul palier a 50% PV, effet generique identique pour tous les boss) par
+## un entier `_phase_idx` + des seuils PAR `kind` (EnemySpawner.BOSS_PHASE_THRESHOLDS) — matcher
+## sur `chassis`/`behavior` ne suffit pas : midboss_a et midboss_b partagent les deux mais
+## doivent rester differencies (Le Devastateur a deja barrage:true de base, pas Le Bombardier).
+## Seul `kind` est unique par boss. Les seuils par defaut ([0.5, 0.2]) gardent le palier a 50%
+## EXACTEMENT ou il etait pour les boss deja livres/eprouves — seul belier01 deplace le sien.
+var _phase_idx: int = 0
+var _boss_frenzy: bool = false      # phase 3 famille ranged+ogive : force l'anneau a CHAQUE tir
+var _boss_hazard_cd: float = 0.0    # phase 3 crusherboss/cryoboss/reacteurboss/citadelleboss :
+                                     # cooldown partage, differencie par `match kind` au declenchement
+var _belier_burst_left: int = 0     # phase 3 belier01 : charges enchainees sans repasser par COOLDOWN
+var _reacteur_pulse_on: bool = true     # phase 3 reacteurboss : alterne zone chargee/zone ventee
+var _citadelle_push_out: bool = false   # phase 3 citadelleboss : alterne pousse/attire
 var _boss_shot: int = 0
 # CHARGE DE TAUREAU (ennemis de melee de base) : quand le joueur est en ligne de mire/portee, l'ennemi
 # se cabre (telegraph flash) puis FONCE en ligne droite (direction verrouillee). Plafond global = anti-latence.
@@ -39,8 +65,29 @@ var _bull_mod0: Color = Color.WHITE   # teinte de base a restaurer apres la char
 static var _bulls_charging: int = 0
 const BULL_CAP: int = 7          # max d'ennemis qui chargent en meme temps (lisibilite + perf)
 
+# ===== NOUVEAUX COMPORTEMENTS (plan direction artistique, 26/09) — chassis DEJA existants,
+# aucun nouvel asset : "chaque ennemi doit poser une question differente". =====
+var _heal_cd: float = 0.0                  # REPARATEUR
+const HEAL_RANGE: float = 260.0
+const HEAL_TICK: float = 1.4
+const HEAL_FRACTION: float = 0.06          # % du hp_max de LA CIBLE, par tick
+var _push_cd: float = 0.0                  # DISPERSEUR (perturbateur)
+const PUSH_INTERVAL: float = 2.6
+const PUSH_RANGE: float = 150.0
+const PUSH_FORCE: float = 420.0
+var _mine_cd: float = 0.0                  # MINEUR
+const MINE_RANGE: float = 90.0
+const MINE_COOLDOWN: float = 4.0
+var _kamikaze_arming: bool = false         # KAMIKAZE (29/09, bestiaire elargi)
+var _kamikaze_fuse: float = 0.0
+const KAMIKAZE_RANGE: float = 90.0
+const KAMIKAZE_FUSE_TIME: float = 0.6
 var _spr: Sprite2D
 var _mat: ShaderMaterial
+## 🚨 tente le 26/09 ("trop de lag") : un ShaderMaterial PARTAGE entre tous les ennemis (batching)
+## + flash/warn en "instance uniform". Rejete au premier test headless : ce build Godot 4.3 ne
+## supporte pas les instance uniforms sur les shaders canvas_item (echec de compilation + methode
+## absente sur Sprite2D). Revenu a un ShaderMaterial par ennemi — voir enemy_read.gdshader.
 var _frames: int = 1
 var _fps: float = 14.0
 var _t: float = 0.0
@@ -67,6 +114,19 @@ var drops_bonus: bool = false                     # intermediate foes drop a bon
 static var _enemies_frame: int = -1
 static var _enemies_cache: Array = []
 
+## 🚨 patron 26/09 ("trop de lag quand il y a beaucoup d'ennemis") : healer/pusher (ajoutes cette
+## session) appelaient CHACUN get_tree().get_nodes_in_group("enemies") — une COPIE d'array fraiche,
+## independamment de ce cache — exactement l'anti-pattern que le commentaire ci-dessus decrit deja.
+## Avec une dizaine de reparateurs/perturbateurs vivants a la fois pres du plafond de 220 ennemis,
+## ca fait autant de balayages complets et non synchronises entre eux par seconde. Seul point d'acces
+## desormais : reutilise le meme instantane que la separation, reconstruit au plus une fois/frame.
+func _shared_enemies() -> Array:
+	var pf: int = Engine.get_physics_frames()
+	if pf != _enemies_frame:
+		_enemies_frame = pf
+		_enemies_cache = get_tree().get_nodes_in_group("enemies")
+	return _enemies_cache
+
 # Movement internals
 var velocity: Vector2 = Vector2.ZERO
 # PROCEDURAL enemy (premium static-pose model, no baked walk cycle): the SPRITE is animated in code
@@ -78,6 +138,13 @@ var _proc_base_scale: Vector2 = Vector2.ONE
 var _proc_t: float = 0.0
 var field_slow: float = 1.0   # transient: a slow-field prop dampens this each frame inside it
 var _speed_mult: float = 1.0
+## Ciblage prioritaire (27/09, rapport "Archives-machines" : rendre l'auto-visee interessante).
+## Reduit fictivement la distance vue par Player._nearest_enemy()/_cone_target() -> cet ennemi
+## devient plus susceptible d'etre choisi SANS bonus de degats et sans toucher au ciblage des
+## missiles a tete chercheuse (Projectile._find_homing_target, boucle independante) ni aux zones
+## de faisceau/melee (touchent tout ce qui est dans leur forme, pas seulement la "meilleure" cible).
+## 0.0 = aucun effet (defaut). Purement lu par Player.gd ; jamais ecrit ici.
+var priority_boost: float = 0.0
 var _wander_phase: float = 0.0
 
 # Attack internals
@@ -91,6 +158,13 @@ var _strafe_timer: float = 0.0
 # Animation state
 var _anims: Dictionary = {}          # anim -> Texture2D (single) OR {front,back,left,right}
 var _cur_anim: String = ""
+## 🚨 patron 26/09 ("le jeu se bloque quelques instants et reprend") : _anims est par-INSTANCE,
+## donc chaque ennemi refaisait ResourceLoader.exists()+load() sur jusqu'a 5 anims x 4 directions,
+## MEME quand 50 "brute" d'affilee redemandent exactement les memes fichiers. Une vague qui spawn
+## plusieurs ennemis d'un coup fait donc une pointe de lectures disque redondantes -> le trou net
+## puis la reprise que le patron decrit. _feet_cache (plus bas) faisait deja ca correctement pour
+## un autre besoin ; meme principe ici, par chassis+anim, partage par TOUS les ennemis.
+static var _anim_cache: Dictionary = {}   # "<chassis>|<anim_name>" -> resultat de _load_anim()
 var _one_shot: bool = false
 var _anim_done: bool = false
 var _base_loop: String = ""
@@ -291,13 +365,19 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	
 	# Auto-discover animation sheets: directional 4-view (<kind>_<anim>_<dir>.png)
 	# if present, else the single front-only sheet (<kind>_<anim>.png).
-	var names_to_check: Array[String] = ["idle", "walk", "attack", "hit", "die"]
+	var names_to_check: Array[String] = ["idle", "walk", "run", "attack", "hit", "die"]
 	if motion != "":
 		names_to_check.append(motion)
 	for anim_name: String in names_to_check:
 		if _anims.has(anim_name):
 			continue
-		var a: Variant = _load_anim(anim_name)
+		var cache_key: String = "%s|%s" % [chassis, anim_name]
+		var a: Variant
+		if Enemy._anim_cache.has(cache_key):
+			a = Enemy._anim_cache[cache_key]
+		else:
+			a = _load_anim(anim_name)
+			Enemy._anim_cache[cache_key] = a
 		if a != null:
 			_anims[anim_name] = a
 			if a is Dictionary:
@@ -363,6 +443,11 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		_mat.shader = load("res://shaders/hit_flash.gdshader")
 		_spr.material = _mat
 	add_child(_spr)
+
+	# 🚨 25/09 : ce noeud etait cree ICI, pour CHAQUE ennemi (jusqu'a 220 en simultane), avec son
+	# propre _process() tournant a chaque frame meme pour les ~99% jamais touches par Bruiser —
+	# "lag meme avec peu d'ennemis" signale par le patron. Deplace en creation PARESSEUSE dans
+	# take_damage() : n'existe que pour un ennemi qui recoit reellement une pile.
 
 	# energy shield BUBBLE that ENVELOPS the whole body (a soft filled aura + crisp rim),
 	# sized to the VISUAL sprite (vsize) so it wraps the mech, not a small ring in front.
@@ -696,7 +781,7 @@ func _frappe_arc(dir: Vector2) -> void:
 		if player.has_method("take_damage"):
 			# PAS de bonus de degats : ce que le palier apporte, c'est l'ALLONGE. Frapper plus
 			# loin ET plus fort faisait deux ameliorations d'un coup — d'ou la falaise mesuree.
-			player.take_damage(contact_dmg)
+			player.take_damage(contact_dmg, global_position)
 	_libere_arc()
 	play("attack", true)
 
@@ -743,8 +828,9 @@ func _fire_ogive(dir: Vector2) -> void:
 	var target: Vector2 = global_position + dir * 300.0
 	if player != null and is_instance_valid(player):
 		target = (player as Node2D).global_position
-	if barrage and _boss_shot % 3 == 0:
-		# ANNEAU : 6 zones en cercle autour du joueur (il faut trouver le trou)
+	if barrage and (_boss_frenzy or _boss_shot % 3 == 0):
+		# ANNEAU : 6 zones en cercle autour du joueur (il faut trouver le trou). Phase 3
+		# (_boss_frenzy) : a CHAQUE tir au lieu d'un sur 3, plutot que d'inventer un nouveau motif.
 		for i in 6:
 			var a: float = TAU * float(i) / 6.0 + randf() * 0.4
 			game.spawn_ground_zone(target + Vector2.from_angle(a) * 150.0, 88.0, 1.05, attack_dmg * 0.85, OGIVE_COL)
@@ -763,6 +849,110 @@ func _fire_ogive(dir: Vector2) -> void:
 		Events.screen_shake.emit(1.6)
 
 
+## Avance _phase_idx d'au plus un cran par frame, seuils lus PAR `kind` (jamais une constante
+## globale — deplacer le seuil de TOUS les boss rebalancerait silencieusement des combats deja
+## livres/eprouves). La plomberie de signal (banniere/VFX/shake) est PARTAGEE ; le contenu de
+## chaque phase (_apply_boss_phase) est sur mesure par boss.
+func _check_boss_phase() -> void:
+	if hp_max <= 0.0:
+		return
+	var thresholds: Array = EnemySpawner.BOSS_PHASE_THRESHOLDS.get(kind, [0.5])
+	if _phase_idx >= thresholds.size():
+		return
+	if hp <= hp_max * float(thresholds[_phase_idx]):
+		_phase_idx += 1
+		if game != null:
+			if game.has_method("show_banner"):
+				show_banner_phase()
+			if game.has_method("spawn_vfx"):
+				game.spawn_vfx("shockwave", global_position, 0.0, _body_radius / 40.0, Color(1.0, 0.5, 0.35))
+		Events.screen_shake.emit(5.0)
+		_apply_boss_phase(_phase_idx)
+
+func show_banner_phase() -> void:
+	game.show_banner("PHASE %d" % (_phase_idx + 1), Color(1.0, 0.45, 0.35))
+
+## Contenu SUR MESURE par boss — matche sur `kind`, jamais sur `chassis`/`behavior` (midboss_a et
+## midboss_b partagent les deux et doivent pourtant rester differencies).
+func _apply_boss_phase(idx: int) -> void:
+	match kind:
+		"midboss", "midboss_a", "midboss_b", "endboss":
+			_phase_ranged_ogive(idx)
+		"crusherboss":
+			_phase_crusher(idx)
+		"belier01":
+			_phase_belier(idx)
+		"cryoboss", "reacteurboss", "rucheboss", "citadelleboss":
+			_phase_biome_boss(idx)
+		_:
+			pass   # tout futur rank>=3 sans config dediee : banniere seule, jamais de crash
+
+## Colosse / Bombardier / Devastateur / Souverain : meme squelette de progression (deja motive
+## par _fire_ogive, qui sait DEJA moduler son intensite via `barrage`), intensite differente par
+## `kind`. Phase 2 = comportement d'origine INCHANGE (barrage + cadence -20%). Phase 3 = sursaut
+## reel (cadence -40% de plus, anneau a CHAQUE tir via _boss_frenzy) — le Souverain (deja
+## barrage:true des le debut) est donc le seul a ressentir la PLEINE differenciation phase2 vs
+## phase1 des la phase 3 uniquement ; c'est voulu, il est cense etre le plus dur des quatre.
+func _phase_ranged_ogive(idx: int) -> void:
+	if idx == 1:
+		barrage = true
+		attack_cd = maxf(0.6, attack_cd * 0.8)
+	elif idx == 2:
+		_boss_frenzy = true
+		attack_cd = maxf(0.4, attack_cd * 0.75)
+
+## Broyeur Titan : pas de tir, pas de charge — chasse et degat de contact en continu (comme un
+## ennemi "rush" normal, en plus gros). Phase 2 = plus rapide et plus dur au contact (« il
+## s'enerve »). Phase 3 = en plus, laisse une trainee de GroundZone en chassant (modification de
+## l'arene sans inventer un pattern d'attaque que ce boss n'a jamais eu).
+func _phase_crusher(idx: int) -> void:
+	if idx == 1:
+		speed *= 1.2
+		contact_dmg *= 1.15
+	elif idx == 2:
+		speed *= 1.15
+		_boss_hazard_cd = 0.2   # amorce la trainee (voir _physics_process)
+
+## Belier-01 : SANS bouclier par decision produit documentee ("le risque c'est la charge a
+## esquiver, pas un palier de PV a ronger") — les 2 phases restent donc de la charge, jamais de
+## bouclier. Phase 2 = tuning deja existant (cooldown court + windup rapide), simplement deplace
+## de 50% a 66% comme demande. Phase 3 = charge DOUBLE (2 charges d'affilee sans repasser par
+## COOLDOWN) + une GroundZone au point d'impact de chaque charge de cette phase.
+func _phase_belier(idx: int) -> void:
+	if idx == 2:
+		_belier_burst_left = 1
+
+## ====================== LES 4 BOSS DE CHAPITRE "15 MAPS" (cryo/reacteur/ruche/citadelle) =========
+## Phases 1-2 = meme squelette ranged+ogive deja eprouve par Colosse/Bombardier/Devastateur/
+## Souverain (_phase_ranged_ogive). Phase 3 = EN PLUS, une signature propre au biome de leur
+## chapitre, qui reutilise un idiome deja prouve par le decor de CE biome (PropScatter.gd) plutot
+## qu'un nouveau pattern d'attaque :
+##   cryoboss      -> GroundZone a stun (idiome jet_de_cryo)
+##   reacteurboss  -> pulse alterne degats/aucun degat (idiome zone_alternante)
+##   rucheboss     -> aura continue de ralentissement (idiome sol_collant) ; PAS de GroundZone ici
+##                    (son tie-in naturel, cocon -> awaken_enemy, est inerte tant que les ennemis
+##                    reguliers restent vides - tradeoff documente, pas un oubli)
+##   citadelleboss -> pulsion ponctuelle pousse/attire en alternance (idiome zone_push_pull)
+const CRYO_HAZARD_CD: float = 2.3
+const CRYO_HAZARD_R: float = 100.0
+const CRYO_HAZARD_STUN: float = 1.1
+const REACTEUR_HAZARD_CD: float = 1.8
+const REACTEUR_HAZARD_R: float = 130.0
+const RUCHE_AURA_R: float = 220.0
+const RUCHE_AURA_MULT: float = 0.55
+const RUCHE_VFX_CD: float = 2.0
+const CITADELLE_PULSE_CD: float = 3.0
+const CITADELLE_PULSE_R: float = 420.0
+const CITADELLE_PULSE_FORCE: float = 260.0
+func _phase_biome_boss(idx: int) -> void:
+	_phase_ranged_ogive(idx)   # meme barrage (phase 2) / frenzy (phase 3) que les 4 boss existants
+	if idx == 2:
+		# amorce le pouls biome (voir le bloc _boss_hazard_cd dans _physics_process). Pour
+		# rucheboss ce cooldown ne pilote qu'un ping VFX cosmetique (son effet reel, l'aura de
+		# ralentissement, est CONTINU et gere separement plus bas dans _physics_process).
+		_boss_hazard_cd = 0.2
+
+
 func _physics_process(delta: float) -> void:
 	if not alive:
 		if _dying:
@@ -778,6 +968,64 @@ func _physics_process(delta: float) -> void:
 	_atk_cd -= delta
 	if _atk_cd < 0.0:
 		_atk_cd = 0.0
+	if rank >= 3:
+		_check_boss_phase()
+	if _boss_hazard_cd > 0.0:
+		_boss_hazard_cd -= delta
+		if _boss_hazard_cd <= 0.0 and game != null:
+			match kind:
+				"crusherboss":
+					if game.has_method("spawn_ground_zone"):
+						_boss_hazard_cd = 1.4
+						game.spawn_ground_zone(global_position, 90.0, 0.9, contact_dmg * 0.7, Color(0.8, 0.2, 0.15))
+				"cryoboss":
+					# meme idiome que jet_de_cryo (PropScatter.gd) : GroundZone construite
+					# directement car stun_duration n'est pas expose par game.spawn_ground_zone().
+					_boss_hazard_cd = CRYO_HAZARD_CD
+					if player != null and is_instance_valid(player) and "enemy_layer" in game:
+						var zc: GroundZone = GroundZone.new()
+						zc.radius = CRYO_HAZARD_R; zc.delay = 1.0; zc.damage = contact_dmg * 0.4
+						zc.color = Color(0.6, 0.85, 1.0); zc.stun_duration = CRYO_HAZARD_STUN
+						zc.game = game; zc.player = player
+						zc.global_position = player.global_position
+						game.enemy_layer.add_child(zc)
+				"reacteurboss":
+					# meme idiome que zone_alternante : alterne une zone qui degate ("chargee") et
+					# une qui ne degate pas ("ventee"), via le spawn_ground_zone generique.
+					_boss_hazard_cd = REACTEUR_HAZARD_CD
+					_reacteur_pulse_on = not _reacteur_pulse_on
+					if game.has_method("spawn_ground_zone"):
+						var r_dmg: float = contact_dmg * 0.8 if _reacteur_pulse_on else 0.0
+						var r_col: Color = Color(0.55, 1.0, 0.5) if _reacteur_pulse_on else Color(0.25, 0.45, 0.3)
+						game.spawn_ground_zone(global_position, REACTEUR_HAZARD_R, 0.8, r_dmg, r_col)
+				"rucheboss":
+					# pas de GroundZone (cocon->awaken_enemy est inerte sans ennemis restaures) ;
+					# juste le TELL visuel de l'aura continue geree plus bas (RUCHE_AURA_*).
+					_boss_hazard_cd = RUCHE_VFX_CD
+					if game.has_method("spawn_vfx") and player != null and is_instance_valid(player) \
+							and global_position.distance_squared_to(player.global_position) < RUCHE_AURA_R * RUCHE_AURA_R:
+						game.spawn_vfx("shockwave", global_position, 0.0, RUCHE_AURA_R / 95.0, Color(1.0, 0.75, 0.95))
+				"citadelleboss":
+					# meme math que zone_push_pull (PropScatter.gd) dupliquee ici (2 lignes, pas de
+					# helper partage) mais en POULS ponctuel plutot qu'en nudge continu par frame.
+					_boss_hazard_cd = CITADELLE_PULSE_CD
+					_citadelle_push_out = not _citadelle_push_out
+					if player != null and is_instance_valid(player):
+						var away: Vector2 = player.global_position - global_position
+						var dd: float = away.length()
+						if dd > 1.0 and dd < CITADELLE_PULSE_R:
+							player.global_position += away.normalized() * CITADELLE_PULSE_FORCE * (1.0 if _citadelle_push_out else -1.0)
+							if game.has_method("spawn_vfx"):
+								game.spawn_vfx("shockwave", global_position, 0.0, CITADELLE_PULSE_R / 95.0, Color(0.4, 0.85, 1.0))
+				_:
+					pass
+	if _brisure_stacks > 0:
+		_brisure_t -= delta
+		if _brisure_t <= 0.0:
+			_brisure_stacks -= 1                                    # une pile a la fois, pas tout d'un coup
+			_brisure_t = BRISURE_STACK_DUR if _brisure_stacks > 0 else 0.0
+			if _brisure_pips != null:
+				_brisure_pips.count = _brisure_stacks
 	# L'ARME EVOLUE AVEC L'INTELLIGENCE. Un seul point de verite : _palier est relu ici, et
 	# toute montee declenche un eclat unique — l'evolution doit se voir a l'ecran, pas seulement
 	# se subir. (_palier_vu ne redescend jamais : pas de clignotement en bordure de seuil.)
@@ -800,7 +1048,13 @@ func _physics_process(delta: float) -> void:
 		var to_player: Vector2 = player.global_position - global_position
 		var dist_sq: float = to_player.length_squared()
 		var dist: float = sqrt(dist_sq)
-		
+
+		# RUCHEBOSS phase 3 : aura CONTINUE de ralentissement tant que le joueur est a portee -
+		# meme idiome que sol_collant (PropScatter.gd), independante du cooldown _boss_hazard_cd
+		# (qui ne pilote que le ping VFX cosmetique de ce boss, voir plus haut).
+		if kind == "rucheboss" and _phase_idx >= 2 and dist < RUCHE_AURA_R and "field_slow" in player:
+			player.field_slow = minf(player.field_slow, RUCHE_AURA_MULT)
+
 		if dist > 1.0:
 			var dir: Vector2 = to_player / dist
 			
@@ -837,7 +1091,11 @@ func _physics_process(delta: float) -> void:
 						if _mat != null and _mat.shader != null:
 							_mat.set_shader_parameter("flash", 0.0)
 							_mat.set_shader_parameter("warn", 0.0)
-						play("attack", true)
+						# Un chassis avec un cycle "run" bake (brute/vanquisher) sprinte en boucle
+						# pendant toute la charge (choisi par le dispatch mouvement plus bas) ; les
+						# autres gardent le tell "attack" en un seul passage, comme avant.
+						if not _anims.has("run"):
+							play("attack", true)
 				elif _phase == _PH_DASH_ACTIVE:
 					desired_vel = _dash_dir * speed * DASH_POUSSEE[_palier]
 					if dist < 44.0 and _contact_cd <= 0.0:
@@ -845,18 +1103,125 @@ func _physics_process(delta: float) -> void:
 						if player.has_method("take_damage"):
 							# the charge lands the big hit (attack_dmg), not the light contact graze
 							var charge_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg
-							player.take_damage(charge_dmg)
+							player.take_damage(charge_dmg, global_position)
 							_impact_charge(_dash_dir)
-							
+							# Phase 3 (BELIER-01) : chaque impact laisse une GroundZone — la charge
+							# elle-meme modifie l'arene, sans nouveau pattern a lire pour le joueur.
+							if _phase_idx >= 2 and game != null and game.has_method("spawn_ground_zone"):
+								game.spawn_ground_zone(global_position, 80.0, 0.8, contact_dmg * 0.6, Color(1.0, 0.35, 0.15))
+
 					if _phase_timer <= 0.0:
-						_phase = _PH_DASH_COOLDOWN
-						_phase_timer = 1.2
+						if _belier_burst_left > 0:
+							# Phase 3 : charge DOUBLE — repart directement en WIND (bref) sans repasser
+							# par COOLDOWN, une seule fois par charge (pas une boucle infinie).
+							_belier_burst_left -= 1
+							_phase = _PH_DASH_WIND
+							_phase_timer = 0.28
+						else:
+							_phase = _PH_DASH_COOLDOWN
+							# Phase 2 (BELIER-01, "meme lecon, mais plus dense") : recupere plus vite ->
+							# les charges s'enchainent, sans nouveau pattern a lire pour le joueur.
+							_phase_timer = 0.7 if _phase_idx >= 1 else 1.2
+							if _phase_idx >= 2:
+								_belier_burst_left = 1   # arme la PROCHAINE charge pour un enchainement double
 				elif _phase == _PH_DASH_COOLDOWN:
 					desired_vel = dir * speed * 0.3
 					if _phase_timer <= 0.0:
 						_phase = _PH_DASH_WIND
-						_phase_timer = DASH_ARMEMENT[_palier]
-						
+						_phase_timer = DASH_ARMEMENT[_palier] * (0.7 if _phase_idx >= 1 else 1.0)
+
+			elif behavior == "healer":
+				# REPARATEUR : garde ses distances comme "ranged" (kite), soigne au lieu de tirer.
+				# "Il doit devenir une cible prioritaire" — cf. le rayon vert, tres visible.
+				var dm: float = 40.0
+				if dist > prefer_dist + dm:
+					desired_vel = dir * speed * _speed_mult
+				elif dist < prefer_dist - dm:
+					desired_vel = -dir * speed * _speed_mult
+				else:
+					desired_vel = Vector2.ZERO
+				_heal_cd -= delta
+				if _heal_cd <= 0.0:
+					_heal_cd = HEAL_TICK
+					var best: Enemy = null
+					var best_missing: float = 0.0
+					for e in _shared_enemies():
+						if e == self or not (e is Enemy) or not (e as Enemy).alive:
+							continue
+						var en: Enemy = e as Enemy
+						if global_position.distance_squared_to(en.global_position) > HEAL_RANGE * HEAL_RANGE:
+							continue
+						var missing: float = en.hp_max - en.hp
+						if missing > best_missing:
+							best_missing = missing
+							best = en
+					if best != null:
+						best.hp = minf(best.hp_max, best.hp + best.hp_max * HEAL_FRACTION)
+						if game != null and game.has_method("_streak"):
+							var mid: Vector2 = (global_position + best.global_position) * 0.5
+							game._streak(mid, (best.global_position - global_position).normalized(),
+								Color(0.4, 1.0, 0.5), global_position.distance_to(best.global_position), 6.0, 0.22)
+
+			elif behavior == "carrier":
+				# PORTEUR : fuit — jamais vers le joueur. drops_bonus (deja sur sa fiche) recompense
+				# la prise de risque de le poursuivre, cf. "choisir entre le poursuivre et rester en securite".
+				desired_vel = -dir * speed * _speed_mult
+
+			elif behavior == "pusher":
+				# DISPERSEUR : n'attaque pas, repousse les ennemis proches a intervalle regulier —
+				# "casse les strategies trop statiques" en dispersant la meute autour du joueur.
+				desired_vel = Vector2.ZERO
+				_push_cd -= delta
+				if _push_cd <= 0.0:
+					_push_cd = PUSH_INTERVAL
+					for e in _shared_enemies():
+						if e == self or not (e is Enemy):
+							continue
+						var en2: Enemy = e as Enemy
+						var away: Vector2 = en2.global_position - global_position
+						var alen: float = away.length()
+						if alen > 1.0 and alen < PUSH_RANGE:
+							en2.global_position += away / alen * PUSH_FORCE * 0.12
+					if game != null and game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, PUSH_RANGE / 95.0, Color(0.85, 0.55, 1.0))
+
+			elif behavior == "miner":
+				# MINEUR : approche, pose une zone au sol telegraphiee (spawn_ground_zone existe
+				# deja pour l'eruption volcanique), puis se tient a distance le temps du cooldown.
+				if dist > MINE_RANGE + 20.0:
+					desired_vel = dir * speed * _speed_mult
+				else:
+					desired_vel = Vector2.ZERO
+					_mine_cd -= delta
+					if _mine_cd <= 0.0 and game != null and game.has_method("spawn_ground_zone"):
+						_mine_cd = MINE_COOLDOWN
+						var mine_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.8
+						game.spawn_ground_zone(global_position, 110.0, 1.1, mine_dmg, Color(1.0, 0.42, 0.12))
+
+			elif behavior == "kamikaze":
+				# KAMIKAZE : quasi identique a "miner" (approche + GroundZone), SAUF qu'il ne
+				# recule jamais — a portee, il s'arme (meche visible) puis fonce et se detruit ;
+				# la GroundZone posee SUR LUI-MEME au moment du sacrifice EST l'explosion (reutilise
+				# le systeme deja en place, qui ne degate que le joueur — meme convention que MINEUR).
+				if not _kamikaze_arming:
+					desired_vel = dir * speed * _speed_mult * 1.15   # fonce, plus vite qu'un rush normal
+					if dist <= KAMIKAZE_RANGE:
+						_kamikaze_arming = true
+						_kamikaze_fuse = KAMIKAZE_FUSE_TIME
+				else:
+					desired_vel = dir * speed * _speed_mult * 0.3   # continue d'avancer pendant la meche
+					_kamikaze_fuse -= delta
+					var pulse: float = absf(sin(_kamikaze_fuse * 26.0))
+					if _mat != null and _mat.shader != null:
+						_mat.set_shader_parameter("warn", pulse)
+					if _kamikaze_fuse <= 0.0:
+						if game != null and game.has_method("spawn_ground_zone"):
+							var boom_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 2.2
+							# delai quasi nul : la meche de 0.6s (warn qui pulse) EST deja le telegraphe,
+							# inutile de superposer le grand anneau de GroundZone par-dessus.
+							game.spawn_ground_zone(global_position, 100.0, 0.05, boom_dmg, Color(1.0, 0.35, 0.1))
+						take_damage(hp_max + 1.0)   # auto-destruction : reutilise le bookkeeping normal de _die()
+
 			else:
 				# --- CHARGE DE TAUREAU : cabrage (telegraph) -> charge LIGNE DROITE -> cooldown ---
 				if _bull_state == 1:                       # WIND-UP : se cabre + rougeoie (tell CLAIR)
@@ -887,7 +1252,7 @@ func _physics_process(delta: float) -> void:
 					if dist < 46.0 and _contact_cd <= 0.0:
 						_contact_cd = 0.5
 						if player.has_method("take_damage"):
-							player.take_damage(attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.6)
+							player.take_damage(attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.6, global_position)
 							_impact_charge(_bull_dir)   # meme arme, impact de plus en plus lourd
 					_bull_t -= delta
 					if _bull_t <= 0.0:
@@ -946,7 +1311,7 @@ func _physics_process(delta: float) -> void:
 					if dist < CONTACT_PORTEE[_palier] and _contact_cd <= 0.0:
 						_contact_cd = CONTACT_CAD[_palier]
 						if player.has_method("take_damage"):
-							player.take_damage(contact_dmg)
+							player.take_damage(contact_dmg, global_position)
 							play("attack", true)
 							if _palier >= 1:
 								_percussion(dir)   # palier 1 : le coup au contact se VOIT partir
@@ -976,11 +1341,7 @@ func _physics_process(delta: float) -> void:
 			# dans le rayon consomment le budget. En quelques images, chaque ennemi a donc vu
 			# son vrai voisinage.
 			var separation: Vector2 = Vector2.ZERO
-			var pf: int = Engine.get_physics_frames()
-			if pf != _enemies_frame:
-				_enemies_frame = pf
-				_enemies_cache = get_tree().get_nodes_in_group("enemies")   # one alloc/frame, shared
-			var enemies: Array = _enemies_cache
+			var enemies: Array = _shared_enemies()
 			var sep_rad_sq: float = _SEP_RADIUS * _SEP_RADIUS
 			var nb: int = enemies.size()
 			if nb > 1:
@@ -1060,11 +1421,14 @@ func _physics_process(delta: float) -> void:
 	if _one_shot:
 		_advance_one_shot(delta)
 	else:
-		# Movement-driven selection
+		# Movement-driven selection. Un cycle "run" distinct (quand le chassis en a un baké) ne
+		# joue que pendant une VRAIE ruée/charge (dash actif, charge du bull) — pas pendant une
+		# approche ordinaire — pour que l'art rapide serve exactement le moment qui le justifie.
+		var sprinting: bool = _anims.has("run") and ((behavior == "dasher" and _phase == _PH_DASH_ACTIVE) or _bull_state == 2)
 		var current_speed: float = velocity.length()
 		var max_speed: float = speed * _speed_mult
 		if max_speed > 0.0 and current_speed > (max_speed * 0.12):
-			play(_base_loop, false)
+			play("run" if sprinting else _base_loop, false)
 		else:
 			play(_idle_anim, false)
 			
@@ -1184,9 +1548,29 @@ func _advance_one_shot(delta: float) -> void:
 		_spr.frame = frame_idx
 
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, source_chassis: String = "", weapon_id: String = "") -> void:
 	if not alive:
 		return
+	# credite la DERNIERE arme trackee qui a touche cet ennemi (pour les conditions d'evolution
+	# "N kills avec cette arme") — un coup de grace par une source non-arme (aura/drone/lame/
+	# orbe du joueur, brasier plasma, tourelle capturee) laisse l'attribution precedente en
+	# l'etat ; si l'ennemi n'a JAMAIS ete touche par une arme trackee, le kill ne credite rien
+	# (voulu, cf. GameState.add_kill).
+	if weapon_id != "":
+		_last_weapon_id = weapon_id
+	if _brisure_stacks > 0:
+		var per_stack: float = BRISURE_PER_STACK * (0.5 if rank >= 3 else 1.0)   # moitie contre les boss
+		amount *= (1.0 + per_stack * float(_brisure_stacks))
+	if source_chassis == "bruiser":
+		_brisure_stacks = mini(_brisure_stacks + 1, 5)
+		_brisure_t = BRISURE_STACK_DUR
+		if _brisure_pips == null:   # creation paresseuse — voir la note dans setup()
+			_brisure_pips = StackPips.new()
+			_brisure_pips.col = Color(1.0, 0.35, 0.25)
+			_brisure_pips.offset_y = -_body_radius * 1.6
+			_brisure_pips.z_index = 6
+			add_child(_brisure_pips)
+		_brisure_pips.count = _brisure_stacks
 	# the energy shield soaks damage first; only the overflow reaches HP
 	if shield > 0.0:
 		var absorbed: float = minf(shield, amount)
@@ -1241,7 +1625,7 @@ func _die() -> void:
 		_hp_bg.visible = false
 	if _hp_fill != null:
 		_hp_fill.visible = false
-	GameState.add_kill(global_position, rank)
+	GameState.add_kill(global_position, rank, _last_weapon_id)
 	if game != null:
 		if game.has_method("death_fx"):
 			# no destruction flash on regular enemies (swarm = constant kills); the endboss
@@ -1256,6 +1640,16 @@ func _die() -> void:
 		# ci-dessus — sinon l'emprunt perdrait son cote "tu viens de battre une vraie menace".
 		if rank >= 3 and game.has_method("spawn_weapon_loan"):
 			game.spawn_weapon_loan(global_position)
+		# FORGE DETERMINISTE (26/09) : chance de plan a la mort d'un boss — seulement les VRAIS
+		# boss nommes (kind existe dans PLAN_SLOT_BY_BOSS/PLAN_RARITY_WEIGHT), pas n'importe quel
+		# rank>=3 futur qui n'aurait pas d'affinite de slot definie.
+		if rank >= 3 and (kind == "endboss" or SaveManager.PLAN_SLOT_BY_BOSS.has(kind)):
+			var plan: Dictionary = SaveManager.grant_boss_plan(kind)
+			if not plan.is_empty() and game.has_method("show_hint"):
+				var sn: String = String(SaveManager.GEAR_SLOT_NAMES.get(plan.get("slot", ""), ""))
+				var rn: String = String(SaveManager.GEAR_RARITY_NAMES.get(plan.get("rarity", ""), ""))
+				game.show_hint("Plan obtenu : %s %s — forgez-le depuis Équipement." % [rn, sn],
+					Color(0.85, 0.75, 1.0), 5.0)
 	if is_final:
 		# SANS FIN: the endboss is a milestone, not an ending — the run rolls on, harder.
 		if GameState.endless and game != null and game.has_method("endless_boss_down"):

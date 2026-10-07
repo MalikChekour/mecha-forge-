@@ -186,7 +186,7 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if body.is_in_group("player") and body.has_method("take_damage"):
 		_impact()
-		body.take_damage(_dmg)
+		body.take_damage(_dmg, global_position)
 		_recycle.call_deferred()
 	elif body.is_in_group("cover"):
 		_impact()

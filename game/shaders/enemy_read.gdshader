@@ -13,6 +13,10 @@ uniform float flash : hint_range(0.0, 1.0) = 0.0;
 // indifferenciees », et le signal de charge du taureau, lui aussi blanc/rouge sur un mecha deja
 // magenta, se perdait dans la foule. Le telegraphe a maintenant SA couleur, et il prime.
 uniform float warn : hint_range(0.0, 1.0) = 0.0;
+// 🚨 tente le 26/09 : "instance uniform" pour partager UN materiau entre tous les ennemis
+// (batching). Rejete : ce build Godot 4.3 rend "Uniform instances are not yet implemented for
+// 'canvas_item' shaders" (echec de compilation) + Sprite2D n'a pas set_instance_shader_parameter.
+// Fonctionnalite absente de cette version -> reste en uniform PLEIN, un ShaderMaterial par ennemi.
 uniform vec4 warn_color : source_color = vec4(1.0, 0.13, 0.10, 1.0);
 uniform vec4 outline_color : source_color = vec4(0.04, 0.05, 0.07, 0.50);  // subtle DARK edge (was a warm/yellow rim the patron disliked)
 uniform float outline_w = 1.25;    // outline width in texels (thin ink edge)

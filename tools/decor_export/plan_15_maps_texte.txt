@@ -1,0 +1,756 @@
+--- PAGE 1 ---
+Le probleme actuel : les cartes sont des arenes plates sans obstacles ni decor interactif. L'interet
+vient uniquement des ennemis.
+La solution : 15 maps uniques, chacune avec sa mecanique signature. Le terrain devient un
+acteur du gameplay — le joueur lit le terrain, fait des choix spatiaux, et interagit avec le decor.
+# Map Biome Diﬀiculte Mecanique signature
+1 Hall d'Assemblage SECTEUR TECH Facile Convoyeurs + bras presseurs
+2 Fonderie des Pistons SECTEUR TECH Facile+ Surchauﬀe du sol + vannes
+3 Quai de Chargement SECTEUR TECH Normal Containers mobiles + portes auto
+4 Cryo-Voute ZONE CRYO Normal Sol glissant + capsules cryo
+5 Serres Gelees ZONE CRYO Normal+ Brouillard froid + radiateurs
+6 Lac de Permafrost ZONE CRYO Diﬀicile Glace qui se fissure + ilots safe
+7 Bassins Toxiques NOYAU INSTABLE Diﬀicile Flaques radioactives + drainage
+8 Salle des Turbines NOYAU INSTABLE Diﬀicile+ Vent directionnel global
+9 Noyau Fissure NOYAU INSTABLE Tres diﬀicile Zones safe/danger alternent
+10 Couvoir Mecanique BIOMECANIQUE Tres diﬀicile Cocons a risque (bonus ou ennemi)
+11 Veines Vivantes BIOMECANIQUE Extreme Sol collant + tentacules
+12 Jardin de Spores BIOMECANIQUE Extreme+ Nuages toxiques + visibilite
+13 Pont Orbital FORGE FINALE Extreme Portes de securite controlables
+14 Anneau de Gravite FORGE FINALE Extreme+ Push/pull + lasers rotatifs
+15 Chambre de la Forge FORGE FINALE Final Arene modulaire qui reconfigure
+Plan complet v2 — 15 maps uniques / 5 biomes —
+Mecha-Forge
+Vision generale
+Progression des 15 maps
+--- PAGE 2 ---
+Identite visuelle : Cyberpunk industriel, dalles metalliques sombres, circuits lumineux
+cyan/orange, vapeur, machines.
+Mecanique de biome : Convoyeurs, pression, surchauﬀe — le biome introduit le mouvement
+force et la gestion de temperature.
+Couleur BIOME_TINT : Cyan/orange.
+Identite : Chaine d'assemblage avec bras robotises, convoyeurs au sol, circuits lumineux.
+Atmosphere de factory line active.
+Obstacle principal : Tapis convoyeurs (SceneryScatter)
+Bandes transporteuses au sol qui deplacent le joueur et les ennemis dans une direction ﬁxe. Le
+mouvement force cree des situations ou le joueur est pousse vers un groupe d'ennemis. La
+direction des convoyeurs est conﬁgurable par zone.
+Objet interactif : Consoles de controle (SceneryScatter)
+Terminaux interactifs qui arretent les convoyeurs pendant 8 secondes (cooldown 25s). Le
+joueur peut les utiliser pour reprendre le controle du positionnement ou canaliser les ennemis.
+Danger au sol : Bras presseurs (GroundZone)
+Bras mecaniques qui frappent une ligne telegraphee au sol. Telegraph : cercle jaune 1.5s. Eﬀet :
+degats moderes + stun court 0.5s. Intervalle : 8-15s.
+Pourquoi c'est fun :
+Le joueur utilise le mouvement force des convoyeurs pour canaliser les ennemis vers les bras
+presseurs. C'est un puzzle spatial dynamique ou le joueur exploite le terrain contre les ennemis.
+Conﬁg proposee :
+"tech_convoyeur": {
+    "systeme": "SceneryScatter",
+    "declencheur": "contact",
+    "vitesse_pousse": 30.0,
+    "direction": Vector2(1, 0),
+    "couleur_bande": Color(0.3, 0.3, 0.3, 0.5),
+    "mobile": {"vitesse_min": 20.0},
+},
+"tech_bras_presseur": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 8.0, "intervalle_max": 15.0,
+    "duree_telegraphe": 1.5, "duree_effet": 1.0,
+    "degats": 15, "stun_duree": 0.5,
+    "rayon": 120.0, "forme": "ligne",
+    "mobile": {"rayon_min": 90.0, "duree_telegraphe_mobile": 2.0},
+},
+"tech_console_convoyeur": {
+    "systeme": "SceneryScatter",
+    "declencheur": "proximite",
+Biome 1 — SECTEUR TECH (Usine)
+Map 1 — Hall d'Assemblage
+--- PAGE 3 ---
+    "duree_effet": 8.0, "cooldown": 25.0,
+    "rayon_proximite": 80.0,
+    "effet": "arret_convoyeurs",
+    "mobile": {"rayon_proximite_mobile": 120.0},
+},
+Identite : Fonderie industrielle, sol metallique chauﬀant, pistons hydrauliques verticaux,
+vapeur, chaleur visible.
+Obstacle principal : Pistons hydrauliques (SceneryScatter)
+Pistons qui montent/descendent periodiquement, bloquant le passage. Le joueur doit
+synchroniser son deplacement avec les cycles. Les pistons creent des couloirs temporaires.
+Objet interactif : Vannes de refroidissement (SceneryScatter)
+3 vannes par carte. Activer une vanne refroidit une zone du sol pendant 10s (cooldown 30s),
+creant un passage safe. Mais une autre zone surchauﬀe en compensation — le joueur choisit
+quel zone sauver.
+Danger au sol : Surchauﬀe du sol (GroundZone)
+Zones rouges qui grandissent depuis le centre par paliers. Le joueur doit se deplacer vers les
+bords refroidis par les vannes. Degats continus tant que le joueur est dans la zone.
+Pourquoi c'est fun :
+Le joueur gere un systeme de vannes pour controler la temperature du terrain. C'est de la
+gestion d'espace sous pression — chaque choix de refroidissement a un cout ailleurs.
+Conﬁg proposee :
+"tech_piston_hydraulique": {
+    "systeme": "SceneryScatter",
+    "declencheur": "timer",
+    "cycle_montee": 2.0, "cycle_descente": 2.0, "pause": 1.0,
+    "bloque_mouvement": true,
+    "mobile": {"cycle_min": 3.0},
+},
+"tech_vanne_refroidissement": {
+    "systeme": "SceneryScatter",
+    "declencheur": "proximite",
+    "duree_effet": 10.0, "cooldown": 30.0,
+    "rayon_proximite": 80.0,
+    "effet": "refroidir_zone",
+    "rayon_effet": 150.0,
+    "contre_effet": "surchauffer_zone_autre",
+},
+"tech_surchauffe_sol": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "duree_telegraphe": 2.0,
+    "duree_effet": -1.0,  # persistant jusqu'a vanne
+    "degats_par_seconde": 8,
+Map 2 — Fonderie des Pistons
+--- PAGE 4 ---
+    "croissance": 5.0,  # px/s
+    "couleur": Color(1, 0.2, 0, 0.4),
+    "mobile": {"rayon_min": 80.0, "duree_telegraphe_mobile": 2.5},
+},
+Identite : Quai de fret industriel, containers empiles, portes automatiques, grues de transfert,
+ambiance logistique.
+Obstacle principal : Containers mobiles (SceneryScatter)
+Containers metalliques sur rails qui se deplacent periodiquement, modiﬁant la topologie de la
+carte en temps reel. Le joueur doit anticiper les mouvements pour ne pas se faire coincer.
+Objet interactif : Portes automatiques (SceneryScatter)
+Portes qui s'ouvrent/ferment sur un timer. Le joueur peut les traverser au bon moment pour
+creer des barrieres contre les ennemis. Le timing est tactique.
+Danger au sol : Zones de chargement (GroundZone)
+Zones telegraphiees (cercle orange 1.5s) ou des containers tombent du ciel. Le joueur doit
+evacuer la zone avant l'impact. Degats de zone a l'impact.
+Pourquoi c'est fun :
+La carte change physiquement pendant la run. Les containers mobiles et portes automatiques
+creent un terrain vivant ou le joueur doit constamment s'adapter.
+Conﬁg proposee :
+"tech_container_mobile": {
+    "systeme": "SceneryScatter",
+    "declencheur": "timer",
+    "cycle_deplacement": 20.0,
+    "vitesse": 15.0,
+    "bloque_mouvement": true,
+    "rails": ["horizontal_gauche", "vertical_centre"],
+},
+"tech_porte_automatique": {
+    "systeme": "SceneryScatter",
+    "declencheur": "timer",
+    "cycle_ouvert": 5.0, "cycle_ferme": 5.0,
+    "bloque_mouvement": true,
+    "mobile": {"cycle_min": 7.0},
+},
+"tech_zone_chargement": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 10.0, "intervalle_max": 18.0,
+    "duree_telegraphe": 1.5, "duree_effet": 0.5,
+    "degats": 30, "rayon": 80.0,
+    "couleur_telegraphe": Color(1, 0.6, 0, 0.3),
+Map 3 — Quai de Chargement
+--- PAGE 5 ---
+    "mobile": {"rayon_min": 60.0, "duree_telegraphe_mobile": 2.0},
+},
+Identite visuelle : Laboratoire cryogenique blanc/bleu, givre sur metal, capsules de stase,
+vapeur froide, cristaux de glace.
+Mecanique de biome : Glisse/inertie, gel/degel, visibilite reduite — le mouvement devient un
+deﬁ de controle.
+Couleur BIOME_TINT : Bleu clair/blanc.
+Identite : Laboratoire cryogenique, capsules de stase alignees, givre sur les murs, vapeur froide
+au sol, lumieres bleues tamisees.
+Obstacle principal : Plaques de glace (SceneryScatter)
+Zones au sol ou la friction est reduite — le joueur glisse et son inertie le porte. Le mouvement
+devient un deﬁ de controle, pas juste de direction. Les ennemis glissent aussi.
+Objet interactif : Capsules cryogeniques (PropScatter)
+Capsules destructibles. Chaque capsule libere soit un bonus (soin, cristaux, noyaux) soit un
+ennemi gele qui se reveille. Le joueur prend un risque en les ouvrant. Taux de bonus vs ennemi
+: 65/35.
+Danger au sol : Jets de cryo (GroundZone)
+Nuages de cryo qui ﬁgent brievement joueur et ennemis au contact. Telegraph : nuage blanc
+1.0s. Eﬀet : gel 1.5s (immobilisation totale). Intervalle : 6-12s.
+Pourquoi c'est fun :
+Le joueur joue avec l'inertie — attirer les ennemis sur la glace pour les faire deraper, casser les
+capsules au bon moment, gerer les jets de cryo. Le mouvement lui-meme devient tactique. Un
+ennemi gele par un jet de cryo est une cible facile.
+Conﬁg proposee :
+"cryo_plaque_glace": {
+    "systeme": "SceneryScatter",
+    "declencheur": "contact",
+    "friction_mult": 0.3,  # 30% de la friction normale
+    "couleur": Color(0.7, 0.9, 1.0, 0.4),
+    "mobile": {"friction_min": 0.4},  # moins glissant sur mobile
+},
+"cryo_capsule": {
+    "systeme": "PropScatter",
+    "declencheur": "destruction",
+    "pv": 40,
+    "proba_bonus": 0.65, "proba_ennemi": 0.35,
+    "bonus_possibles": ["soin", "cristaux", "noyaux"],
+    "delai_spawn": 0.5,
+Biome 2 — ZONE CRYO (Nouveau)
+Map 4 — Cryo-Voute
+--- PAGE 6 ---
+    "taux_spawn": 0.15,
+    "mobile": {"rayon_min": 50.0},
+},
+"cryo_jet_cryo": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 6.0, "intervalle_max": 12.0,
+    "duree_telegraphe": 1.0, "duree_effet": 1.5,
+    "effet": "gel",  # immobilisation totale
+    "rayon": 70.0,
+    "couleur_telegraphe": Color(0.8, 0.9, 1.0, 0.2),
+    "couleur_effet": Color(0.5, 0.8, 1.0, 0.4),
+    "mobile": {"rayon_min": 55.0, "duree_telegraphe_mobile": 1.5},
+},
+Identite : Serre techno industrielle envahie par la glace, plantes mortes cristallisees, cristaux
+lumineux, brouillard blanc dense.
+Obstacle principal : Brouillard froid (GroundZone)
+Nuage mobile qui reduit la visibilite dans de grandes zones. Le joueur ne voit pas les ennemis
+arriver. Le brouillard se deplace lentement a travers la carte. Rayon de reduction de visibilite :
+200px.
+Objet interactif : Radiateurs (SceneryScatter)
+Radiateurs que le joueur active pour dissiper le brouillard dans un rayon pendant 8s (cooldown
+20s). Cree des corridors de visibilite. Le joueur peut planiﬁer ses trajets autour des radiateurs.
+Danger au sol : Pics de glace (GroundZone)
+Pics qui surgissent du sol. Telegraph : ﬁssure lumineuse 1.2s. Restent 3s puis se retractent.
+Degats moderes + ralentissement 2s.
+Pourquoi c'est fun :
+Le joueur controle la visibilite — activer les radiateurs cree des safe zones visuelles. C'est un
+survivor-like ou l'information spatiale est elle-meme un gameplay. Le joueur doit choisir entre
+voir (activer radiateur) et se battre (utiliser le temps autrement).
+Conﬁg proposee :
+"cryo_brouillard_froid": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,  # permanent, se deplace
+    "vitesse_deplacement": 10.0,
+    "rayon_visibilite_reduit": 200.0,
+    "opacite": 0.7,
+    "couleur": Color(0.9, 0.95, 1.0, 0.5),
+    "mobile": {"opacite_min": 0.5},
+},
+"cryo_radiateur": {
+    "systeme": "SceneryScatter",
+Map 5 — Serres Gelees
+--- PAGE 7 ---
+    "declencheur": "proximite",
+    "duree_effet": 8.0, "cooldown": 20.0,
+    "rayon_proximite": 80.0,
+    "rayon_dissipation": 180.0,
+    "effet": "dissiper_brouillard",
+    "mobile": {"rayon_proximite_mobile": 120.0, "rayon_dissipation_mobile": 200.0},
+},
+"cryo_pics_glace": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 5.0, "intervalle_max": 10.0,
+    "duree_telegraphe": 1.2, "duree_effet": 3.0,
+    "degats": 12, "ralentissement": 2.0,
+    "rayon": 50.0, "forme": "cercle",
+    "couleur_telegraphe": Color(0.7, 0.9, 1.0, 0.2),
+    "couleur_effet": Color(0.8, 0.95, 1.0, 0.5),
+    "mobile": {"rayon_min": 45.0, "duree_telegraphe_mobile": 1.5},
+},
+Identite : Lac gele industriel, passerelles metalliques au-dessus, glace ﬁssuree, eau sombre en
+dessous, lumiere froide bleue.
+Obstacle principal : Plaques de glace fragiles (GroundZone)
+Plaques qui se ﬁssurent puis cedent apres trop de passages. Le joueur laisse des traces de
+destruction derriere lui. Les zones qu'il a beaucoup utilisees deviennent impraticables. Chaque
+passage augmente le compteur de ﬁssuration.
+Objet interactif : Bornes thermiques (PropScatter)
+Bornes que le joueur active pour regeler une zone de glace et la solidiﬁer temporairement (10s,
+cooldown 25s). Mais la zone regelee est glissante (eﬀet Map 4). Le joueur choisit : solidite ou
+controle.
+Danger au sol : Eﬀondrement de glace (GroundZone)
+Zones de glace qui cedent, creant des trous qui ralentissent ou bloquent le passage. La carte se
+degrade pendant la run. Le joueur doit gerer ses trajets pour ne pas detruire tous ses passages.
+Pourquoi c'est fun :
+La carte se degrade au ﬁl du temps — le joueur doit gerer ses trajets, ne pas repasser trop de fois
+au meme endroit, et utiliser les bornes thermiques strategiquement. C'est une carte qui punit
+l'habitude et recompense l'exploration.
+Conﬁg proposee :
+"cryo_glace_fragile": {
+    "systeme": "GroundZone",
+    "declencheur": "passage",
+    "ﬁssures_max": 3,  # passages avant effondrement
+    "duree_telegraphe": 0.8,
+    "duree_effet": -1.0,  # permanent jusqu'a borne thermique
+    "effet": "trou",  # bloque le passage
+Map 6 — Lac de Permafrost
+--- PAGE 8 ---
+    "couleur_ﬁssure_1": Color(0.8, 0.9, 1.0, 0.3),
+    "couleur_ﬁssure_2": Color(0.6, 0.7, 0.9, 0.4),
+    "couleur_effondree": Color(0.1, 0.1, 0.2, 0.8),
+    "mobile": {"duree_telegraphe_mobile": 1.2},
+},
+"cryo_borne_thermique": {
+    "systeme": "PropScatter",
+    "declencheur": "activation",
+    "duree_effet": 10.0, "cooldown": 25.0,
+    "rayon_proximite": 70.0,
+    "rayon_regel": 120.0,
+    "effet": "regeler_glace",
+    "effet_secondaire": "glissant",  # comme Map 4
+    "pv": 30,  # cassable
+    "taux_spawn": 0.12,
+},
+Identite visuelle : Reacteur nucleaire instable, tuyaux de vapeur, pulsations d'energie, liquides
+radioactifs verts, chaleur.
+Mecanique de biome : Danger alterne, ventilation, drainage — le joueur doit gerer des zones qui
+changent d'etat.
+Couleur BIOME_TINT : Vert toxique.
+Identite : Salle de traitement chimique, bassins de liquide radioactif vert, ponts metalliques au-
+dessus, vapeur toxique.
+Obstacle principal : Bassins de liquide toxique (GroundZone)
+Zones persistantes de liquide radioactif qui occupent de grandes surfaces au sol. Le joueur est
+restreint aux ponts metalliques et passerelles etroites. Les ennemis terrestres sont aussi
+bloques.
+Objet interactif : Vannes de drainage (SceneryScatter)
+Vannes qui vident un bassin pendant 15s (cooldown 35s), revelant un passage et parfois du loot
+cache au fond. Le joueur choisit quel bassin drainer.
+Danger au sol : Flaques radioactives persistantes (GroundZone)
+Degats continus tant que le joueur est dans la zone. Les safe zones (ponts) sont ﬁxes mais
+certaines sont mobiles (ponts basculants).
+Pourquoi c'est fun :
+Le joueur doit gerer le niveau de danger du terrain en activant les vannes de drainage. Le
+terrain lui-meme est la principale source de tension — le joueur doit planiﬁer ses trajets autour
+des bassins.
+Conﬁg proposee :
+Biome 3 — NOYAU INSTABLE (Reacteur)
+Map 7 — Bassins Toxiques
+--- PAGE 9 ---
+"reacteur_bassin_toxique": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,
+    "degats_par_seconde": 6,
+    "ralentissement": 0.5,
+    "couleur": Color(0.2, 1.0, 0.2, 0.4),
+    "mobile": {"opacite_min": 0.3},
+},
+"reacteur_vanne_drainage": {
+    "systeme": "SceneryScatter",
+    "declencheur": "proximite",
+    "duree_effet": 15.0, "cooldown": 35.0,
+    "rayon_proximite": 80.0,
+    "effet": "drainer_bassin",
+    "rayon_drainage": 200.0,
+    "mobile": {"rayon_proximite_mobile": 120.0},
+},
+Identite : Salle des turbines avec ventilateurs geants, courants d'air visibles, sol grille avec
+lumieres vertes, grand espace ouvert.
+Obstacle principal : Vent directionnel (SceneryScatter)
+Vent qui pousse le joueur, les ennemis ET les projectiles dans une direction. La direction
+change toutes les 20-30s. Le vent aﬀecte tout — tirer contre le vent ralentit les projectiles, tirer
+avec le vent les accelere.
+Objet interactif : Consoles de controle du vent (SceneryScatter)
+Consoles qui permettent de changer la direction du vent manuellement (cooldown 15s). Le
+joueur peut orienter le vent pour pousser les ennemis vers les murs ou les turbines.
+Danger au sol : Grilles de ventilation (GroundZone)
+Jets de vapeur periodiques qui sortent des grilles au sol. Telegraph : siﬄement visuel 1.0s.
+Degats + projection vers le haut (saut force).
+Pourquoi c'est fun :
+Le vent aﬀecte TOUT — c'est une mecanique globale qui change completement la facon de jouer.
+Le joueur peut utiliser le vent pour accelere ses projectiles ou pousser les ennemis. C'est la
+carte la plus dynamique du biome.
+Conﬁg proposee :
+"reacteur_vent_directionnel": {
+    "systeme": "SceneryScatter",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,
+    "direction_change_interval": 25.0,
+    "force_pousse": 40.0,
+    "affecte_projectiles": true,
+Map 8 — Salle des Turbines
+--- PAGE 10 ---
+    "modiﬁcateur_vitesse_projectile": 0.5,  # x0.5 contre, x1.5 avec
+    "couleur_indicateur": Color(0.3, 0.8, 0.3, 0.15),
+    "mobile": {"force_min": 25.0},
+},
+"reacteur_console_vent": {
+    "systeme": "SceneryScatter",
+    "declencheur": "proximite",
+    "duree_effet": 5.0, "cooldown": 15.0,
+    "rayon_proximite": 80.0,
+    "effet": "changer_direction_vent",
+    "mobile": {"rayon_proximite_mobile": 120.0},
+},
+"reacteur_grille_ventilation": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 7.0, "intervalle_max": 14.0,
+    "duree_telegraphe": 1.0, "duree_effet": 1.0,
+    "degats": 10, "projection": true,
+    "rayon": 60.0,
+    "mobile": {"rayon_min": 50.0, "duree_telegraphe_mobile": 1.5},
+},
+Identite : Coeur du reacteur, ﬁssures lumineuses dans le sol, pulsations d'energie, couleurs qui
+alternent vert/jaune.
+Obstacle principal : Zones safe/danger alternes (GroundZone)
+Zones qui alternent entre safe et danger. Quand une zone est safe, une autre devient
+dangereuse. Le joueur doit constamment se deplacer entre les zones. Pattern d'alternance
+conﬁgurable.
+Objet interactif : Cristaux d'energie instables (PropScatter)
+Cristaux qui donnent un boost de surcharge instantane mais explosent apres 3s. Le joueur doit
+les ramasser et s'eloigner rapidement.
+Danger au sol : Pulses d'energie (GroundZone)
+Pulses qui emanent du centre, creant des anneaux qui s'etendent vers l'exterieur. Telegraph :
+cercle central 1.0s. Le joueur doit sauter par-dessus l'anneau ou se placer dans une zone safe.
+Pourquoi c'est fun :
+La carte entiere respire — les zones safe deviennent dangereuses et inversement. C'est un jeu de
+positionnement rythmique ou le joueur doit anticiper les alternances. Ca cree une sensation de
+danse avec le terrain.
+Conﬁg proposee :
+"reacteur_zone_alternante": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "duree_cycle": 5.0,  # 5s safe, 5s danger
+    "degats_par_seconde": 10,
+Map 9 — Noyau Fissure
+--- PAGE 11 ---
+    "rayon": 100.0,
+    "couleur_safe": Color(0.1, 0.3, 0.1, 0.2),
+    "couleur_danger": Color(0.8, 1.0, 0.2, 0.4),
+    "mobile": {"duree_cycle_min": 7.0, "rayon_min": 80.0},
+},
+"reacteur_cristal_instable": {
+    "systeme": "PropScatter",
+    "declencheur": "contact",
+    "effet": "boost_surcharge",
+    "delai_explosion": 3.0,
+    "degats_explosion": 25,
+    "rayon_explosion": 100.0,
+    "taux_spawn": 0.10,
+    "mobile": {"rayon_min": 70.0, "delai_explosion_mobile": 4.0},
+},
+"reacteur_pulse_energie": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 8.0, "intervalle_max": 12.0,
+    "duree_telegraphe": 1.0,
+    "vitesse_expansion": 80.0,  # px/s
+    "degats": 15,
+    "couleur_telegraphe": Color(0.8, 1.0, 0.2, 0.2),
+    "couleur_effet": Color(0.6, 1.0, 0.2, 0.5),
+    "mobile": {"vitesse_expansion_min": 60.0, "duree_telegraphe_mobile": 1.5},
+},
+Identite visuelle : Architecture organique-metallic, parois vivantes qui pulsent, lumieres
+bioluminescentes vertes/violettes, spores.
+Mecanique de biome : Risque/recompense, terrain hostile organique, visibilite reduite.
+Couleur BIOME_TINT : Violet/vert bioluminescent.
+Identite : Chambre d'incubation biomecanique, parois vivantes qui pulsent, cocons lumineux
+violets/verts.
+Obstacle principal : Cocons (PropScatter)
+Cocons repartis sur la carte. Chaque cocon contient soit un bonus (cristaux, noyaux, soin) soit
+un ennemi elite. Le joueur prend un risque en les ouvrant. Proba bonus vs ennemi : 60/40.
+Objet interactif : Les cocons eux-memes
+Le joueur choisit quels cocons ouvrir. Chaque cocon est un dilemme risque/recompense. La
+position des cocons cree un parcours de decisions sur toute la carte.
+Danger au sol : Residu biomecanique (GroundZone)
+Zones au sol qui ralentissent le joueur mais attirent les ennemis. Le joueur doit les eviter ou les
+exploiter pour pieger les ennemis.
+Biome 4 — BIOMECANIQUE (Ruche)
+Map 10 — Couvoir Mecanique
+--- PAGE 12 ---
+Pourquoi c'est fun :
+Chaque cocon est une surprise. Le joueur doit decider : ouvrir un cocon pour un bonus
+potentiel, ou risquer de liberer un ennemi elite au milieu d'une vague. C'est de la gestion de
+risque en temps reel.
+Conﬁg proposee :
+"ruche_cocon": {
+    "systeme": "PropScatter",
+    "declencheur": "destruction",
+    "pv": 60,
+    "proba_bonus": 0.60, "proba_ennemi": 0.40,
+    "bonus_possibles": ["soin", "cristaux", "noyaux", "surcharge"],
+    "ennemi_type": "elite",
+    "delai_spawn": 0.8,
+    "taux_spawn": 0.18,
+    "mobile": {"rayon_min": 55.0},
+},
+"ruche_residu_biomecanique": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,
+    "ralentissement_joueur": 0.4,
+    "attire_ennemis": true,
+    "rayon_attraction": 150.0,
+    "couleur": Color(0.5, 0.2, 0.6, 0.3),
+    "mobile": {"ralentissement_min": 0.6},
+},
+Identite : Tunnels organiques metalliques, parois qui pulsent, veines lumineuses, sol visqueux.
+Obstacle principal : Sol collant (GroundZone)
+Zones au sol qui ralentissent fortement le joueur. Les ennemis volants ne sont pas aﬀectes. Cree
+une asymetrie de mouvement — le joueur est lent mais les ennemis volants sont rapides.
+Objet interactif : Tentacules mecaniques (SceneryScatter)
+Tentacules qui surgissent du sol periodiquement et balayent une zone. Le joueur peut les
+utiliser pour bloquer les ennemis, mais ils sont dangereux pour lui aussi. Telegraph : ombre au
+sol 1.0s.
+Danger au sol : Tentacules (GroundZone)
+Surgissent du sol, balayent une zone circulaire. Telegraph : ombre 1.0s. Restent 3s puis se
+retractent. Degats moderes + projection.
+Pourquoi c'est fun :
+Le sol collant change la facon de se deplacer. Le joueur doit planiﬁer ses trajets en fonction des
+zones collantes et des tentacules. Les tentacules sont a double tranchant — ils bloquent les
+ennemis mais sont dangereux pour le joueur.
+Map 11 — Veines Vivantes
+--- PAGE 13 ---
+Conﬁg proposee :
+"ruche_sol_collant": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,
+    "ralentissement_joueur": 0.3,
+    "ralentissement_ennemi_terrestre": 0.5,
+    "affecte_ennemis_volants": false,
+    "couleur": Color(0.4, 0.2, 0.5, 0.4),
+    "mobile": {"ralentissement_min": 0.5},
+},
+"ruche_tentacule": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 6.0, "intervalle_max": 12.0,
+    "duree_telegraphe": 1.0, "duree_effet": 3.0,
+    "degats": 12, "projection": true,
+    "rayon": 80.0, "forme": "cercle",
+    "couleur_telegraphe": Color(0.3, 0.1, 0.4, 0.3),
+    "couleur_effet": Color(0.5, 0.2, 0.7, 0.5),
+    "mobile": {"rayon_min": 65.0, "duree_telegraphe_mobile": 1.5},
+},
+Identite : Chambre de culture biomecanique, spores lumineuses ﬂottantes, vegetation metal-
+organique, lumieres tamisees.
+Obstacle principal : Nuages de spores toxiques (GroundZone)
+Nuages qui se deplacent lentement a travers la carte. Inﬂigent des degats et reduisent la
+visibilite. Plus le temps passe, plus les spores sont denses.
+Objet interactif : Plantes lumineuses (SceneryScatter)
+Plantes qui, lorsqu'elles sont touchees, emettent une pulsation lumineuse qui dissipe les spores
+dans un rayon pendant 5s (cooldown 15s). Le joueur cree des corridors de visibilite.
+Danger au sol : Spores toxiques denses (GroundZone)
+Spores qui se densiﬁent avec le temps. Degats continus + reduction de visibilite progressive. Le
+joueur doit utiliser les plantes pour creer des passages.
+Pourquoi c'est fun :
+La visibilite reduite cree une tension unique. Le joueur doit interagir avec les plantes pour voir,
+tout en gerant les vagues d'ennemis. C'est un survivor-like ou l'information spatiale est elle-
+meme un gameplay.
+Conﬁg proposee :
+"ruche_nuage_spores": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+Map 12 — Jardin de Spores
+--- PAGE 14 ---
+    "duree_effet": -1.0,
+    "vitesse_deplacement": 8.0,
+    "degats_par_seconde": 5,
+    "rayon_visibilite_reduit": 180.0,
+    "densite_augmente": true,  # plus dense avec le temps
+    "opacite": 0.6,
+    "couleur": Color(0.4, 0.6, 0.3, 0.4),
+    "mobile": {"opacite_min": 0.4, "rayon_visibilite_min": 150.0},
+},
+"ruche_plante_lumineuse": {
+    "systeme": "SceneryScatter",
+    "declencheur": "proximite",
+    "duree_effet": 5.0, "cooldown": 15.0,
+    "rayon_proximite": 70.0,
+    "rayon_dissipation": 160.0,
+    "effet": "dissiper_spores",
+    "mobile": {"rayon_proximite_mobile": 110.0, "rayon_dissipation_mobile": 180.0},
+},
+Identite visuelle : Architecture grandiose orbitale, dalles d'energie, lumieres dorees et bleues,
+epic ﬁnal.
+Mecanique de biome : Topologie dynamique, toutes mecaniques combinees.
+Couleur BIOME_TINT : Dore/bleu.
+Identite : Pont orbital au-dessus du vide, passerelles etroites, lumieres dorees et bleues, vue sur
+l'espace.
+Obstacle principal : Portes de securite (SceneryScatter)
+Portes qui se ferment periodiquement sur les passages etroits. Le joueur doit traverser au bon
+moment. Les portes peuvent bloquer les ennemis mais aussi le joueur.
+Objet interactif : Portes controlables (SceneryScatter)
+Portes que le joueur peut ouvrir/fermer manuellement (proximite). Fermer une porte bloque
+les ennemis mais aussi le joueur. C'est un outil tactique pour creer des barrages.
+Danger au sol : Zones de depressurisation (GroundZone)
+Zones ou l'air s'echappe, creant un eﬀet d'aspiration vers le bord. Telegraph : alarme visuelle
+1.5s. Le joueur est attire vers le vide.
+Pourquoi c'est fun :
+Le joueur controle les portes pour creer des barrages contre les vagues. C'est de la gestion de
+ﬂux — ouvrir et fermer les passages au bon moment pour canaliser les ennemis.
+Conﬁg proposee :
+Biome 5 — FORGE FINALE (Citadelle)
+Map 13 — Pont Orbital
+--- PAGE 15 ---
+"citadelle_porte_securite": {
+    "systeme": "SceneryScatter",
+    "declencheur": "timer + manuel",
+    "cycle_ferme": 8.0, "cycle_ouvert": 6.0,
+    "bloque_mouvement": true,
+    "mobile": {"cycle_min": 10.0},
+},
+"citadelle_porte_controllable": {
+    "systeme": "SceneryScatter",
+    "declencheur": "proximite",
+    "duree_effet": 4.0, "cooldown": 12.0,
+    "rayon_proximite": 80.0,
+    "effet": "ouvrir_fermer_porte",
+    "mobile": {"rayon_proximite_mobile": 120.0},
+},
+"citadelle_depressurisation": {
+    "systeme": "GroundZone",
+    "declencheur": "timer",
+    "intervalle_min": 10.0, "intervalle_max": 18.0,
+    "duree_telegraphe": 1.5, "duree_effet": 2.0,
+    "force_aspiration": 50.0,
+    "direction": "vers_bord",
+    "couleur_telegraphe": Color(1, 0.2, 0, 0.2),
+    "mobile": {"duree_telegraphe_mobile": 2.0, "force_min": 35.0},
+},
+Identite : Anneau circulaire avec champ de gravite variable, dalles d'energie ﬂottantes,
+lumieres dorees intenses.
+Obstacle principal : Zones push/pull (GroundZone)
+Zones qui poussent ou attirent le joueur et les ennemis. Quand une zone pousse, l'autre attire.
+Le joueur doit lire le rythme pour se positionner.
+Objet interactif : Lasers rotatifs (GroundZone)
+Lasers qui tournent autour d'un point central. Le joueur doit trouver la fenetre de mouvement
+dans la rotation. Telegraph : ligne de preﬁre 1.0s.
+Danger au sol : Anneaux de gravite alternes (GroundZone)
+Push/pull qui alternent. Le joueur doit se deplacer en spirale pour eviter d'etre attire ou pousse
+dans un mur.
+Pourquoi c'est fun :
+Les lasers rotatifs forcent un mouvement circulaire, et les zones push/pull ajoutent une
+dimension de gestion de l'attraction. C'est une carte qui demande un mouvement precis et
+rythmique — comme une danse.
+Conﬁg proposee :
+Map 14 — Anneau de Gravite
+--- PAGE 16 ---
+"citadelle_zone_push_pull": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,
+    "duree_cycle": 4.0,  # 4s push, 4s pull
+    "force": 35.0,
+    "rayon": 120.0,
+    "couleur_push": Color(1, 0.8, 0, 0.2),
+    "couleur_pull": Color(0.2, 0.8, 1, 0.2),
+    "mobile": {"duree_cycle_min": 6.0, "force_min": 25.0},
+},
+"citadelle_laser_rotatif": {
+    "systeme": "GroundZone",
+    "declencheur": "persistent",
+    "duree_effet": -1.0,
+    "vitesse_rotation": 30.0,  # degres/s
+    "duree_telegraphe": 1.0,
+    "degats": 20,
+    "longueur": 400.0, "largeur": 30.0,
+    "couleur_telegraphe": Color(1, 0.8, 0, 0.2),
+    "couleur_effet": Color(1, 0.4, 0, 0.6),
+    "mobile": {"vitesse_rotation_min": 20.0, "duree_telegraphe_mobile": 1.5},
+},
+Identite : Arene centrale de la forge, architecture modulaire grandiose, lumieres dorees
+intenses, sol d'energie. Le boss ﬁnal.
+Obstacle principal : Arene modulaire (SceneryScatter)
+L'arene entiere reconﬁgure ses murs pendant la run. Toutes les 2-3 minutes, les murs se
+deplacent, de nouvelles zones de danger apparaissent, les passages changent. La carte n'est
+jamais la meme.
+Objet interactif : Piliers d'energie (PropScatter)
+Piliers que le joueur peut detruire pour declencher une vague d'energie qui repousse tous les
+ennemis. Mais les detruire revele aussi de nouvelles zones de danger.
+Danger au sol : Combinaison de toutes les mecaniques (GroundZone)
+Chaque phase de la run active diﬀerentes mecaniques des biomes precedents : vents, ﬂacques,
+lasers, tentacules, push/pull, glace, surchauﬀe. Le joueur doit s'adapter en permanence.
+Pourquoi c'est fun :
+C'est le climax. La carte combine toutes les mecaniques apprises dans les 14 maps precedentes
+et les melange en temps reel. Le joueur doit s'adapter en permanence. C'est le test ﬁnal de
+maitrise du terrain.
+Conﬁg proposee :
+"citadelle_arene_modulaire": {
+    "systeme": "SceneryScatter",
+Map 15 — Chambre de la Forge
+--- PAGE 17 ---
+    "declencheur": "timer",
+    "intervalle_reconﬁguration": 150.0,  # 2.5 min
+    "conﬁgurations_possibles": ["ouverte", "couloirs", "ile_centrale", "quadrants"]
+    "bloque_mouvement": true,
+    "mobile": {"intervalle_min": 180.0},
+},
+"citadelle_pilier_energie": {
+    "systeme": "PropScatter",
+    "declencheur": "destruction",
+    "pv": 100,
+    "effet": "vague_energie",
+    "force_repoussement": 80.0,
+    "rayon": 300.0,
+    "revele_danger": true,
+    "taux_spawn": 0.06,
+    "mobile": {"rayon_min": 80.0},
+},
+"citadelle_dangers_multi_biomes": {
+    "systeme": "GroundZone",
+    "declencheur": "phase",
+    "phases": [
+        {"biome_source": "tech", "duree": 60.0},
+        {"biome_source": "cryo", "duree": 60.0},
+        {"biome_source": "reacteur", "duree": 60.0},
+        {"biome_source": "ruche", "duree": 60.0},
+        {"biome_source": "tous", "duree": -1.0},  # ﬁn: tout en meme temps
+    ],
+    "mobile": {"duree_telegraphe_mobile": 2.0},
+},
+1. Rayon minimum : toute zone de danger doit faire au moins 60px de rayon sur mobile
+2. Telegraphe minimum : 1.5s sur desktop, 2.0s sur mobile
+3. Pas de chevauchement tactile : aucune zone de danger ou prop interactif sur le joystick
+(bas-gauche) ou la zone de tir (bas-droite)
+4. Obstacles non bloquants : en survivor-like, le mouvement est vital. Les obstacles creent des
+choix, pas des impasses
+5. Performance : reutiliser les pools existants, pas de queue_free() en boucle
+6. Bonus decouvrables : indice visuel subtil (glow, couleur diﬀerente)
+Contraintes mobile (5-6 pouces)
+Regles absolues
+--- PAGE 18 ---
+La glisse peut etre un simple multiplicateur sur les zones gelees :
+# Sur une plaque de glace, la friction du joueur est multipliee
+# par friction_mult (0.3 = 70% de glisse en plus).
+# Pas de refonte du controleur — juste un parametre.
+if sur_plaque_glace:
+    friction_joueur = friction_base * 0.3
+Priorite Action Systeme
+1 Corriger PropScatter (props invisibles en jeu) PropScatter
+2 Ajouter obstacles fixes (murs, couvertures) SceneryScatter
+3 Implementer convoyeurs (Map 1) SceneryScatter
+4 Implementer bras presseurs (Map 1) GroundZone
+5 Implementer vannes de refroidissement (Map 2) SceneryScatter
+6 Implementer surchauﬀe du sol (Map 2) GroundZone
+7 Implementer containers mobiles (Map 3) SceneryScatter
+8 Implementer portes automatiques (Map 3) SceneryScatter
+Priorite Action Systeme
+9 Implementer plaques de glace / friction (Map 4) SceneryScatter
+10 Implementer capsules cryo destructibles (Map 4) PropScatter
+11 Implementer jets de cryo (Map 4) GroundZone
+12 Implementer brouillard froid (Map 5) GroundZone
+13 Implementer radiateurs (Map 5) SceneryScatter
+14 Implementer glace fragile (Map 6) GroundZone
+15 Implementer bornes thermiques (Map 6) PropScatter
+Glisse Cryo en MVP
+Plan d'implementation MVP
+Phase 1 — Fondations (maps 1-3, biome Usine)
+Phase 2 — Biome Cryo (maps 4-6)
+--- PAGE 19 ---
+Implementation progressive des mecaniques des biomes Reacteur, Ruche, et Citadelle selon le
+meme pattern : PropScatter + SceneryScatter + GroundZone.
+5 arènes de boss modulaires avec mecaniques de decor speciﬁques.
+Proposition de design, non implementee : faute de code source
+Test Android reel impossible depuis cet environnement
+Document de mecaniques : ce plan est une proposition autonome, a adapter avec le
+document de design fourni
+Images : 5 concepts visuels (1 par biome) + 1 planche 15 maps. Les concepts illustrent
+l'identite visuelle du biome, pas chaque map individuellement
+Phase 3 — Biomes restants (maps 7-15)
+Phase 4 — Boss arenas
+Limites
