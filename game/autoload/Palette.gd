@@ -76,3 +76,71 @@ func ui_theme() -> Theme:
 	th.set_color("font_disabled_color", "Button", Color(0.46, 0.51, 0.57))
 	th.set_font_size("font_size", "Button", fs(18))
 	return th
+
+# --- MOTION DESIGN & ANIMATION (UI) ---
+# Centralized motion design system for a premium "Hologram" feel.
+
+## Simple Fade-In for backgrounds or whole layers (100% safe).
+static func fade_in(node: CanvasItem, delay: float = 0.0, dur: float = 0.25) -> Tween:
+	node.modulate.a = 0.0
+	var t: Tween = node.create_tween()
+	t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	if delay > 0.0:
+		t.tween_interval(delay)
+	t.tween_property(node, "modulate:a", 1.0, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	return t
+
+## Pop-in (safe for Container children): starts at alpha 0 and scale from_scale, settles at scale 1.0 and alpha 1.0.
+## Never alters node.position so Container layouts remain 100% pixel-perfect.
+static func pop_in(node: Control, delay: float = 0.0, dur: float = 0.26, from_scale: float = 0.92) -> void:
+	node.modulate.a = 0.0
+	var run = func() -> void:
+		if not is_instance_valid(node) or not node.is_inside_tree():
+			return
+		node.pivot_offset = node.size * 0.5
+		node.scale = Vector2(from_scale, from_scale)
+		var t: Tween = node.create_tween()
+		t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		t.set_parallel(true)
+		t.tween_property(node, "modulate:a", 1.0, dur * 0.7).set_delay(delay)
+		t.tween_property(node, "scale", Vector2.ONE, dur).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if node.is_inside_tree():
+		node.get_tree().process_frame.connect(run, Object.CONNECT_ONE_SHOT)
+	else:
+		node.ready.connect(func() -> void:
+			if is_instance_valid(node) and node.is_inside_tree():
+				node.get_tree().process_frame.connect(run, Object.CONNECT_ONE_SHOT)
+		, Object.CONNECT_ONE_SHOT)
+
+## Staggered reveal for children in a Container (safe: animates alpha and subtle scale, NEVER position).
+static func stagger_reveal(container: Control, stagger: float = 0.04, base_delay: float = 0.0) -> void:
+	var d: float = base_delay
+	for c in container.get_children():
+		if c is Control:
+			pop_in(c, d, 0.25, 0.94)
+			d += stagger
+
+## Alias for backward compatibility: redirects to safe stagger_reveal without breaking positions.
+static func stagger_slide(container: Control, _offset: Vector2 = Vector2.ZERO, stagger: float = 0.04, base_delay: float = 0.0) -> void:
+	stagger_reveal(container, stagger, base_delay)
+
+## Slide-in: safe fade that does not destroy layout.
+static func slide_in(node: Control, _offset: Vector2 = Vector2.ZERO, delay: float = 0.0, dur: float = 0.3) -> Tween:
+	return fade_in(node, delay, dur)
+
+## Binds a simple scale bounce to button hover events (desktop only).
+static func bind_hover_scale(btn: Control, scale_factor: float = 1.04, dur: float = 0.1) -> void:
+	if DisplayServer.is_touchscreen_available():
+		return
+	btn.mouse_entered.connect(func() -> void:
+		if btn.size.length() > 1.0: btn.pivot_offset = btn.size / 2.0
+		var t: Tween = btn.create_tween()
+		t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		t.tween_property(btn, "scale", Vector2(scale_factor, scale_factor), dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	btn.mouse_exited.connect(func() -> void:
+		var t: Tween = btn.create_tween()
+		t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		t.tween_property(btn, "scale", Vector2.ONE, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+

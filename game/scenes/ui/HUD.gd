@@ -25,6 +25,7 @@ var player: Player
 var _root: Control
 var _topbar: ColorRect
 var _hp_fill: ColorRect
+var _hp_ghost: ColorRect
 var _hp_bg: ColorRect
 var _xp_fill: ColorRect
 var _xp_bg: ColorRect
@@ -231,6 +232,7 @@ func _build() -> void:
 	_topbar = _rect(_root, Color(0, 0, 0, 0.38))
 	_topbar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_hp_bg = _rect(_root, Color(0.22, 0.05, 0.05, 0.9))
+	_hp_ghost = _rect(_root, Color(1.0, 1.0, 1.0, 0.85))
 	_hp_fill = _rect(_root, Color(0.92, 0.26, 0.2, 1))
 	_hp_overlay = HpSegments.new()
 	_hp_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -369,6 +371,8 @@ func _relayout() -> void:
 	_topbar.offset_bottom = band_h
 	_hp_bg.position = Vector2(pad, top)
 	_hp_bg.size = Vector2(_bar_w, hp_h)
+	_hp_ghost.position = _hp_bg.position
+	_hp_ghost.size.y = hp_h
 	_hp_fill.position = _hp_bg.position
 	_hp_fill.size = Vector2(_bar_w, hp_h)
 	_hp_overlay.position = _hp_bg.position
@@ -460,8 +464,19 @@ func _chip_fs() -> void:
 		_chip.add_theme_font_size_override("font_size", Palette.fs(13))
 
 func _update_hp() -> void:
-	if player != null and _hp_fill != null:
-		_hp_fill.size.x = _bar_w * clampf(player.hp / maxf(1.0, player.max_hp), 0.0, 1.0)
+	if player != null and _hp_fill != null and _hp_ghost != null:
+		var target_w: float = _bar_w * clampf(player.hp / maxf(1.0, player.max_hp), 0.0, 1.0)
+		var current_fill: float = _hp_fill.size.x
+		_hp_fill.size.x = target_w
+		
+		# Ghost bar (damage feedback)
+		if target_w < current_fill:
+			_hp_ghost.size.x = maxf(_hp_ghost.size.x, current_fill)
+			var t: Tween = _hp_ghost.create_tween()
+			t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			t.tween_property(_hp_ghost, "size:x", target_w, 0.4).set_delay(0.15).set_trans(Tween.TRANS_SINE)
+		elif target_w > current_fill:
+			_hp_ghost.size.x = target_w
 
 func _update_xp() -> void:
 	if _xp_fill != null:
@@ -594,7 +609,8 @@ func _render_draft() -> void:
 	# lignes imaginaires. On additionne donc les hauteurs qu'on connait deja.
 	var title_h: float = float(Palette.fs(20)) * 1.4
 	var foot_h: float = maxf(48.0, 44.0 * k)
-	var content_h: float = title_h + float(cards.size()) * row_h + foot_h 		+ row_gap * float(cards.size() + 1)
+	var content_h: float = title_h + float(cards.size()) * row_h + foot_h \
+		+ row_gap * float(cards.size() + 1)
 	vb.size = Vector2(pw - mar * 2.0, 0)
 	var ph: float = minf(vp.y * 0.92, content_h + mar * 2.0)
 	var ox: float = (vp.x - pw) * 0.5
@@ -604,6 +620,11 @@ func _render_draft() -> void:
 	vb.position = Vector2(ox + mar, oy + mar)
 	vb.size = Vector2(pw - mar * 2.0, ph - mar * 2.0)
 	_draft_root.visible = true
+
+	# --- MOTION DESIGN ---
+	Palette.fade_in(bg_blur)
+	Palette.pop_in(panel)
+	Palette.stagger_reveal(vb, 0.04, 0.08)
 
 func pick(i: int) -> void:      # headless bot entry point
 	if _draft_root.visible:

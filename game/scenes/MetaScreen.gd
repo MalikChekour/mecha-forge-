@@ -652,7 +652,7 @@ func _scaffold(min_w: float = 540.0) -> VBoxContainer:
 	center.add_child(v)
 	v.modulate.a = 0.0
 	_intro_pop(v, 0.0, 0.92)
-	_intro_slide(v, 0.0, 48.0 * uk)   # 05/10 : glissement lateral, retirer cette ligne seule pour revenir en arriere
+	_intro_slide(v, 0.0, 48.0 * uk)
 	return v
 
 func _title(v: VBoxContainer, text: String, color: Color, size: int = 40) -> void:

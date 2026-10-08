@@ -949,6 +949,12 @@ func _show_chapter_select() -> void:
 		_show_home())
 	root.add_child(back)   # HORS du ScrollContainer : toujours visible en bas
 
+	# --- MOTION DESIGN ---
+	Palette.fade_in(bg)
+	Palette.fade_in(margin)
+	Palette.stagger_reveal(box, 0.03, 0.04)
+	Palette.pop_in(back, 0.12, 0.24, 0.94)
+
 
 func _on_chapter_chosen(idx: int, overlay: CanvasLayer) -> void:
 	var ch: Dictionary = CHAPTERS[idx]
