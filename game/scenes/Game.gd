@@ -980,12 +980,13 @@ func _show_chapter_select() -> void:
 
 		if not is_unlocked:
 			var lock_overlay: Label = Label.new()
-			lock_overlay.text = "🔒"
+			lock_overlay.text = "[ BLOQUE ]"
 			lock_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lock_overlay.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			lock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 			lock_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			lock_overlay.add_theme_font_size_override("font_size", Palette.fs(18))
+			lock_overlay.add_theme_font_size_override("font_size", Palette.fs(12))
+			lock_overlay.add_theme_color_override("font_color", Color(1.0, 0.7, 0.7, 0.9))
 			thumb_panel.add_child(lock_overlay)
 		hbox.add_child(thumb_panel)
 
@@ -1051,10 +1052,10 @@ func _show_chapter_select() -> void:
 			lbl_stat.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			lbl_stat.add_theme_font_size_override("font_size", Palette.fs(12))
 			if cleared >= n:
-				lbl_stat.text = "✔ BATTU"
+				lbl_stat.text = "BATTU"
 				lbl_stat.add_theme_color_override("font_color", Color(0.45, 0.92, 0.6))
 			else:
-				lbl_stat.text = "DÉPLOYER ▶"
+				lbl_stat.text = "DEPLOYER >"
 				lbl_stat.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0))
 			right_box.add_child(lbl_stat)
 
