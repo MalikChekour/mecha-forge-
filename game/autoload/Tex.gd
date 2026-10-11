@@ -302,6 +302,19 @@ func get_tex(path: String, fallback_color: Color = Color.WHITE, fallback_size: i
 		var r: Variant = load(path)
 		if r is Texture2D:
 			t = r
+	if t == null and FileAccess.file_exists(path):
+		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+		if not bytes.is_empty():
+			var img: Image = Image.new()
+			var err: Error = FAILED
+			if path.ends_with(".jpg") or path.ends_with(".jpeg"):
+				err = img.load_jpg_from_buffer(bytes)
+			elif path.ends_with(".png"):
+				err = img.load_png_from_buffer(bytes)
+			elif path.ends_with(".webp"):
+				err = img.load_webp_from_buffer(bytes)
+			if err == OK:
+				t = ImageTexture.create_from_image(img)
 	if t == null:
 		t = _placeholder(fallback_color, fallback_size)
 	_cache[path] = t

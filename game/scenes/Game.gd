@@ -895,41 +895,181 @@ func _show_chapter_select() -> void:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # largeur = celle du scroll
 	box.add_theme_constant_override("separation", 8)
 	sc.add_child(box)
-	var btn_w: float = _panel_w(560.0)
-	var btn_h: float = clampf(vp.y * 0.085, 40.0, 56.0)
+	var btn_w: float = _panel_w(620.0)
+	var btn_h: float = clampf(vp.y * 0.115, 70.0, 86.0)
 	var cleared: int = SaveManager.chapters_cleared_count()
+	var th_h: float = btn_h - 12.0
+	var th_w: float = roundf(th_h * (16.0 / 9.0))
+	if btn_w < 420.0:
+		th_w = minf(th_w, btn_w * 0.28)
+
 	for i in CHAPTERS.size():
 		var ch: Dictionary = CHAPTERS[i]
 		var n: int = i + 1
+		var is_unlocked: bool = SaveManager.chapter_unlocked(n)
+
 		var b: Button = Button.new()
-		b.add_theme_font_size_override("font_size", Palette.fs(20))
 		b.custom_minimum_size = Vector2(btn_w, btn_h)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		# texte trop long = tronque avec « … » au lieu d'elargir le bouton hors ecran
-		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		b.clip_text = true
-		# PASS : le glisser (doigt / souris) remonte au ScrollContainer -> la liste defile
-		# meme quand on commence le geste SUR un bouton (sinon le bouton avale l'evenement).
 		b.mouse_filter = Control.MOUSE_FILTER_PASS
-		if SaveManager.chapter_unlocked(n):
-			var dn: String = String(GameState.DIFFICULTY[clampi(int(ch["diff"]), 0, GameState.DIFFICULTY.size() - 1)].get("name", ""))
-			var done: String = "  (battu)" if cleared >= n else ""
-			# 🚨 « Palier 1000 » etait INERTE (B10) : la valeur `gate` n'est lue NULLE PART, le
-			# deverrouillage ne depend que du chapitre precedent battu. Un chiffre presente
-			# comme une condition alors qu'il n'en est pas une, c'est pire que rien. On
-			# affiche a la place le sous-titre du chapitre, qui lui est vrai.
-			b.text = "%d.  %s  —  %s      %s%s" % [n, String(ch["name"]), String(ch["sub"]), dn, done]
+		b.text = ""
+		b.clip_text = false
+
+		# Style cyber / carte tactique
+		var sb_n: StyleBoxFlat = StyleBoxFlat.new()
+		sb_n.bg_color = Color(0.04, 0.08, 0.14, 0.88)
+		sb_n.border_color = Color(0.2, 0.45, 0.7, 0.45)
+		sb_n.set_border_width_all(1)
+		sb_n.set_corner_radius_all(6)
+		b.add_theme_stylebox_override("normal", sb_n)
+
+		var sb_h: StyleBoxFlat = StyleBoxFlat.new()
+		sb_h.bg_color = Color(0.08, 0.16, 0.28, 0.95)
+		sb_h.border_color = Color(0.3, 0.85, 1.0, 0.9)
+		sb_h.set_border_width_all(2)
+		sb_h.set_corner_radius_all(6)
+		b.add_theme_stylebox_override("hover", sb_h)
+		b.add_theme_stylebox_override("focus", sb_h)
+
+		var sb_p: StyleBoxFlat = StyleBoxFlat.new()
+		sb_p.bg_color = Color(0.02, 0.06, 0.12, 0.98)
+		sb_p.border_color = Color(0.2, 0.75, 0.95, 0.95)
+		sb_p.set_border_width_all(2)
+		sb_p.set_corner_radius_all(6)
+		b.add_theme_stylebox_override("pressed", sb_p)
+
+		var sb_d: StyleBoxFlat = StyleBoxFlat.new()
+		sb_d.bg_color = Color(0.03, 0.04, 0.06, 0.7)
+		sb_d.border_color = Color(0.14, 0.16, 0.2, 0.35)
+		sb_d.set_border_width_all(1)
+		sb_d.set_corner_radius_all(6)
+		b.add_theme_stylebox_override("disabled", sb_d)
+
+		# Contenu interactif à l'intérieur du bouton (mouse_filter IGNORE pour laisser cliquer le bouton)
+		var hbox: HBoxContainer = HBoxContainer.new()
+		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+		hbox.offset_left = 6
+		hbox.offset_right = -12
+		hbox.offset_top = 6
+		hbox.offset_bottom = -6
+		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hbox.add_theme_constant_override("separation", 12)
+		b.add_child(hbox)
+
+		# 1. Vignette 16:9 du niveau
+		var thumb_panel: PanelContainer = PanelContainer.new()
+		thumb_panel.custom_minimum_size = Vector2(th_w, th_h)
+		thumb_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sb_th: StyleBoxFlat = StyleBoxFlat.new()
+		sb_th.bg_color = Color(0.02, 0.03, 0.05, 1.0)
+		sb_th.set_corner_radius_all(4)
+		sb_th.border_color = Color(0.3, 0.65, 0.95, 0.4) if is_unlocked else Color(0.18, 0.2, 0.24, 0.35)
+		sb_th.set_border_width_all(1)
+		thumb_panel.add_theme_stylebox_override("panel", sb_th)
+		thumb_panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+
+		var img_rect: TextureRect = TextureRect.new()
+		img_rect.texture = Tex.get_tex("res://assets/chapters/chap_%d_%s.jpg" % [n, ch["biome"]])
+		img_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		img_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		img_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		img_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not is_unlocked:
+			img_rect.modulate = Color(0.35, 0.35, 0.4, 0.55)
+		thumb_panel.add_child(img_rect)
+
+		if not is_unlocked:
+			var lock_overlay: Label = Label.new()
+			lock_overlay.text = "🔒"
+			lock_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lock_overlay.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			lock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+			lock_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			lock_overlay.add_theme_font_size_override("font_size", Palette.fs(18))
+			thumb_panel.add_child(lock_overlay)
+		hbox.add_child(thumb_panel)
+
+		# 2. Informations du chapitre (Titre + Sous-titre / Biome)
+		var info_box: VBoxContainer = VBoxContainer.new()
+		info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		info_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		info_box.add_theme_constant_override("separation", 2)
+
+		var lbl_title: Label = Label.new()
+		lbl_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		lbl_title.clip_text = true
+		lbl_title.add_theme_font_size_override("font_size", Palette.fs(16))
+		lbl_title.text = "%d.  %s" % [n, String(ch["name"]).to_upper()]
+		if is_unlocked:
 			if cleared >= n:
-				b.add_theme_color_override("font_color", Color(0.5, 0.85, 0.6))   # déjà battu
+				lbl_title.add_theme_color_override("font_color", Color(0.65, 0.95, 0.75))
+			else:
+				lbl_title.add_theme_color_override("font_color", Color(0.9, 0.96, 1.0))
+		else:
+			lbl_title.add_theme_color_override("font_color", Color(0.48, 0.52, 0.58))
+		info_box.add_child(lbl_title)
+
+		var lbl_sub: Label = Label.new()
+		lbl_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		lbl_sub.clip_text = true
+		lbl_sub.add_theme_font_size_override("font_size", Palette.fs(12))
+		if is_unlocked:
+			lbl_sub.text = "%s  •  %s" % [String(ch["sub"]), _biome_label(ch["biome"])]
+			lbl_sub.add_theme_color_override("font_color", Color(0.55, 0.72, 0.85))
+		else:
+			lbl_sub.text = "Terminez le chapitre %d" % [n - 1]
+			lbl_sub.add_theme_color_override("font_color", Color(0.75, 0.45, 0.45))
+		info_box.add_child(lbl_sub)
+		hbox.add_child(info_box)
+
+		# 3. Badges de droite (Difficulté + Statut)
+		var right_box: VBoxContainer = VBoxContainer.new()
+		right_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		right_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		right_box.add_theme_constant_override("separation", 3)
+
+		if is_unlocked:
+			var diff_idx: int = clampi(int(ch["diff"]), 0, GameState.DIFFICULTY.size() - 1)
+			var dn: String = String(GameState.DIFFICULTY[diff_idx].get("name", ""))
+			var lbl_diff: Label = Label.new()
+			lbl_diff.text = dn
+			lbl_diff.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			lbl_diff.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			lbl_diff.add_theme_font_size_override("font_size", Palette.fs(11))
+			match diff_idx:
+				0: lbl_diff.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
+				1: lbl_diff.add_theme_color_override("font_color", Color(0.35, 0.8, 1.0))
+				2: lbl_diff.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
+				3: lbl_diff.add_theme_color_override("font_color", Color(0.95, 0.45, 0.85))
+			right_box.add_child(lbl_diff)
+
+			var lbl_stat: Label = Label.new()
+			lbl_stat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			lbl_stat.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			lbl_stat.add_theme_font_size_override("font_size", Palette.fs(12))
+			if cleared >= n:
+				lbl_stat.text = "✔ BATTU"
+				lbl_stat.add_theme_color_override("font_color", Color(0.45, 0.92, 0.6))
+			else:
+				lbl_stat.text = "DÉPLOYER ▶"
+				lbl_stat.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0))
+			right_box.add_child(lbl_stat)
+
 			b.pressed.connect(_on_chapter_chosen.bind(i, cl))
 		else:
-			# Rapport de test (26/09, x2) : "le compteur reste a 0/5 chapitres... rien n'est
-			# visible depuis l'ecran de selection" pour savoir QUOI faire. La vraie condition
-			# (cf. commentaire ci-dessus, deja verifiee : chapter_unlocked ne lit PAS "gate",
-			# seulement le chapitre precedent battu) est enfin dite, au lieu d'un "???" muet.
-			b.text = "%d.  VERROUILLE  —  terminez le chapitre %d" % [n, n - 1]
+			var lbl_lock: Label = Label.new()
+			lbl_lock.text = "VERROUILLÉ"
+			lbl_lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			lbl_lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			lbl_lock.add_theme_font_size_override("font_size", Palette.fs(11))
+			lbl_lock.add_theme_color_override("font_color", Color(0.48, 0.5, 0.55))
+			right_box.add_child(lbl_lock)
 			b.disabled = true
-			b.add_theme_color_override("font_color_disabled", Color(0.45, 0.45, 0.52))
+
+		hbox.add_child(right_box)
 		box.add_child(b)
 	var back: Button = Button.new()
 	back.text = "RETOUR"
@@ -954,6 +1094,20 @@ func _show_chapter_select() -> void:
 	Palette.fade_in(margin)
 	Palette.stagger_reveal(box, 0.03, 0.04)
 	Palette.pop_in(back, 0.12, 0.24, 0.94)
+
+
+func _biome_label(b: String) -> String:
+	match b:
+		"tech": return "Secteur Industriel"
+		"desert": return "Désert Toxique"
+		"jungle": return "Ruines Végétales"
+		"volcanic": return "Forge Magmatique"
+		"swamp": return "Cité Engloutie"
+		"cryo": return "Cryo-Laboratoire"
+		"reacteur": return "Cœur Réacteur"
+		"ruche": return "Ruche Xéno"
+		"citadelle": return "Citadelle Orbitale"
+		_: return b.capitalize()
 
 
 func _on_chapter_chosen(idx: int, overlay: CanvasLayer) -> void:
