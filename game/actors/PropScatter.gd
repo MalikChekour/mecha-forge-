@@ -680,6 +680,20 @@ class Prop extends StaticBody2D:
 	var _arc: float = 0.52                 # half-angle of the firing cone (rad)
 	var _muzzle: Vector2 = Vector2.ZERO    # barrel tip, local px (already scaled)
 	var flip: bool = false                 # mirrored copy -> cannon points down-RIGHT instead
+	# CANON A RAYON AUTOMATIQUE A INTERVALLE REGULIER
+	var _cannon_beam: bool = false
+	var _cannon_beam_state: int = 0        # 0 idle, 1 telegraph/charge, 2 tir de rayon
+	var _cannon_beam_t: float = 0.0
+	var _cannon_beam_line: Line2D = null
+	var _cannon_beam_glow: Line2D = null
+	var _cannon_beam_core: Line2D = null
+	var _cannon_beam_flash: Sprite2D = null
+	var _cannon_hit_set: Dictionary = {}
+	const CANNON_IDLE: float = 2.4
+	const CANNON_TELL: float = 0.8
+	const CANNON_FIRE: float = 0.38
+	const CANNON_LEN: float = 1800.0
+	const CANNON_HALF_W: float = 24.0
 	# fuel barrel: arms when you come near, then blows. 4s is enough to walk clear on purpose —
 	# so it's a TOOL (lead the horde over it) as much as a hazard.
 	var _boom: bool = false
@@ -1444,6 +1458,18 @@ class Prop extends StaticBody2D:
 			if flip:
 				_cannon.x = -_cannon.x
 				_muzzle.x = -_muzzle.x
+			_cannon_beam = true
+			_cannon_beam_t = randf_range(0.8, CANNON_IDLE)
+			_cannon_beam_glow = _mk_beam(27)
+			_cannon_beam_line = _mk_beam(28)
+			_cannon_beam_core = _mk_beam(29)
+			_cannon_beam_flash = Sprite2D.new()
+			_cannon_beam_flash.texture = Tex.glow(Color(1.0, 0.6, 0.15), 128)
+			_cannon_beam_flash.material = Tex.add_mat()
+			_cannon_beam_flash.top_level = true
+			_cannon_beam_flash.z_index = 29
+			_cannon_beam_flash.visible = false
+			add_child(_cannon_beam_flash)
 
 		# Prop glow — was a persistent PointLight2D per glowing prop. With chunk streaming that's
 		# a stack of always-on dynamic lights (each a canvas re-render) = a constant mobile tax.
@@ -1516,50 +1542,9 @@ class Prop extends StaticBody2D:
 				return
 		var dist: float = global_position.distance_to(_plr.global_position)
 
-		# --- hostile turret: fires ONLY along its baked barrel, and only into its own arc ---
-		# The cannon is part of the 3/4 drawing and can't turn, so we never fake a tracking shot:
-		# walk into the cone it actually covers and it opens up, straight down the tube.
-		if _shoot_r > 0.0 and not _hacked:
-			_shoot_t -= delta
-			if _shoot_t <= 0.0 and dist < _shoot_r:
-				var to_plr: Vector2 = (_plr.global_position - global_position).normalized()
-				if to_plr != Vector2.ZERO and absf(_cannon.angle_to(to_plr)) <= _arc:
-					_shoot_t = _shoot_cd
-					if game.has_method("spawn_enemy_bolt"):
-						var mz: Vector2 = global_position + _muzzle
-						game.spawn_enemy_bolt(mz, _cannon, _shoot_dmg, Color(1.0, 0.55, 0.25), 1.5)   # heavy emplacement bolt
-						if game.has_method("spawn_vfx"):
-							# +90 deg: the muzzle sheet's flame is drawn pointing UP
-							game.spawn_vfx("muzzle", mz, _cannon.angle() + PI * 0.5, 0.42,
-								Color(1.0, 0.7, 0.4))
-		elif _hacked:
-			# PIRATEE : meme canon FIXE, meme cone — mais elle cherche un ennemi dedans au lieu du
-			# joueur. spawn_enemy_bolt ne touche QUE le joueur (EnemyProjectile filtre le groupe
-			# "player"), donc degat direct + un trait visuel plutot qu'un nouveau type de projectile.
-			_shoot_t -= delta
-			if _shoot_t <= 0.0:
-				var mz2: Vector2 = global_position + _muzzle
-				var best_e: Node2D = null
-				var best_d: float = _shoot_r * _shoot_r
-				for e in get_tree().get_nodes_in_group("enemies"):
-					if not (e is Node2D) or not e.has_method("take_damage"):
-						continue
-					if "alive" in e and not e.alive:
-						continue
-					var to_e: Vector2 = (e as Node2D).global_position - mz2
-					var d: float = to_e.length_squared()
-					if d >= best_d or to_e.length() <= 1.0:
-						continue
-					if absf(_cannon.angle_to(to_e.normalized())) <= _arc:
-						best_d = d
-						best_e = e
-				if best_e != null:
-					_shoot_t = _shoot_cd
-					best_e.take_damage(_shoot_dmg * 1.6)   # "supercharged" now that c'est le tien
-					if game.has_method("_streak"):
-						game._streak(mz2 + _cannon * 60.0, _cannon, Color(0.5, 1.0, 1.6), 120.0, 5.0, 0.14)
-					if game.has_method("spawn_vfx"):
-						game.spawn_vfx("muzzle", mz2, _cannon.angle() + PI * 0.5, 0.42, Color(0.5, 1.0, 1.6))
+		# --- CANON A RAYON AUTOMATIQUE A INTERVALLE REGULIER ---
+		if _cannon_beam and (dist < 1600.0 or _cannon_beam_state != 0):
+			_tick_cannon_beam(delta)
 
 		# --- beacon: emit an enemy on a fixed cadence while the player is in range ---
 		if _beacon:
@@ -2360,6 +2345,117 @@ class Prop extends StaticBody2D:
 				_plr.take_damage(_beam_dmg, global_position)
 				Events.screen_shake.emit(7.0)
 
+	## Tourelle canon a rayon : tire automatiquement un rayon energetique a intervalle regulier
+	## dans la direction de son canon fixe. Phase de charge (telegraph lumineux croissant)
+	## suivie d'un tir de rayon fulgurant penetrant. Si pirate, le rayon devient cyan et foudroie
+	## les ennemis au lieu du joueur.
+	func _tick_cannon_beam(delta: float) -> void:
+		_cannon_beam_t -= delta
+		var a: Vector2 = global_position + _muzzle
+		var b: Vector2 = a + _cannon * CANNON_LEN
+		var pts: PackedVector2Array = PackedVector2Array([a, b])
+		var base_col: Color = Color(0.2, 0.85, 1.0) if _hacked else Color(1.0, 0.35, 0.1)
+
+		match _cannon_beam_state:
+			0:
+				if _cannon_beam_t <= 0.0:
+					_cannon_beam_state = 1
+					_cannon_beam_t = CANNON_TELL
+					for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
+						if ln != null and is_instance_valid(ln):
+							ln.points = pts
+							ln.visible = true
+					Audio.sfx("w_railgun", 0.05)
+					if game != null and game.has_method("spawn_vfx"):
+						game.spawn_vfx("muzzle", a, _cannon.angle() + PI * 0.5, 0.25, base_col)
+			1:
+				# Telegraph : ligne laser fine de ciblage qui s'intensifie
+				var k: float = 1.0 - clampf(_cannon_beam_t / CANNON_TELL, 0.0, 1.0)
+				var puls: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.035)
+				for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
+					if ln != null and is_instance_valid(ln):
+						ln.points = pts
+				if _cannon_beam_core != null and is_instance_valid(_cannon_beam_core):
+					_cannon_beam_core.width = 1.5 + k * 3.5
+					_cannon_beam_core.default_color = Color(1.0, 1.0, 1.0, 0.35 + k * 0.55)
+				if _cannon_beam_line != null and is_instance_valid(_cannon_beam_line):
+					_cannon_beam_line.width = 2.0 + k * 9.0
+					_cannon_beam_line.default_color = Color(base_col.r, base_col.g, base_col.b, 0.25 + k * 0.45)
+				if _cannon_beam_glow != null and is_instance_valid(_cannon_beam_glow):
+					_cannon_beam_glow.width = 6.0 + k * 26.0
+					_cannon_beam_glow.default_color = Color(base_col.r, base_col.g, base_col.b, (0.10 + k * 0.22) * (0.6 + 0.4 * puls))
+				if _cannon_beam_t <= 0.0:
+					_cannon_beam_state = 2
+					_cannon_beam_t = CANNON_FIRE
+					_cannon_hit_set.clear()
+					if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
+						_cannon_beam_flash.position = a
+						_cannon_beam_flash.visible = true
+					_fire_cannon_beam(a, b, base_col)
+					Audio.sfx("w_plasma", 0.06)
+			2:
+				# Decharge de rayon laser : faisceau epais incandescent avec micro-flicker
+				var f: float = clampf(_cannon_beam_t / CANNON_FIRE, 0.0, 1.0)
+				var flick: float = 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.1)
+				for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
+					if ln != null and is_instance_valid(ln):
+						ln.points = pts
+				if _cannon_beam_core != null and is_instance_valid(_cannon_beam_core):
+					_cannon_beam_core.width = CANNON_HALF_W * 0.65 * flick
+					_cannon_beam_core.default_color = Color(1.0, 1.0, 1.0, f)
+				if _cannon_beam_line != null and is_instance_valid(_cannon_beam_line):
+					_cannon_beam_line.width = CANNON_HALF_W * 1.7 * flick
+					_cannon_beam_line.default_color = Color(minf(base_col.r * 1.3, 1.0), minf(base_col.g * 1.3, 1.0), minf(base_col.b * 1.3, 1.0), f * 0.95)
+				if _cannon_beam_glow != null and is_instance_valid(_cannon_beam_glow):
+					_cannon_beam_glow.width = CANNON_HALF_W * 4.4 * flick
+					_cannon_beam_glow.default_color = Color(base_col.r, base_col.g, base_col.b, f * 0.5)
+				if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
+					_cannon_beam_flash.position = a
+					_cannon_beam_flash.scale = Vector2.ONE * (CANNON_HALF_W * 4.5 / 128.0) * (0.8 + 0.4 * flick)
+					_cannon_beam_flash.modulate = Color(base_col.r, base_col.g, base_col.b, f)
+				_check_cannon_beam_hits(a, b)
+				if _cannon_beam_t <= 0.0:
+					_cannon_beam_state = 0
+					_cannon_beam_t = CANNON_IDLE
+					for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
+						if ln != null and is_instance_valid(ln):
+							ln.visible = false
+					if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
+						_cannon_beam_flash.visible = false
+
+	func _fire_cannon_beam(a: Vector2, b: Vector2, base_col: Color) -> void:
+		Audio.sfx("explosion", 0.08)
+		if game != null and game.has_method("spawn_vfx"):
+			game.spawn_vfx("muzzle", a, _cannon.angle() + PI * 0.5, 0.55, base_col)
+			game.spawn_vfx("energy", a, 0.0, 1.0, base_col)
+		_check_cannon_beam_hits(a, b)
+
+	func _check_cannon_beam_hits(a: Vector2, b: Vector2) -> void:
+		# Toucher des ennemis : les tourelles (meme hostiles) transpercent et blessent les ennemis dans la ligne !
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if e is Node2D and is_instance_valid(e) and e.has_method("take_damage"):
+				if _cannon_hit_set.has(e):
+					continue
+				var p: Vector2 = (e as Node2D).global_position
+				if Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p) <= CANNON_HALF_W + 32.0:
+					_cannon_hit_set[e] = true
+					var edmg: float = _shoot_dmg * 6.0 if _hacked else _shoot_dmg * 3.5
+					e.take_damage(edmg)
+					if game != null and game.has_method("impact_fx"):
+						var col: Color = Color(0.3, 0.9, 1.0) if _hacked else Color(1.0, 0.45, 0.15)
+						game.impact_fx(p, col, "laser", _cannon, 1.6)
+
+		# Toucher du joueur : seulement si non pirate
+		if not _hacked and _plr != null and is_instance_valid(_plr) and _plr.has_method("take_damage"):
+			if not _cannon_hit_set.has(_plr):
+				var pp: Vector2 = _plr.global_position
+				if Geometry2D.get_closest_point_to_segment(pp, a, b).distance_to(pp) <= CANNON_HALF_W + 24.0:
+					_cannon_hit_set[_plr] = true
+					_plr.take_damage(_shoot_dmg * 1.5, global_position)
+					Events.screen_shake.emit(6.0)
+					if game != null and game.has_method("impact_fx"):
+						game.impact_fx(pp, Color(1.0, 0.4, 0.1), "laser", _cannon, 1.8)
+
 	## Fuel barrel detonation: hurts EVERYTHING in BOOM_R, the player included — the 4s fuse is
 	## the fair warning. Leading the horde over a barrel is the reward.
 	func _explode() -> void:
@@ -2418,6 +2514,11 @@ class Prop extends StaticBody2D:
 	func _clear_beam() -> void:
 		if _beam_line != null and is_instance_valid(_beam_line):
 			_beam_line.visible = false
+		for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
+			if ln != null and is_instance_valid(ln):
+				ln.visible = false
+		if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
+			_cannon_beam_flash.visible = false
 
 	func _exit_tree() -> void:
 		_clear_beam()
@@ -2440,10 +2541,11 @@ class Prop extends StaticBody2D:
 			if _sprite != null:
 				_sprite.modulate = Color(0.5, 1.4, 1.6)   # cyan — "allie", cf. la hierarchie de couleurs
 			if game != null and game.has_method("show_hint"):
-				game.show_hint("Tourelle piratée — elle tire maintenant sur les ennemis dans son cône.",
+				game.show_hint("Tourelle piratée — son rayon automatique foudroie les ennemis !",
 					Color(0.5, 1.0, 1.0), 4.5)
 			return
 		if hp <= 0.0:
+			_clear_beam()
 			if _boom:
 				_explode()      # shooting a fuel barrel sets it off — no fuse, you chose this
 				return

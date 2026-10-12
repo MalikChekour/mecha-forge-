@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://testcannonbeam001"]
+
+[ext_resource type="Script" path="res://_test_cannon_beam.gd" id="1_canon"]
+
+[node name="TestCannonBeam" type="Node"]
+script = ExtResource("1_canon")
