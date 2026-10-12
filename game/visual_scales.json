@@ -1,0 +1,21 @@
+{
+  "decor_global": 1.0,
+  "vfx_global": 1.0,
+  "decor_categories": {
+    "crates_barrels": 1.0,
+    "machines_towers": 1.0,
+    "interactive_hazards": 1.0,
+    "nature_minerals": 1.0,
+    "borders": 1.0
+  },
+  "vfx_categories": {
+    "explosions": 1.0,
+    "impacts": 1.0,
+    "beams_lasers": 1.0,
+    "shockwaves": 1.0,
+    "shields_auras": 1.0,
+    "muzzle_flashes": 1.0
+  },
+  "decor_custom": {},
+  "vfx_custom": {}
+}

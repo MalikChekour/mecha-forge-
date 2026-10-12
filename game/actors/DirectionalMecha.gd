@@ -39,10 +39,13 @@ const _DIRVEC: Dictionary = {"front": Vector2(0, 1), "back": Vector2(0, -1), "le
 # rotate by the same amount so the muzzle flash + eye-laser stay glued to the (now rotated) hardpoints.
 var _lean: float = 0.0
 var _lean_target: float = 0.0
-const LEAN_MAX: float = 0.40   # ~23° cap on the body tilt (enough to track aim without tipping over)
+const LEAN_MAX: float = 0.40
 
-func set_lean_target(rad: float) -> void:
-	_lean_target = clampf(rad, -LEAN_MAX, LEAN_MAX)
+func set_lean_target(_rad: float) -> void:
+	_lean_target = 0.0
+	_lean = 0.0
+	if _spr != null:
+		_spr.rotation = 0.0
 
 func _ready() -> void:
 	# No ground shadow on the player mech: it walks, and the contact shadow on 3/4 walker art read
@@ -79,6 +82,8 @@ func _tex(anim: String, dir: String) -> Texture2D:
 	return t
 
 func _apply() -> void:
+	if _spr == null:
+		return
 	var tex: Texture2D = _tex(_anim, _dir)
 	_spr.texture = tex
 	_spr.hframes = frame_count
@@ -126,6 +131,21 @@ const _GUN_ANCHORS: Dictionary = {
 	"vortex": {
 		"front": Vector2(-11.7, 6.7), "back": Vector2(8.9, -81.6),
 		"left": Vector2(-67.5, -43.9), "right": Vector2(66.8, -31.9)},
+	"titan": {
+		"front": Vector2(-16.0, -14.0), "back": Vector2(16.0, -12.0),
+		"left": Vector2(14.0, -22.0), "right": Vector2(-14.0, -12.0)},
+	"bruiser": {
+		"front": Vector2(-16.0, -12.0), "back": Vector2(16.0, -10.0),
+		"left": Vector2(14.0, -20.0), "right": Vector2(-14.0, -10.0)},
+	"vanquisher": {
+		"front": Vector2(-18.0, -16.0), "back": Vector2(18.0, -12.0),
+		"left": Vector2(16.0, -22.0), "right": Vector2(-16.0, -12.0)},
+	"pylone": {
+		"front": Vector2(-16.0, -14.0), "back": Vector2(16.0, -12.0),
+		"left": Vector2(14.0, -22.0), "right": Vector2(-14.0, -12.0)},
+	"cerclier": {
+		"front": Vector2(-18.0, -16.0), "back": Vector2(18.0, -12.0),
+		"left": Vector2(16.0, -22.0), "right": Vector2(-16.0, -12.0)},
 }
 # Head/eye pixel per facing (measured from the sprite's head mass, tools/head_check2). The red
 # targeting laser is emitted from here — a head-mounted sight, Terminator style.
@@ -152,12 +172,12 @@ func has_baked_weapon() -> bool:
 # True when gun_anchor() already points at the barrel TIP (not the hand), so the muzzle
 # needs no extra forward offset. VORTEX's arm-cannon anchors are measured tips.
 func gun_at_tip() -> bool:
-	return chassis == "vortex"
+	return chassis in ["vortex", "titan", "bruiser", "vanquisher", "pylone", "cerclier"]
 
 func gun_anchor() -> Vector2:
 	var d: Dictionary = _GUN_ANCHORS.get(chassis, {})
 	var a: Vector2 = d.get(_dir, Vector2(-15.0, -25.0))
-	return a.rotated(_lean) * (display_height / 190.0)
+	return a * (display_height / 190.0)
 
 func has_head_anchor() -> bool:
 	return _HEAD_ANCHORS.has(chassis)
@@ -165,7 +185,7 @@ func has_head_anchor() -> bool:
 func head_anchor() -> Vector2:
 	var d: Dictionary = _HEAD_ANCHORS.get(chassis, {})
 	var a: Vector2 = d.get(_dir, Vector2(0.0, -44.0))
-	return a.rotated(_lean) * (display_height / 190.0)
+	return a * (display_height / 190.0)
 
 func blade_anchor() -> Vector2:
 	var d: Dictionary = _BLADE_ANCHORS.get(chassis, {})
@@ -239,8 +259,8 @@ func _process_static(delta: float) -> void:
 	_recoil_t = maxf(0.0, _recoil_t - delta * 5.5)
 	var kick: Vector2 = (_DIRVEC.get(_dir, Vector2.ZERO) as Vector2) * (-_recoil_t * 13.0)
 	_spr.position = Vector2(kick.x, -bob - bounce + kick.y)
-	_lean = lerp(_lean, _lean_target, minf(1.0, delta * 12.0))
-	_spr.rotation = _lean
+	_lean = 0.0
+	_spr.rotation = 0.0
 
 ## Swap the whole chassis (e.g. base 'vanguard' <-> transformed 'vanguard2').
 ## Clears the texture cache so the new chassis' sheets load on the next frame.
@@ -274,5 +294,5 @@ func _process(delta: float) -> void:
 	_recoil_t = maxf(0.0, _recoil_t - delta * 8.0)
 	var kick: Vector2 = (_DIRVEC.get(_dir, Vector2.ZERO) as Vector2) * (-_recoil_t * 8.0)
 	_spr.position = kick
-	_lean = lerp(_lean, _lean_target, minf(1.0, delta * 12.0))
-	_spr.rotation = _lean
+	_lean = 0.0
+	_spr.rotation = 0.0

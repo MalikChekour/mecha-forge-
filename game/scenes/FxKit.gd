@@ -128,10 +128,18 @@ static func conveyor_pulse(g: Node, pos: Vector2, color: Color, dir: Vector2, sc
 # couches
 # ---------------------------------------------------------------------------------------------
 
+static func _vfx_mult(g: Node, id: String, cat: String) -> float:
+	if g != null and is_instance_valid(g) and g.is_inside_tree():
+		var sm: Node = g.get_node_or_null("/root/SaveManager")
+		if sm != null and sm.has_method("get_vfx_scale"):
+			return sm.get_vfx_scale(id, cat)
+	return 1.0
+
 ## 1+2 — coeur blanc anamorphique + halo colore. `size` = diametre du halo en px.
 static func core(g: Node, pos: Vector2, col: Color, size: float, dur: float = 0.24) -> void:
 	if not ok(g):
 		return
+	size *= _vfx_mult(g, "core", "impacts")
 	var f: Sprite2D = Sprite2D.new()
 	f.texture = Tex.flare_tex()
 	f.material = Tex.add_mat()
@@ -165,6 +173,9 @@ static func shock(g: Node, pos: Vector2, col: Color, r0: float, r1: float, dur: 
 		delay: float = 0.0, alpha: float = 1.0) -> void:
 	if not ok(g):
 		return
+	var vm: float = _vfx_mult(g, "shock", "shockwaves")
+	r0 *= vm
+	r1 *= vm
 	var s: Sprite2D = Sprite2D.new()
 	s.texture = Tex.shock_tex()
 	s.material = Tex.add_mat()

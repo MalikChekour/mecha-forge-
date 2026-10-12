@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MECHA-FORGE — Studio d'Étalonnage Décor & VFX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header de bord tactique -->
+    <header class="studio-header">
+      <div class="brand">
+        <div class="brand-logo">
+          <span class="icon">⚙️</span>
+          <div class="brand-titles">
+            <span class="brand-super">MECHA-FORGE CALIBRATION SUITE</span>
+            <h1 class="brand-title">STUDIO D'ÉTALONNAGE VISUEL</h1>
+          </div>
+        </div>
+        <div class="brand-badges">
+          <span class="badge badge-accent">V11.28</span>
+          <span class="badge badge-neon">MODULE AUTONOME HORS-JEU</span>
+          <span class="badge badge-status" id="save-status-badge">PRÊT</span>
+        </div>
+      </div>
+
+      <!-- Barre de préréglages rapides -->
+      <div class="header-actions">
+        <div class="presets-group">
+          <span class="presets-label">PRÉRÉGLAGES :</span>
+          <button class="btn btn-preset" data-preset="compact">0.8x Épuré</button>
+          <button class="btn btn-preset active" data-preset="default">1.0x Défaut</button>
+          <button class="btn btn-preset" data-preset="imposing">1.25x Imposant</button>
+          <button class="btn btn-preset" data-preset="titanic">1.5x Titanesque</button>
+        </div>
+        <button id="btn-quick-save" class="btn btn-primary">
+          <span class="icon">💾</span> Sauvegarder
+        </button>
+      </div>
+    </header>
+
+    <!-- Conteneur principal en deux volets -->
+    <main class="studio-body">
+      <!-- Volet GAUCHE : Scène de visualisation en direct (Canvas) -->
+      <section class="viewport-section">
+        <!-- Barre d'outils du Viewport -->
+        <div class="viewport-toolbar">
+          <div class="toolbar-group">
+            <label for="biome-select" class="tool-label">SECTEUR :</label>
+            <select id="biome-select" class="select-input">
+              <option value="tech">Tech (Bleu / Cyan)</option>
+              <option value="cryo">Cryo (Glace / Nébuleuse)</option>
+              <option value="reacteur">Réacteur (Toxique / Vert)</option>
+              <option value="ruche">Ruche (Organique / Pourpre)</option>
+              <option value="citadelle">Citadelle (Acier / Ambre)</option>
+            </select>
+          </div>
+
+          <div class="toolbar-group">
+            <label for="mecha-select" class="tool-label">MECHA :</label>
+            <select id="mecha-select" class="select-input">
+              <option value="vortex">Vortex (Châssis Principal)</option>
+              <option value="bluestrike">Bluestrike (Intercepteur)</option>
+              <option value="titan">Titan (Châssis Lourd)</option>
+            </select>
+          </div>
+
+          <div class="toolbar-toggles">
+            <button id="btn-toggle-grid" class="btn btn-icon active" title="Afficher/Masquer la grille métrique">
+              📏 Grille
+            </button>
+            <button id="btn-toggle-hitbox" class="btn btn-icon active" title="Afficher/Masquer les boîtes de collision">
+              🎯 Colliders
+            </button>
+            <button id="btn-zoom-out" class="btn btn-icon" title="Zoom arrière">-</button>
+            <span id="zoom-level" class="zoom-text">100%</span>
+            <button id="btn-zoom-in" class="btn btn-icon" title="Zoom avant">+</button>
+            <button id="btn-zoom-reset" class="btn btn-icon" title="Réinitialiser la caméra">↺</button>
+          </div>
+        </div>
+
+        <!-- Canvas interactif -->
+        <div class="canvas-container" id="canvas-container">
+          <canvas id="stage-canvas"></canvas>
+
+          <!-- Overlay d'informations temps réel -->
+          <div class="viewport-overlay-hud">
+            <div class="hud-item" id="hud-decor-info">
+              <span class="hud-label">DÉCOR :</span>
+              <span class="hud-val" id="hud-decor-text">Baril (1.00x - 90px)</span>
+            </div>
+            <div class="hud-item" id="hud-vfx-info">
+              <span class="hud-label">VFX :</span>
+              <span class="hud-val" id="hud-vfx-text">Explosion AAA (1.00x)</span>
+            </div>
+            <div class="hud-item" id="hud-ratio-info">
+              <span class="hud-label">RATIO / MECHA :</span>
+              <span class="hud-val text-accent" id="hud-ratio-text">0.47x (Normal)</span>
+            </div>
+          </div>
+
+          <!-- Contrôles flottants de lecture VFX -->
+          <div class="vfx-floating-controls">
+            <button id="btn-trigger-vfx" class="btn btn-vfx-action">
+              <span class="icon">💥</span> Déclencher l'effet (Espace)
+            </button>
+            <label class="toggle-control">
+              <input type="checkbox" id="vfx-loop-toggle" checked>
+              <span>Boucle continue</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Barre de diagnostic rapide en bas du viewport -->
+        <footer class="viewport-footer">
+          <div class="footer-stat">
+            <span class="dot dot-online"></span>
+            <span>Rendu Canvas 60 FPS</span>
+          </div>
+          <div class="footer-stat">
+            <span>Décors catalogués : <strong>35</strong></span>
+          </div>
+          <div class="footer-stat">
+            <span>Recettes VFX : <strong>19</strong></span>
+          </div>
+          <div class="footer-stat">
+            <span>Fichier cible : <code>game/visual_scales.json</code></span>
+          </div>
+        </footer>
+      </section>
+
+      <!-- Volet DROIT : Panneau de réglage, onglets & sauvegarde -->
+      <aside class="controls-section">
+        <!-- Navigation par onglets -->
+        <nav class="controls-tabs">
+          <button class="tab-btn active" data-tab="tab-overview">
+            <span class="icon">📊</span> Échelles Globales
+          </button>
+          <button class="tab-btn" data-tab="tab-decors">
+            <span class="icon">🪨</span> Décors
+          </button>
+          <button class="tab-btn" data-tab="tab-vfx">
+            <span class="icon">💥</span> Effets Spéciaux
+          </button>
+          <button class="tab-btn" data-tab="tab-save">
+            <span class="icon">💾</span> Sauvegarde
+          </button>
+          <button class="tab-btn" data-tab="tab-diagnostics">
+            <span class="icon">🧪</span> Vérification
+          </button>
+        </nav>
+
+        <!-- Contenu des onglets -->
+        <div class="tabs-content">
+          <!-- ONGLET 1 : VUE D'ENSEMBLE & ÉCHELLES GLOBALES -->
+          <div class="tab-pane active" id="tab-overview">
+            <div class="pane-header">
+              <h2>CALIBRATION GÉNÉRALE</h2>
+              <p class="pane-desc">Ajustez les multiplicateurs maîtres applicables à l'ensemble du jeu.</p>
+            </div>
+
+            <!-- Master Slider Décors -->
+            <div class="card master-card">
+              <div class="card-head">
+                <div class="card-title-group">
+                  <span class="card-icon">🌲</span>
+                  <div>
+                    <h3 class="card-title">Échelle Globale des Décors</h3>
+                    <p class="card-sub">Multiplie la taille de tous les objets, rochers, machines et caisses</p>
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <span class="scale-badge" id="badge-decor-global">1.00x</span>
+                  <button class="btn btn-sm btn-ghost reset-btn" data-target="decor-global" title="Réinitialiser à 1.00x">↺</button>
+                </div>
+              </div>
+              <div class="slider-row">
+                <button class="btn btn-step" data-action="dec" data-target="decor-global">-</button>
+                <input type="range" id="slider-decor-global" min="0.4" max="2.2" step="0.05" value="1.0" class="range-slider">
+                <button class="btn btn-step" data-action="inc" data-target="decor-global">+</button>
+              </div>
+              <div class="slider-ticks">
+                <span>0.4x (Mini)</span>
+                <span>0.8x</span>
+                <span class="tick-center">1.0x (Défaut)</span>
+                <span>1.4x</span>
+                <span>1.8x</span>
+                <span>2.2x (Maxi)</span>
+              </div>
+            </div>
+
+            <!-- Master Slider VFX -->
+            <div class="card master-card">
+              <div class="card-head">
+                <div class="card-title-group">
+                  <span class="card-icon">💥</span>
+                  <div>
+                    <h3 class="card-title">Échelle Globale des Effets Spéciaux (VFX)</h3>
+                    <p class="card-sub">Multiplie la taille des explosions, ondes de choc, rayons et impacts</p>
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <span class="scale-badge badge-vfx" id="badge-vfx-global">1.00x</span>
+                  <button class="btn btn-sm btn-ghost reset-btn" data-target="vfx-global" title="Réinitialiser à 1.00x">↺</button>
+                </div>
+              </div>
+              <div class="slider-row">
+                <button class="btn btn-step" data-action="dec" data-target="vfx-global">-</button>
+                <input type="range" id="slider-vfx-global" min="0.4" max="2.2" step="0.05" value="1.0" class="range-slider range-vfx">
+                <button class="btn btn-step" data-action="inc" data-target="vfx-global">+</button>
+              </div>
+              <div class="slider-ticks">
+                <span>0.4x (Discret)</span>
+                <span>0.8x</span>
+                <span class="tick-center">1.0x (Défaut)</span>
+                <span>1.4x</span>
+                <span>1.8x</span>
+                <span>2.2x (Spectaculaire)</span>
+              </div>
+            </div>
+
+            <!-- Résumé par catégories -->
+            <div class="summary-section">
+              <h4 class="section-title">APERÇU DES COEFFICIENTS PAR CATÉGORIE</h4>
+              <div class="summary-grid" id="overview-category-summary">
+                <!-- Rempli dynamiquement -->
+              </div>
+            </div>
+          </div>
+
+          <!-- ONGLET 2 : DÉCORS (Catégories et Objets) -->
+          <div class="tab-pane" id="tab-decors">
+            <div class="pane-header">
+              <h2>AJUSTEMENT PAR CATÉGORIE DE DÉCOR</h2>
+              <p class="pane-desc">Réglez l'échelle par famille de décor ou ciblez un objet individuel.</p>
+            </div>
+
+            <!-- Sélecteur d'inspection active -->
+            <div class="card select-card">
+              <label for="decor-item-picker" class="picker-label">DÉCOR ACTUELLEMENT EN PRÉVISUALISATION :</label>
+              <select id="decor-item-picker" class="select-input select-large">
+                <!-- Rempli par app.js -->
+              </select>
+              <div class="item-details" id="decor-item-details">
+                <!-- Rempli dynamiquement -->
+              </div>
+            </div>
+
+            <!-- Liste des catégories de décors avec sliders -->
+            <div class="categories-list" id="decor-categories-container">
+              <!-- Rempli par app.js -->
+            </div>
+          </div>
+
+          <!-- ONGLET 3 : EFFETS SPÉCIAUX (Catégories et Effets) -->
+          <div class="tab-pane" id="tab-vfx">
+            <div class="pane-header">
+              <h2>AJUSTEMENT DES EFFETS SPÉCIAUX</h2>
+              <p class="pane-desc">Réglez l'intensité et le rayon de déflagration de chaque famille de VFX.</p>
+            </div>
+
+            <!-- Sélecteur d'effet actif -->
+            <div class="card select-card">
+              <label for="vfx-item-picker" class="picker-label">EFFET SPÉCIAL EN COURS D'INSPECTION :</label>
+              <select id="vfx-item-picker" class="select-input select-large">
+                <!-- Rempli par app.js -->
+              </select>
+              <div class="item-details" id="vfx-item-details">
+                <!-- Rempli dynamiquement -->
+              </div>
+            </div>
+
+            <!-- Liste des catégories VFX avec sliders -->
+            <div class="categories-list" id="vfx-categories-container">
+              <!-- Rempli par app.js -->
+            </div>
+          </div>
+
+          <!-- ONGLET 4 : SAUVEGARDE & EXPORT -->
+          <div class="tab-pane" id="tab-save">
+            <div class="pane-header">
+              <h2>GESTION DES SAUVEGARDES</h2>
+              <p class="pane-desc">Conservez, exportez ou appliquez directement vos réglages de calibrage.</p>
+            </div>
+
+            <!-- Carte Enregistrement Jeu Direct -->
+            <div class="card action-card">
+              <div class="action-card-header">
+                <span class="action-icon">🚀</span>
+                <div>
+                  <h3>Enregistrer dans le Jeu (Recommandé)</h3>
+                  <p>Sauvegarde directement dans <code>game/visual_scales.json</code> pour application instantanée dans Mecha-Forge.</p>
+                </div>
+              </div>
+              <button id="btn-save-to-game" class="btn btn-primary btn-block">
+                <span class="icon">⚡</span> Enregistrer dans le dossier du jeu
+              </button>
+              <div id="game-save-feedback" class="feedback-msg"></div>
+            </div>
+
+            <!-- Carte Export Téléchargement JSON -->
+            <div class="card action-card">
+              <div class="action-card-header">
+                <span class="action-icon">📥</span>
+                <div>
+                  <h3>Télécharger le fichier de configuration</h3>
+                  <p>Télécharge un fichier <code>visual_scales.json</code> que vous pouvez conserver ou partager.</p>
+                </div>
+              </div>
+              <button id="btn-download-json" class="btn btn-secondary btn-block">
+                <span class="icon">💾</span> Télécharger visual_scales.json
+              </button>
+            </div>
+
+            <!-- Carte Import / Chargement JSON -->
+            <div class="card action-card">
+              <div class="action-card-header">
+                <span class="action-icon">📂</span>
+                <div>
+                  <h3>Importer une configuration existante</h3>
+                  <p>Chargez un fichier <code>visual_scales.json</code> préalablement sauvegardé.</p>
+                </div>
+              </div>
+              <input type="file" id="file-import-json" accept=".json" style="display: none;">
+              <button id="btn-trigger-import" class="btn btn-secondary btn-block">
+                <span class="icon">📁</span> Sélectionner un fichier JSON...
+              </button>
+            </div>
+
+            <!-- Carte Réinitialisation d'usine -->
+            <div class="card action-card danger-card">
+              <div class="action-card-header">
+                <span class="action-icon">⚠️</span>
+                <div>
+                  <h3>Réinitialiser les échelles d'origine</h3>
+                  <p>Rétablit tous les multiplicateurs à 1.00x (configuration par défaut du jeu).</p>
+                </div>
+              </div>
+              <button id="btn-reset-all" class="btn btn-danger btn-block">
+                <span class="icon">↺</span> Réinitialiser tout à 1.00x
+              </button>
+            </div>
+
+            <!-- Visualiseur du JSON actif -->
+            <div class="json-viewer-box">
+              <div class="json-header">
+                <span>APERÇU DU FICHIER JSON ACTUEL :</span>
+                <button id="btn-copy-json" class="btn btn-xs">Copier</button>
+              </div>
+              <pre id="json-preview-text">{}</pre>
+            </div>
+          </div>
+
+          <!-- ONGLET 5 : DIAGNOSTIC & VÉRIFICATION -->
+          <div class="tab-pane" id="tab-diagnostics">
+            <div class="pane-header">
+              <h2>VÉRIFICATION & CONTRÔLE DE QUALITÉ</h2>
+              <p class="pane-desc">Testez la validité des textures, les bornes de sécurité et la cohérence des ratios.</p>
+            </div>
+
+            <div class="card test-runner-card">
+              <button id="btn-run-diagnostics" class="btn btn-accent btn-large btn-block">
+                <span class="icon">▶</span> Lancer le Diagnostic Automatisé Complet
+              </button>
+            </div>
+
+            <div class="diagnostics-results-box" id="diagnostics-results">
+              <div class="diag-placeholder">
+                Cliquez sur « Lancer le Diagnostic » pour vérifier l'ensemble des décors, des animations VFX et la cohérence de sauvegarde.
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -192,6 +192,7 @@ const UPGRADES: Array = [
 	{"id": "regen", "name": "Regeneration  (+PV / s)"},                # Energy Drink
 	{"id": "xpgain", "name": "Parchemin ninja  (+15% EXP)"},           # Koga Ninja Scroll
 	{"id": "goldgain", "name": "Liaison a huile  (+20% Or)"},          # Oil Bond
+	{"id": "w_autocannon", "name": "Arme : Autocanon"},
 	{"id": "w_missile", "name": "Arme : Missiles chercheurs"},
 	{"id": "w_railgun", "name": "Arme : Railgun percant"},
 	{"id": "w_plasma", "name": "Arme : Plasma (zone)"},
@@ -208,7 +209,7 @@ const UPGRADES: Array = [
 	{"id": "pool", "name": "Brasier plasma  (mare au sol)"},    # burning ground pool (role Molotov, maison)
 ]
 # maps a weapon draft-card id -> its WeaponSystem id (for showing the current level on the card)
-const _WEAPON_CARD: Dictionary = {"w_missile": "missilepod", "w_railgun": "railgun", "w_plasma": "plasma",
+const _WEAPON_CARD: Dictionary = {"w_autocannon": "autocannon", "w_missile": "missilepod", "w_railgun": "railgun", "w_plasma": "plasma",
 	"w_sabre": "sabre", "w_disperseur": "disperseur", "w_ricochet": "ricochet",
 	"w_disque": "disque", "w_faisceau": "faisceau"}
 
@@ -415,15 +416,30 @@ func play_story_then_home() -> void:
 ##   1. l'illustration dediee si elle existe un jour ;
 ##   2. sinon le SOL reel du biome (assets/decor/ground_<biome>.png) — c'est vraiment ce secteur,
 ##      et chaque biome a donc enfin sa propre image ;
-##   3. sinon RIEN : on saute la sequence. Mieux vaut pas de cinematique qu'une fausse.
+const BIOME_ART: Dictionary = {
+	"tech": "res://assets/chapters/chap_1_tech.jpg",
+	"desert": "res://assets/chapters/chap_2_desert.jpg",
+	"jungle": "res://assets/chapters/chap_3_jungle.jpg",
+	"volcanic": "res://assets/chapters/chap_4_volcanic.jpg",
+	"swamp": "res://assets/chapters/chap_5_swamp.jpg",
+	"cryo": "res://assets/chapters/chap_6_cryo.jpg",
+	"reacteur": "res://assets/chapters/chap_7_reacteur.jpg",
+	"ruche": "res://assets/chapters/chap_8_ruche.jpg",
+	"citadelle": "res://assets/chapters/chap_9_citadelle.jpg",
+	"earth": "res://assets/chapters/chap_earth.jpg",
+	"spaceship": "res://assets/chapters/chap_spaceship.jpg",
+	"ice": "res://assets/chapters/chap_ice.jpg",
+}
+
 func _load_cut(fname: String) -> Texture2D:
 	var p: String = "res://assets/cutscenes/%s.png" % fname
 	if ResourceLoader.exists(p):
 		return load(p) as Texture2D
 	var biome: String = fname.replace("_intro", "").replace("_outro", "")
-	var g: String = "res://assets/decor/ground_%s.png" % biome
-	if ResourceLoader.exists(g):
-		return load(g) as Texture2D
+	if BIOME_ART.has(biome):
+		var art_path: String = String(BIOME_ART[biome])
+		if ResourceLoader.exists(art_path):
+			return load(art_path) as Texture2D
 	return null
 
 func _run_cutscene(panels: Array) -> void:
@@ -480,6 +496,8 @@ func _play_opening() -> void:
 func _begin_run() -> void:
 	if not _bot:
 		await _map_intro(BIOMES[clampi(_biome, 0, BIOMES.size() - 1)])   # arrival panel for map 1
+	if player != null and player.has_method("reset_input_state"):
+		player.reset_input_state()
 	if hud != null:
 		hud.visible = true   # reveal the in-run HUD now that the fight starts
 	var dname: String = String(GameState.diff().get("name", "NORMAL"))
@@ -740,7 +758,9 @@ func show_settings(from_home: bool = false) -> void:
 		if from_home:
 			_show_home()     # on revient au hub, qui se remet en pause tout seul
 		else:
-			get_tree().paused = false)
+			get_tree().paused = false
+			if player != null and player.has_method("reset_input_state"):
+				player.reset_input_state())
 	box.add_child(resume)
 	if from_home:
 		return   # pas d'« ABANDONNER » hors partie
@@ -824,12 +844,12 @@ func _apply_orientation(mode: String) -> void:
 			js = "(function(){try{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();}catch(x){}})()"
 		JavaScriptBridge.eval(js, true)
 		return
-	# NATIVE (Android): actually lock the device orientation — this is where the toggle fully works.
-	var o: int = DisplayServer.SCREEN_SENSOR
+	# NATIVE (Android): lock orientation safely to landscape by default (allows 180 flip)
+	var o: int = DisplayServer.SCREEN_SENSOR_LANDSCAPE
 	if mode == "portrait":
 		o = DisplayServer.SCREEN_PORTRAIT
 	elif mode == "landscape":
-		o = DisplayServer.SCREEN_LANDSCAPE
+		o = DisplayServer.SCREEN_SENSOR_LANDSCAPE
 	DisplayServer.screen_set_orientation(o)
 
 func _on_difficulty_chosen(idx: int, overlay: CanvasLayer) -> void:
@@ -850,58 +870,76 @@ func _on_difficulty_chosen(idx: int, overlay: CanvasLayer) -> void:
 ## SELECTION DE CHAPITRE (remplace le choix de difficulté). Liste les 5 chapitres ; les
 ## verrouillés sont grisés (🔒). Choisir un chapitre débloqué lance ce biome en mode campagne.
 func _show_chapter_select() -> void:
-	# 🚨 05/10 : avec 9 chapitres (post-campagne), la liste depassait la hauteur de l'ecran
-	# (ex. navigateur 1036x558) -> RETOUR hors champ = joueur bloque. Un 1er correctif
-	# (ScrollContainer > CenterContainer plein ecran) n'a RIEN change cote joueur. Structure
-	# definitive : TITRE et RETOUR epingles HORS du defilement, seule la LISTE defile entre
-	# les deux. RETOUR est donc toujours visible, quelle que soit la taille de l'ecran.
-	# Fond opaque (comme avant la refonte) : pas de shader SCREEN_TEXTURE sur cet ecran.
 	get_tree().paused = true
 	var cl: CanvasLayer = CanvasLayer.new()
 	cl.layer = 40
 	cl.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(cl)
+
 	var bg: ColorRect = ColorRect.new()
-	bg.color = Color(0.03, 0.05, 0.09, 0.96)
+	bg.color = Color(0.02, 0.04, 0.08, 0.96)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	cl.add_child(bg)
+
 	var vp: Vector2 = get_viewport().get_visible_rect().size
-	var pad: float = clampf(vp.y * 0.03, 8.0, 28.0)
-	var margin: MarginContainer = MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.theme = Palette.ui_theme()   # meme langage que les menus hors partie
-	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, int(pad))
-	cl.add_child(margin)
-	var root: VBoxContainer = VBoxContainer.new()
-	root.add_theme_constant_override("separation", int(pad * 0.6))
-	margin.add_child(root)
+	var card_w: float = clampf(vp.x * 0.82, 700.0, 980.0)
+	if vp.x < 740.0:
+		card_w = vp.x - 24.0
+	var card_h: float = clampf(vp.y * 0.165, 96.0, 118.0)
+
+	# Conteneur centré plein écran pour aligner parfaitement le menu horizontalement et verticalement
+	var center_root: CenterContainer = CenterContainer.new()
+	center_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center_root.theme = Palette.ui_theme()
+	cl.add_child(center_root)
+
+	var col: VBoxContainer = VBoxContainer.new()
+	var col_h: float = maxf(vp.y - 32.0, 300.0)
+	col.custom_minimum_size = Vector2(card_w + 16.0, col_h)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 10)
+	center_root.add_child(col)
+
+	# --- En-tête centré ---
+	var header_box: VBoxContainer = VBoxContainer.new()
+	header_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	header_box.add_theme_constant_override("separation", 2)
+	col.add_child(header_box)
+
 	var title: Label = Label.new()
 	title.text = "CHOISIS UN CHAPITRE"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", Palette.fs(32))
-	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
-	root.add_child(title)
-	# --- zone qui defile : prend toute la hauteur restante entre le titre et RETOUR ---
+	title.add_theme_color_override("font_color", Color(0.75, 0.94, 1.0))
+	header_box.add_child(title)
+
+	var subhead: Label = Label.new()
+	subhead.text = "CAMPAGNE TACTIQUE  •  SELECTIONNE UNE ZONE"
+	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subhead.add_theme_font_size_override("font_size", Palette.fs(14))
+	subhead.add_theme_color_override("font_color", Color(0.48, 0.65, 0.8))
+	header_box.add_child(subhead)
+
+	# --- Zone qui défile (liste des 9 chapitres) ---
 	var sc: ScrollContainer = ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	sc.follow_focus = true
-	root.add_child(sc)
+	col.add_child(sc)
+
 	var box: VBoxContainer = VBoxContainer.new()
-	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # largeur = celle du scroll
-	box.add_theme_constant_override("separation", 8)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 10)
 	sc.add_child(box)
-	var btn_w: float = _panel_w(620.0)
-	var btn_h: float = clampf(vp.y * 0.115, 70.0, 86.0)
+
 	var cleared: int = SaveManager.chapters_cleared_count()
-	var th_h: float = btn_h - 12.0
+	var th_h: float = card_h - 16.0
 	var th_w: float = roundf(th_h * (16.0 / 9.0))
-	if btn_w < 420.0:
-		th_w = minf(th_w, btn_w * 0.28)
+	if card_w < 500.0:
+		th_w = minf(th_w, card_w * 0.28)
 
 	for i in CHAPTERS.size():
 		var ch: Dictionary = CHAPTERS[i]
@@ -909,61 +947,61 @@ func _show_chapter_select() -> void:
 		var is_unlocked: bool = SaveManager.chapter_unlocked(n)
 
 		var b: Button = Button.new()
-		b.custom_minimum_size = Vector2(btn_w, btn_h)
-		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		b.custom_minimum_size = Vector2(card_w, card_h)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.mouse_filter = Control.MOUSE_FILTER_PASS
 		b.text = ""
 		b.clip_text = false
 
 		# Style cyber / carte tactique
 		var sb_n: StyleBoxFlat = StyleBoxFlat.new()
-		sb_n.bg_color = Color(0.04, 0.08, 0.14, 0.88)
-		sb_n.border_color = Color(0.2, 0.45, 0.7, 0.45)
+		sb_n.bg_color = Color(0.04, 0.08, 0.15, 0.92)
+		sb_n.border_color = Color(0.2, 0.5, 0.8, 0.5) if is_unlocked else Color(0.14, 0.18, 0.24, 0.4)
 		sb_n.set_border_width_all(1)
-		sb_n.set_corner_radius_all(6)
+		sb_n.set_corner_radius_all(8)
 		b.add_theme_stylebox_override("normal", sb_n)
 
 		var sb_h: StyleBoxFlat = StyleBoxFlat.new()
-		sb_h.bg_color = Color(0.08, 0.16, 0.28, 0.95)
-		sb_h.border_color = Color(0.3, 0.85, 1.0, 0.9)
+		sb_h.bg_color = Color(0.08, 0.18, 0.32, 0.98)
+		sb_h.border_color = Color(0.35, 0.9, 1.0, 0.95)
 		sb_h.set_border_width_all(2)
-		sb_h.set_corner_radius_all(6)
+		sb_h.set_corner_radius_all(8)
 		b.add_theme_stylebox_override("hover", sb_h)
 		b.add_theme_stylebox_override("focus", sb_h)
 
 		var sb_p: StyleBoxFlat = StyleBoxFlat.new()
 		sb_p.bg_color = Color(0.02, 0.06, 0.12, 0.98)
-		sb_p.border_color = Color(0.2, 0.75, 0.95, 0.95)
+		sb_p.border_color = Color(0.2, 0.8, 1.0, 1.0)
 		sb_p.set_border_width_all(2)
-		sb_p.set_corner_radius_all(6)
+		sb_p.set_corner_radius_all(8)
 		b.add_theme_stylebox_override("pressed", sb_p)
 
 		var sb_d: StyleBoxFlat = StyleBoxFlat.new()
-		sb_d.bg_color = Color(0.03, 0.04, 0.06, 0.7)
+		sb_d.bg_color = Color(0.03, 0.04, 0.06, 0.75)
 		sb_d.border_color = Color(0.14, 0.16, 0.2, 0.35)
 		sb_d.set_border_width_all(1)
-		sb_d.set_corner_radius_all(6)
+		sb_d.set_corner_radius_all(8)
 		b.add_theme_stylebox_override("disabled", sb_d)
 
-		# Contenu interactif à l'intérieur du bouton (mouse_filter IGNORE pour laisser cliquer le bouton)
+		# Contenu interactif à l'intérieur du bouton
 		var hbox: HBoxContainer = HBoxContainer.new()
 		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-		hbox.offset_left = 6
-		hbox.offset_right = -12
-		hbox.offset_top = 6
-		hbox.offset_bottom = -6
+		hbox.offset_left = 8
+		hbox.offset_right = -16
+		hbox.offset_top = 8
+		hbox.offset_bottom = -8
 		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hbox.add_theme_constant_override("separation", 12)
+		hbox.add_theme_constant_override("separation", 16)
 		b.add_child(hbox)
 
-		# 1. Vignette 16:9 du niveau
+		# 1. Vignette 16:9 du niveau (grande illustration)
 		var thumb_panel: PanelContainer = PanelContainer.new()
 		thumb_panel.custom_minimum_size = Vector2(th_w, th_h)
 		thumb_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var sb_th: StyleBoxFlat = StyleBoxFlat.new()
 		sb_th.bg_color = Color(0.02, 0.03, 0.05, 1.0)
-		sb_th.set_corner_radius_all(4)
-		sb_th.border_color = Color(0.3, 0.65, 0.95, 0.4) if is_unlocked else Color(0.18, 0.2, 0.24, 0.35)
+		sb_th.set_corner_radius_all(6)
+		sb_th.border_color = Color(0.3, 0.75, 1.0, 0.5) if is_unlocked else Color(0.18, 0.2, 0.24, 0.35)
 		sb_th.set_border_width_all(1)
 		thumb_panel.add_theme_stylebox_override("panel", sb_th)
 		thumb_panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
@@ -985,29 +1023,29 @@ func _show_chapter_select() -> void:
 			lock_overlay.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			lock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 			lock_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			lock_overlay.add_theme_font_size_override("font_size", Palette.fs(12))
+			lock_overlay.add_theme_font_size_override("font_size", Palette.fs(13))
 			lock_overlay.add_theme_color_override("font_color", Color(1.0, 0.7, 0.7, 0.9))
 			thumb_panel.add_child(lock_overlay)
 		hbox.add_child(thumb_panel)
 
-		# 2. Informations du chapitre (Titre + Sous-titre / Biome)
+		# 2. Informations du chapitre (Titre + Sous-titre / Biome + Conseil)
 		var info_box: VBoxContainer = VBoxContainer.new()
 		info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info_box.alignment = BoxContainer.ALIGNMENT_CENTER
 		info_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		info_box.add_theme_constant_override("separation", 2)
+		info_box.add_theme_constant_override("separation", 3)
 
 		var lbl_title: Label = Label.new()
 		lbl_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		lbl_title.clip_text = true
-		lbl_title.add_theme_font_size_override("font_size", Palette.fs(16))
+		lbl_title.add_theme_font_size_override("font_size", Palette.fs(20))
 		lbl_title.text = "%d.  %s" % [n, String(ch["name"]).to_upper()]
 		if is_unlocked:
 			if cleared >= n:
 				lbl_title.add_theme_color_override("font_color", Color(0.65, 0.95, 0.75))
 			else:
-				lbl_title.add_theme_color_override("font_color", Color(0.9, 0.96, 1.0))
+				lbl_title.add_theme_color_override("font_color", Color(0.92, 0.97, 1.0))
 		else:
 			lbl_title.add_theme_color_override("font_color", Color(0.48, 0.52, 0.58))
 		info_box.add_child(lbl_title)
@@ -1016,30 +1054,30 @@ func _show_chapter_select() -> void:
 		lbl_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		lbl_sub.clip_text = true
-		lbl_sub.add_theme_font_size_override("font_size", Palette.fs(12))
+		lbl_sub.add_theme_font_size_override("font_size", Palette.fs(14))
 		if is_unlocked:
 			lbl_sub.text = "%s  •  %s" % [String(ch["sub"]), _biome_label(ch["biome"])]
-			lbl_sub.add_theme_color_override("font_color", Color(0.55, 0.72, 0.85))
+			lbl_sub.add_theme_color_override("font_color", Color(0.55, 0.76, 0.92))
 		else:
-			lbl_sub.text = "Terminez le chapitre %d" % [n - 1]
+			lbl_sub.text = "Debloque apres avoir vaincu le chapitre %d" % [n - 1]
 			lbl_sub.add_theme_color_override("font_color", Color(0.75, 0.45, 0.45))
 		info_box.add_child(lbl_sub)
 		hbox.add_child(info_box)
 
-		# 3. Badges de droite (Difficulté + Statut)
+		# 3. Badges de droite (Difficulté + Statut d'action)
 		var right_box: VBoxContainer = VBoxContainer.new()
 		right_box.alignment = BoxContainer.ALIGNMENT_CENTER
 		right_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		right_box.add_theme_constant_override("separation", 3)
+		right_box.add_theme_constant_override("separation", 4)
 
 		if is_unlocked:
 			var diff_idx: int = clampi(int(ch["diff"]), 0, GameState.DIFFICULTY.size() - 1)
 			var dn: String = String(GameState.DIFFICULTY[diff_idx].get("name", ""))
 			var lbl_diff: Label = Label.new()
-			lbl_diff.text = dn
+			lbl_diff.text = "[ %s ]" % dn
 			lbl_diff.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			lbl_diff.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			lbl_diff.add_theme_font_size_override("font_size", Palette.fs(11))
+			lbl_diff.add_theme_font_size_override("font_size", Palette.fs(12))
 			match diff_idx:
 				0: lbl_diff.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
 				1: lbl_diff.add_theme_color_override("font_color", Color(0.35, 0.8, 1.0))
@@ -1047,37 +1085,47 @@ func _show_chapter_select() -> void:
 				3: lbl_diff.add_theme_color_override("font_color", Color(0.95, 0.45, 0.85))
 			right_box.add_child(lbl_diff)
 
+			if int(ch.get("gate", 0)) > 0:
+				var lbl_gate: Label = Label.new()
+				lbl_gate.text = "Pce rec. : %d" % int(ch["gate"])
+				lbl_gate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				lbl_gate.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+				lbl_gate.add_theme_font_size_override("font_size", Palette.fs(11))
+				lbl_gate.add_theme_color_override("font_color", Color(0.7, 0.78, 0.9, 0.85))
+				right_box.add_child(lbl_gate)
+
 			var lbl_stat: Label = Label.new()
 			lbl_stat.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			lbl_stat.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			lbl_stat.add_theme_font_size_override("font_size", Palette.fs(12))
+			lbl_stat.add_theme_font_size_override("font_size", Palette.fs(14))
 			if cleared >= n:
 				lbl_stat.text = "BATTU"
 				lbl_stat.add_theme_color_override("font_color", Color(0.45, 0.92, 0.6))
 			else:
 				lbl_stat.text = "DEPLOYER >"
-				lbl_stat.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0))
+				lbl_stat.add_theme_color_override("font_color", Color(0.3, 0.88, 1.0))
 			right_box.add_child(lbl_stat)
 
 			b.pressed.connect(_on_chapter_chosen.bind(i, cl))
 		else:
 			var lbl_lock: Label = Label.new()
-			lbl_lock.text = "VERROUILLÉ"
+			lbl_lock.text = "VERROUILLE"
 			lbl_lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			lbl_lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			lbl_lock.add_theme_font_size_override("font_size", Palette.fs(11))
+			lbl_lock.add_theme_font_size_override("font_size", Palette.fs(12))
 			lbl_lock.add_theme_color_override("font_color", Color(0.48, 0.5, 0.55))
 			right_box.add_child(lbl_lock)
 			b.disabled = true
 
 		hbox.add_child(right_box)
 		box.add_child(b)
+
+	# --- Bouton RETOUR en bas, largeur calée sur la liste ---
 	var back: Button = Button.new()
 	back.text = "RETOUR"
 	back.add_theme_font_size_override("font_size", Palette.fs(20))
-	back.custom_minimum_size = Vector2(btn_w, clampf(vp.y * 0.08, 40.0, 50.0))
+	back.custom_minimum_size = Vector2(card_w, 50.0)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	# Echap / bouton retour manette = RETOUR (une issue meme sans souris)
 	var esc: InputEventAction = InputEventAction.new()
 	esc.action = "ui_cancel"
 	var sh: Shortcut = Shortcut.new()
@@ -1088,11 +1136,11 @@ func _show_chapter_select() -> void:
 		if is_instance_valid(cl):
 			cl.queue_free()
 		_show_home())
-	root.add_child(back)   # HORS du ScrollContainer : toujours visible en bas
+	col.add_child(back)
 
 	# --- MOTION DESIGN ---
 	Palette.fade_in(bg)
-	Palette.fade_in(margin)
+	Palette.fade_in(col)
 	Palette.stagger_reveal(box, 0.03, 0.04)
 	Palette.pop_in(back, 0.12, 0.24, 0.94)
 
@@ -2198,6 +2246,10 @@ func _draw_cards() -> void:
 		if warme != "" and not gamme.has(warme):
 			continue                     # arme hors de la gamme de ce chassis
 		var neuve: bool = not _passives.has(uid)
+		if warme != "" and player != null and player.has_method("weapons"):
+			var ws_owned: WeaponSystem = player.weapons()
+			if ws_owned != null and ws_owned.owned_weapons().has(warme):
+				neuve = false
 		var bloquee: bool = neuve and ((_card_cat(u) == "act" and act_plein) or (_card_cat(u) == "pas" and pas_plein))
 		if bloquee:
 			replis.append(u)
@@ -2335,6 +2387,8 @@ func _on_card_picked(index: int) -> void:
 		call_deferred("_open_draft")   # keep the tree paused; open the next card
 	else:
 		get_tree().paused = false
+		if player != null and player.has_method("reset_input_state"):
+			player.reset_input_state()
 
 func _apply_upgrade(id: String) -> void:
 	if id.begins_with("evo_"):
@@ -2372,6 +2426,7 @@ func _apply_upgrade(id: String) -> void:
 		"regen": player.hp_regen += 1.5
 		"xpgain": GameState.run_xp_mult += 0.15
 		"goldgain": GameState.run_scrap_mult += 0.20
+		"w_autocannon": player.add_weapon("autocannon")
 		"w_missile": player.add_weapon("missilepod")
 		"w_railgun": player.add_weapon("railgun")
 		"w_disperseur": player.add_weapon("disperseur")

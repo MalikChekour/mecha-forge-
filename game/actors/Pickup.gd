@@ -75,10 +75,10 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 	_spr.modulate = col if (k == "xp" or k == "heal" or k == "od" or k == "skill") else Color.WHITE
 	var th: float = float(_spr.texture.get_height())
 	if th > 0.0:
-		_spr.scale = Vector2.ONE * ((28.0 if big else 18.0) / th)
+		_spr.scale = Vector2.ONE * ((34.0 if big else 24.0) / th)
 	_light.texture = Tex.glow(col, 64)
-	_light.modulate = Color(col.r, col.g, col.b, 0.5 if big else 0.28)
-	_light.scale = Vector2.ONE * ((2.6 if big else 1.7) * 28.0 / 64.0)
+	_light.modulate = Color(col.r, col.g, col.b, 0.52 if big else 0.32)
+	_light.scale = Vector2.ONE * ((2.8 if big else 1.9) * (34.0 if big else 24.0) / 64.0)
 
 func _physics_process(delta: float) -> void:
 	_t += delta

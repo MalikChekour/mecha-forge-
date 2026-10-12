@@ -282,6 +282,9 @@ func reset() -> void:
 	difficulty = SaveManager.get_difficulty()   # default from last choice; run-start menu can override
 	endless = bool(SaveManager.setting("endless", false))
 	endless_wave = 0
+	compute_meta()
+
+func compute_meta() -> void:
 	_compute_meta()
 
 func _compute_meta() -> void:

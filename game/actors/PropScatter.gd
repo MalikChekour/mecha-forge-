@@ -51,28 +51,28 @@ const COVER_R: int = 1             # chunks around the player kept in cover_list
 # gold competence cache), glow, boom(fuel barrel), shoot*(hostile turret), awaken(carcass)
 const DECOR: Dictionary = {
 	# --- fuel barrels: get close and they arm, then blow up (see BOOM_* in Prop) ---
-	"baril":      {"f": "g20", "hp": 40.0,  "sz": 90.0,  "destruct": true,  "skill": 0.30, "boom": true, "glow": "orange"},
-	"caisses":    {"f": "g21", "hp": 38.0,  "sz": 92.0,  "destruct": true,  "skill": 0.50},
+	"baril":      {"f": "g20", "hp": 40.0,  "sz": 118.0, "destruct": true,  "skill": 0.30, "boom": true, "glow": "orange"},
+	"caisses":    {"f": "g21", "hp": 38.0,  "sz": 120.0, "destruct": true,  "skill": 0.50},
 	# ARC PYLON: zaps the nearest enemies with lightning, and blows an EMP shockwave when destroyed.
 	# Neutral-helpful — lead the horde past it and it thins them; break it for a burst. Tougher HP.
-	"generateur": {"f": "g22", "hp": 170.0, "sz": 140.0, "destruct": true, "glow": "cyan",
+	"generateur": {"f": "g22", "hp": 170.0, "sz": 175.0, "destruct": true, "glow": "cyan",
 	               "arc": true, "arc_cd": 1.5, "arc_dmg": 22.0, "arc_r": 300.0},
 	# BEACON: spawns enemies until destroyed -> a PRIORITY target. It makes standing still costly
 	# and pushing in to silence it rewarding (the aggression the game was missing). Tougher HP so
 	# killing it is a real commitment, not a stray shot.
-	"antenne":    {"f": "g23", "hp": 220.0, "sz": 150.0, "destruct": true, "glow": "orange",
+	"antenne":    {"f": "g23", "hp": 220.0, "sz": 190.0, "destruct": true, "glow": "orange",
 	               "beacon": true, "beacon_cd": 3.4, "beacon_kind": "drone"},
 	# SLOW FIELD: a persistent zone that bogs down the player AND the horde. A trap AND a tool —
 	# lead the swarm into it and hold the edge. Destroy it (low HP) to clear the zone.
-	"conduit":    {"f": "g24", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
+	"conduit":    {"f": "g24", "hp": 90.0,  "sz": 145.0, "destruct": true, "glow": "cyan",
 	               "slow": true, "slow_r": 200.0, "slow_mult": 0.5},
 	# EMETTEUR — enemy REPAIR node: heals nearby foes over time, so it's a priority target (green glow
 	# to read as "healing", distinct from the magenta beam capaciteur that shares this sprite).
-	"emetteur":   {"f": "g25", "hp": 90.0,  "sz": 118.0, "destruct": true,  "glow": "green",
+	"emetteur":   {"f": "g25", "hp": 90.0,  "sz": 148.0, "destruct": true,  "glow": "green",
 	               "aura": "heal", "aura_r": 260.0, "aura_p1": 5.0},
 	# EPAVE — a DORMANT war robot: walk close and it wakes into a live enemy (ambush). Shoot it first
 	# to kill it in its sleep. (awaken hook already handled in _process.)
-	"epave":      {"f": "g26", "hp": 130.0, "sz": 168.0, "destruct": true, "awaken": "brute"},
+	"epave":      {"f": "g26", "hp": 130.0, "sz": 215.0, "destruct": true, "awaken": "brute"},
 	# Leftover war machine: still online and hostile, and DESTRUCTIBLE so you can silence it.
 	# Its cannon is BAKED into the 3/4 art and cannot rotate (rotating a 3/4 head in 2D would
 	# tip it onto its back). So it behaves like a fixed emplacement gun: it only fires ALONG its
@@ -80,10 +80,10 @@ const DECOR: Dictionary = {
 	#   aim  = barrel axis in the art, degrees (measured off the sprite: down-left)
 	#   arc  = half-angle of the firing cone
 	#   muzzle = barrel tip, local px at the texture's native size (centered origin)
-	"tourelle":   {"f": "g27", "hp": 140.0, "sz": 130.0, "destruct": true, "glow": "orange",
+	"tourelle":   {"f": "g27", "hp": 140.0, "sz": 160.0, "destruct": true, "glow": "orange",
 	               "shoot": 470.0, "shoot_cd": 1.7, "shoot_dmg": 8.0,
 	               "aim": 140.0, "arc": 30.0, "muzzle": [-162.5, 117.0]},
-	"container":  {"f": "g28", "hp": 45.0,  "sz": 140.0, "destruct": true,  "skill": 0.55},
+	"container":  {"f": "g28", "hp": 45.0,  "sz": 185.0, "destruct": true,  "skill": 0.55},
 	# CAPACITEUR — the arena's neutral hazard. Sweeps a beam along a FIXED cardinal axis on a
 	# FIXED 4.4s cycle: predictable on purpose, so it can be learned and then exploited. It hurts
 	# the player AND the horde, and hurts the horde ~4x more — that ratio is what turns it from a
@@ -94,21 +94,21 @@ const DECOR: Dictionary = {
 	"capaciteur": {"f": "g25", "hp": 220.0, "sz": 140.0, "destruct": true, "glow": "magenta",
 	               "beam": true, "beam_dmg": 45.0, "beam_dmg_enemy": 170.0},
 	# --- NATURE: indestructible scenery ---
-	"rocher":     {"f": "g29", "hp": 170.0, "sz": 140.0, "nature": true},
+	"rocher":     {"f": "g29", "hp": 170.0, "sz": 175.0, "nature": true},
 	# CRISTAUX — shatters into damaging shards on destruction (+ a little Overdrive). Break it in a crowd.
-	"cristaux":   {"f": "g30", "hp": 70.0,  "sz": 100.0, "nature": true, "destruct": true, "glow": "cyan", "shatter": true},
+	"cristaux":   {"f": "g30", "hp": 70.0,  "sz": 125.0, "nature": true, "destruct": true, "glow": "cyan", "shatter": true},
 	"arbre":      {"f": "g31", "hp": 70.0,  "sz": 178.0, "nature": true},
 	# PLANTE — toxic SPORE cloud: poisons + slows the player AND the horde in a radius.
-	"plante":     {"f": "g32", "hp": 55.0,  "sz": 78.0,  "nature": true, "destruct": true, "glow": "green",
+	"plante":     {"f": "g32", "hp": 55.0,  "sz": 115.0, "nature": true, "destruct": true, "glow": "green",
 	               "aura": "spore", "aura_r": 150.0, "aura_p1": 7.0, "aura_p2": 0.7},
 	# GLACE — FROST field: strongly slows any enemy nearby (a tactical tool — herd the swarm into it).
-	"glace":      {"f": "g33", "hp": 70.0,  "sz": 122.0, "nature": true, "destruct": true, "glow": "cyan",
+	"glace":      {"f": "g33", "hp": 70.0,  "sz": 150.0, "nature": true, "destruct": true, "glow": "cyan",
 	               "aura": "frost", "aura_r": 170.0, "aura_p1": 0.4},
 	# arche (catalogue no 16) — GARDEE, rendue solide : collider elargi (block 0.46 au lieu de 0.30)
 	# pour qu'on ne passe plus / ne tire plus a travers l'ouverture de l'arche.
-	"arche":      {"f": "g34", "hp": 190.0, "sz": 196.0, "nature": true, "block": 0.46},
+	"arche":      {"f": "g34", "hp": 190.0, "sz": 235.0, "nature": true, "block": 0.46},
 	# LAVE — a BURNING pool: continuous fire damage to the player AND enemies standing in it.
-	"lave":       {"f": "g35", "hp": 150.0, "sz": 112.0, "nature": true, "destruct": true, "glow": "orange",
+	"lave":       {"f": "g35", "hp": 150.0, "sz": 145.0, "nature": true, "destruct": true, "glow": "orange",
 	               "aura": "burn", "aura_r": 130.0, "aura_p1": 10.0},
 	# RACINES — a SNARE: whatever enters (player or foe) is dragged to a crawl (a trap zone).
 	"racines":    {"f": "g36", "hp": 95.0,  "sz": 132.0, "nature": true, "destruct": true, "glow": "green",
@@ -128,7 +128,7 @@ const DECOR: Dictionary = {
 	              "guard": true, "guard_r": 170.0, "guard_cd": 3.5, "guard_force": 300.0},
 	"terminal":  {"f": "g38", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
 	              "dwell": true, "dwell_r": 100.0, "dwell_time": 1.2, "dwell_force": 260.0},
-	"archives":  {"f": "g23", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "cyan",
+	"archives":  {"f": "g23", "hp": 110.0, "sz": 185.0, "destruct": true, "glow": "cyan",
 	              "spot": true, "spot_r": 340.0, "spot_boost": 0.55, "spot_hold": 3.0},
 	"quai":      {"f": "g28", "hp": 130.0, "sz": 140.0, "nature": true, "block": 0.34,
 	              "cycle": true, "cycle_on": 6.0, "cycle_off": 3.0},
@@ -141,19 +141,19 @@ const DECOR: Dictionary = {
 	                       "conveyor": true, "conveyor_r": 150.0, "conveyor_speed": 60.0},
 	"console_convoyeur":  {"f": "console_convoyeur", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
 	                       "console": true, "console_r": 400.0},
-	"bras_presseur":      {"f": "bras_presseur", "hp": 150.0, "sz": 130.0, "destruct": true, "glow": "orange",
+	"bras_presseur":      {"f": "bras_presseur", "hp": 150.0, "sz": 160.0, "destruct": true, "glow": "orange",
 	                       "presser": true, "presser_len": 240.0, "presser_dmg": 15.0, "presser_stun": 0.5},
-	"piston_hydraulique": {"f": "piston_hydraulique", "hp": 150.0, "sz": 130.0, "nature": true, "block": 0.30,
+	"piston_hydraulique": {"f": "piston_hydraulique", "hp": 150.0, "sz": 155.0, "nature": true, "block": 0.30,
 	                       "cycle": true, "cycle_on": 2.0, "cycle_off": 2.0},
 	"vanne_refroidissement": {"f": "vanne_refroidissement", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
 	                       "valve": true, "valve_r": 150.0, "valve_cd": 30.0},
 	"surchauffe_sol":     {"f": "surchauffe_sol", "hp": 90.0,  "sz": 150.0, "nature": true,
 	                       "overheat": true, "overheat_max": 260.0},
-	"porte_automatique":  {"f": "porte_automatique", "hp": 150.0, "sz": 150.0, "nature": true, "block": 0.40,
+	"porte_automatique":  {"f": "porte_automatique", "hp": 150.0, "sz": 185.0, "nature": true, "block": 0.40,
 	                       "cycle": true, "cycle_on": 6.0, "cycle_off": 5.0},
 	"zone_chargement":    {"f": "zone_chargement", "hp": 90.0,  "sz": 150.0, "destruct": true, "glow": "orange",
 	                       "dropzone": true},
-	"container_mobile":   {"f": "container_mobile", "hp": 160.0, "sz": 140.0, "destruct": true,
+	"container_mobile":   {"f": "container_mobile", "hp": 160.0, "sz": 185.0, "destruct": true,
 	                       "rail": true, "rail_span": 220.0, "rail_speed": 15.0},
 
 	# ===== 03/10, refonte decor "Zone Cryo" (plan 15 maps, maps 4-6, nouveau biome "cryo").
@@ -179,11 +179,11 @@ const DECOR: Dictionary = {
 	# ===== 03/10, refonte decor "Noyau Instable" (plan 15 maps, maps 7-9, nouveau biome
 	# "reacteur"). Memes idiomes que ci-dessus. Les 8 ont leur art final (zone_alternante/
 	# pulse_energie integres le 03/10).
-	"bassin_toxique":     {"f": "bassin_liquide_toxique", "hp": 90.0, "sz": 150.0, "nature": true, "block": 0.0,
+	"bassin_toxique":     {"f": "bassin_liquide_toxique", "hp": 90.0, "sz": 180.0, "nature": true, "block": 0.0,
 	                       "toxic_pool": true, "toxic_r": 150.0, "toxic_dps": 6.0},
 	"vanne_drainage":     {"f": "vanne_drainage", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
 	                       "drain": true, "drain_r": 250.0},
-	"poche_de_vent":      {"f": "turbine_geante", "hp": 130.0, "sz": 170.0, "destruct": true, "glow": "orange",
+	"poche_de_vent":      {"f": "turbine_geante", "hp": 130.0, "sz": 205.0, "destruct": true, "glow": "orange",
 	                       "wind": true, "wind_r": 220.0, "wind_speed": 50.0},
 	"console_vent":       {"f": "console_controle_vent", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
 	                       "wind_console": true, "wind_console_r": 400.0},
@@ -192,7 +192,7 @@ const DECOR: Dictionary = {
 	"zone_alternante":    {"f": "zone_alternante", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "green",
 	                       "alt_zone": true, "alt_zone_r": 100.0, "alt_zone_dps": 10.0, "cycle_on": 5.0, "cycle_off": 5.0,
 	                       "block": 0.0},
-	"cristal_instable":   {"f": "cristal_energie_instable", "hp": 0.0, "sz": 100.0, "nature": true, "block": 0.0,
+	"cristal_instable":   {"f": "cristal_energie_instable", "hp": 0.0, "sz": 125.0, "nature": true, "block": 0.0,
 	                       "unstable_crystal": true},
 	"pulse_energie":      {"f": "pulse_energie", "hp": 130.0, "sz": 140.0, "destruct": true, "glow": "green",
 	                       "energy_pulse": true},
@@ -201,23 +201,23 @@ const DECOR: Dictionary = {
 	# "ruche"). Memes idiomes que ci-dessus. 4/6 ont deja leur art final ; nuage_spores est
 	# procedural comme brouillard_froid (aucun art externe necessaire) ; residu_biomecanique
 	# (ajoute 03/10, separee de sol_collant qui etait a tort fusionnee avec elle) en placeholder.
-	"cocon":              {"f": "cocon", "hp": 60.0, "sz": 130.0, "destruct": true, "glow": "cyan",
+	"cocon":              {"f": "cocon", "hp": 60.0, "sz": 155.0, "destruct": true, "glow": "cyan",
 	                       "capsule": true},
 	"residu_biomecanique": {"f": "g33", "hp": 90.0, "sz": 140.0, "nature": true, "block": 0.0,
 	                       "bio_residue": true, "bio_residue_r": 150.0, "bio_residue_slow": 0.6, "bio_residue_pull": 40.0},
 	"sol_collant":        {"f": "sol_collant", "hp": 90.0, "sz": 140.0, "nature": true, "block": 0.0,
 	                       "sticky": true, "sticky_r": 150.0, "sticky_mult": 0.45},
-	"tentacule_emergence": {"f": "tentacule_emergence", "hp": 110.0, "sz": 130.0, "destruct": true, "glow": "green",
+	"tentacule_emergence": {"f": "tentacule_emergence", "hp": 110.0, "sz": 155.0, "destruct": true, "glow": "green",
 	                       "tentacle": true},
 	"nuage_spores":       {"f": "g20", "hp": 90.0, "sz": 20.0, "nature": true, "block": 0.0,
 	                       "spore_cloud": true, "spore_r": 220.0, "spore_dps": 5.0},
-	"plante_lumineuse":   {"f": "plante_lumineuse", "hp": 60.0, "sz": 80.0, "destruct": true, "glow": "green",
+	"plante_lumineuse":   {"f": "plante_lumineuse", "hp": 60.0, "sz": 115.0, "destruct": true, "glow": "green",
 	                       "light_plant": true, "light_plant_r": 180.0},
 
 	# ===== 03/10, refonte decor "Forge Finale" (plan 15 maps, maps 13-15, nouveau biome
 	# "citadelle"). Memes idiomes que ci-dessus. Les 6 ont leur art final (zone_depressurisation/
 	# zone_push_pull integres le 03/10).
-	"porte_securite_orbitale": {"f": "porte_securite_orbitale", "hp": 170.0, "sz": 150.0, "nature": true, "block": 0.40,
+	"porte_securite_orbitale": {"f": "porte_securite_orbitale", "hp": 170.0, "sz": 185.0, "nature": true, "block": 0.40,
 	                       "cycle": true, "cycle_on": 6.0, "cycle_off": 5.0},
 	"zone_depressurisation": {"f": "zone_depressurisation", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "orange",
 	                       "depress": true, "depress_r": 200.0, "depress_force": 220.0},
@@ -225,7 +225,7 @@ const DECOR: Dictionary = {
 	                       "grav_zone": true, "grav_r": 180.0, "grav_force": 60.0},
 	"emetteur_laser_rotatif": {"f": "emetteur_laser_rotatif", "hp": 170.0, "sz": 150.0, "destruct": true, "glow": "orange",
 	                       "rot_laser": true},
-	"pilier_energie":     {"f": "pilier_energie", "hp": 260.0, "sz": 220.0, "destruct": true, "glow": "orange",
+	"pilier_energie":     {"f": "pilier_energie", "hp": 260.0, "sz": 255.0, "destruct": true, "glow": "orange",
 	                       "pillar": true},
 	"segment_mur_modulaire": {"f": "segment_mur_modulaire", "hp": 220.0, "sz": 170.0, "nature": true, "block": 0.40,
 	                       "cycle": true, "cycle_on": 10.0, "cycle_off": 8.0},
@@ -304,7 +304,8 @@ func _place_border(kind: String, pos: Vector2, scl: float, flip: bool) -> void:
 	if tex == null:
 		return
 	var th: float = maxf(1.0, float(tex.get_height()))
-	var sc: float = scl * (BORDER_SZ / th)
+	var d_mult: float = SaveManager.get_decor_scale(kind, "borders") if (SaveManager != null and SaveManager.has_method("get_decor_scale")) else 1.0
+	var sc: float = scl * (BORDER_SZ / th) * d_mult
 	var shadow: Sprite2D = Sprite2D.new()
 	shadow.texture = Tex.glow(Color(0, 0, 0, 1), 64)
 	shadow.modulate = Color(0, 0, 0, 0.5)
@@ -329,6 +330,17 @@ func _place_border(kind: String, pos: Vector2, scl: float, flip: bool) -> void:
 # EVERY biome now carries active battlefield hazards (turret + beam cannon + a spawn/slow emplacement)
 # on top of its native flora/terrain — it is a ROBOT WAR, war-machines and wreckage litter every zone.
 # So no level is ever a passive stroll: cannons fire, beams sweep, nests spew, whatever the biome.
+static func _decor_cat(k: String) -> String:
+	if k in ["baril", "caisses", "container", "crate"]:
+		return "crates_barrels"
+	if k in ["generateur", "antenne", "conduit", "emetteur", "epave", "tourelle", "capaciteur", "archives"]:
+		return "machines_towers"
+	if k in ["convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "surchauffe_sol", "plaque_de_glace", "jet_de_cryo", "bassin_toxique", "poche_de_vent", "zone_alternante", "zone_depressurisation"]:
+		return "interactive_hazards"
+	if k in ["rocher", "cristaux", "arbre", "plante", "glace", "arche", "lave", "racines", "pilier_energie"]:
+		return "nature_minerals"
+	return "borders"
+
 const BIOME_DECOR: Dictionary = {
 	# EVERY biome carries the full trap set: canon (tourelle) + rayon (capaciteur) + pylône-arc
 	# (generateur) + mine (baril), on top of its native flora/terrain. No map is ever short on traps.
@@ -1401,7 +1413,8 @@ class Prop extends StaticBody2D:
 			or _depress or _grav_zone or _rot_laser)
 		var tex: Texture2D = load("res://assets/decor/%s.png" % String(def.get("f", "g20")))
 		var th: float = maxf(1.0, float(tex.get_height()))
-		var sc: float = rand_scale * (float(def.get("sz", 110.0)) / th)
+		var d_mult: float = SaveManager.get_decor_scale(kind, PropScatter._decor_cat(kind)) if (SaveManager != null and SaveManager.has_method("get_decor_scale")) else 1.0
+		var sc: float = rand_scale * (float(def.get("sz", 110.0)) / th) * d_mult
 		var spanx: float = float(tex.get_width()) * sc
 		var spany: float = th * sc
 

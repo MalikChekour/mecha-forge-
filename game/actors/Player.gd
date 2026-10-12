@@ -196,11 +196,10 @@ func get_layer_ok() -> bool:
 ## avant le tout premier _begin_run() d'une session (REJOUER passe par un reload de scene,
 ## qui recree deja le Player correctement — pas concerne).
 func refresh_equipped_chassis() -> void:
+	GameState.compute_meta()
 	var hero_id: String = GameState.debug_force_mech if GameState.debug_force_mech != "" else SaveManager.equipped_mech()
 	if not GameState.mech_def(hero_id):
 		hero_id = "vortex"
-	if base_chassis == hero_id:
-		return   # rien equipe depuis le boot -> pas besoin de rebatir le sprite
 	var mech: Dictionary = GameState.mech_def(hero_id)
 	var gear: Dictionary = SaveManager.gear_totals()
 	max_hp = 70.0 + GameState.meta_hp + float(mech.get("hp", 0.0)) + float(gear.get("hp", 0.0))
@@ -208,18 +207,26 @@ func refresh_equipped_chassis() -> void:
 	base_speed = 320.0 * (1.0 + GameState.meta_speed) * float(mech.get("speed", 1.0)) * (1.0 + float(gear.get("speed_pct", 0.0))) * Protocols.player_speed
 	crit_chance = 0.05 + float(mech.get("crit", 0.0)) + float(gear.get("crit", 0.0))
 	hp = max_hp
-	if mecha != null:
-		mecha.queue_free()
-	var dmech: DirectionalMecha = DirectionalMecha.new()
-	dmech.chassis = String(GameState.RENDER_CHASSIS.get(hero_id, hero_id))   # reskin (27/09), voir RENDER_CHASSIS
-	dmech.frame_count = 8
-	dmech.display_height = 360.0
-	mecha = dmech
-	add_child(mecha)
-	base_chassis = hero_id
-	if mecha.has_method("set_tint"):
-		mecha.set_tint(BASE_TINT)
-	_apply_lock_visuals(hero_id)   # le reticule de verrouillage suit le changement de chassis
+	if base_chassis != hero_id:
+		if mecha != null:
+			mecha.queue_free()
+		var dmech: DirectionalMecha = DirectionalMecha.new()
+		dmech.chassis = String(GameState.RENDER_CHASSIS.get(hero_id, hero_id))   # reskin (27/09), voir RENDER_CHASSIS
+		dmech.frame_count = 8
+		dmech.display_height = 360.0
+		mecha = dmech
+		add_child(mecha)
+		base_chassis = hero_id
+		if mecha.has_method("set_tint"):
+			mecha.set_tint(BASE_TINT)
+		_apply_lock_visuals(hero_id)   # le reticule de verrouillage suit le changement de chassis
+	var sig: String = GameState.mech_signature(hero_id)
+	var gamme: Array = GameState.mech_arsenal(hero_id)
+	var start_w: String = SaveManager.start_weapon()
+	if not (SaveManager.weapon_unlocked(start_w) and gamme.has(start_w)):
+		start_w = sig
+	if _weapons != null:
+		_weapons.reset_loadout([start_w])
 
 func _ready() -> void:
 	add_to_group("player")
@@ -499,6 +506,12 @@ func _physics_process(delta: float) -> void:
 	# sans jamais l'ecraser vers le bas.
 	_patch_inertia = maxf(0.0, _patch_inertia - delta * 2.5)
 	_stun_t = maxf(0.0, _stun_t - delta)
+	# Desktop/Web anti-drift safety: if not on mobile, virtual stick cannot stay held without active mouse button
+	if not OS.has_feature("mobile"):
+		if _stick_id != -1 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			reset_move_stick()
+		if _aim_stick_id != -1 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			reset_aim_stick()
 	var mv: Vector2 = Vector2.ZERO if _stun_t > 0.0 else _move_input()
 	if base_chassis == "pylone" and not transformed:
 		_anchor_t = minf(_anchor_t + delta, ANCHOR_DELAY) if mv == Vector2.ZERO else 0.0
@@ -1243,6 +1256,25 @@ func _move_input() -> Vector2:
 		return _stick_vec
 	return Vector2.ZERO
 
+func reset_input_state() -> void:
+	reset_move_stick()
+	reset_aim_stick()
+
+func reset_move_stick() -> void:
+	_stick_id = -1
+	_stick_origin = Vector2.ZERO
+	_stick_vec = Vector2.ZERO
+
+func reset_aim_stick() -> void:
+	_aim_stick_id = -1
+	_aim_stick_origin = Vector2.ZERO
+	_aim_stick_vec = Vector2.ZERO
+	_aim_stick_active = false
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_PAUSED:
+		reset_input_state()
+
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventScreenTouch:
 		if e.pressed and _stick_id == -1 and e.position.x < get_viewport_rect().size.x * 0.55:
@@ -1256,12 +1288,9 @@ func _unhandled_input(e: InputEvent) -> void:
 			_aim_stick_active = false
 		elif not e.pressed:
 			if e.index == _stick_id:
-				_stick_id = -1
-				_stick_vec = Vector2.ZERO
+				reset_move_stick()
 			if e.index == _aim_stick_id:
-				_aim_stick_id = -1
-				_aim_stick_vec = Vector2.ZERO
-				_aim_stick_active = false   # release -> falls back to auto-aim next frame
+				reset_aim_stick()
 	elif e is InputEventScreenDrag:
 		if e.index == _stick_id:
 			_stick_vec = (e.position - _stick_origin).limit_length(80.0) / 80.0
@@ -1271,6 +1300,9 @@ func _unhandled_input(e: InputEvent) -> void:
 			if d.length() > 10.0:
 				aim_dir = d.normalized()
 				_aim_stick_active = true
+	elif e is InputEventMouseButton and not e.pressed:
+		if not OS.has_feature("mobile"):
+			reset_input_state()
 
 var _nearest_frame: int = -1
 var _nearest_cache: Node2D = null

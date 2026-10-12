@@ -159,6 +159,23 @@ func setup(p: Node, starters: Array = ["autocannon"]) -> void:
 	for wid in starters:
 		add_weapon(String(wid))
 
+## Reconfigure completement les armes au lancement d'une run (changement de mecha ou choix d'arsenal dans le hub).
+func reset_loadout(starters: Array) -> void:
+	for wid: String in _weapons.keys():
+		var w: Dictionary = _weapons[wid]
+		for k in ["sprite", "shadow", "muzzle"]:
+			var n: Variant = w.get(k)
+			if n != null and is_instance_valid(n):
+				(n as Node).queue_free()
+	_weapons.clear()
+	var mid: String = SaveManager.equipped_mech()
+	var mdef: Dictionary = GameState.mech_def(mid)
+	_sig = GameState.mech_signature(mid)
+	_accent = Color(mdef.get("accent", Color.WHITE))
+	_sig_muzzle = mdef.get("sig_muzzle", [])
+	for wid in starters:
+		add_weapon(String(wid))
+
 func signature() -> String:
 	return _sig
 
@@ -496,6 +513,7 @@ const SFX_FOR: Dictionary = {
 	"railgun": "w_railgun", "annihilator": "w_railgun",
 	"plasma": "w_plasma", "singularity": "w_plasma",
 	"sabre": "w_sabre", "tempest": "w_sabre",
+	"rail_nova": "w_railgun", "frelon": "w_missile",
 }
 
 func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:

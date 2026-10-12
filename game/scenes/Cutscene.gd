@@ -148,7 +148,7 @@ func _build() -> void:
 
 	# PASSER (skip all) — above the catcher so it gets its own taps
 	_skip = Button.new()
-	_skip.text = "PASSER  ›"
+	_skip.text = "PASSER  >"
 	_skip.modulate = Color(1, 1, 1, 0.8)
 	_skip.pressed.connect(_finish)
 	add_child(_skip)

@@ -42,6 +42,7 @@ func load_data() -> void:
 			if d is Dictionary:
 				for k in d:
 					data[k] = d[k]
+	load_visual_scales()
 	_accorde_chassis_gratuits()
 
 ## Tout chassis dont le cout vaut 0 est POSSEDE d'office.
@@ -520,7 +521,7 @@ func owns_mech(id: String) -> bool:
 	return (data.get("owned_mechs", []) as Array).has(id)
 
 func equipped_mech() -> String:
-	return String(data.get("equipped_mech", "mecha_joueur"))
+	return String(data.get("equipped_mech", "vortex"))
 
 func equip_mech(id: String) -> void:
 	if owns_mech(id):
@@ -589,3 +590,43 @@ func set_start_weapon(id: String) -> void:
 	if weapon_unlocked(id):
 		data["start_weapon"] = id
 		save_data()
+
+## --- ÉCHELLES VISUELLES DÉCOR & VFX (configurées via le Studio Web externe) ---
+var visual_scales: Dictionary = {
+	"decor_global": 1.0,
+	"vfx_global": 1.0,
+	"decor_categories": {},
+	"vfx_categories": {},
+	"decor_custom": {},
+	"vfx_custom": {},
+}
+
+func load_visual_scales() -> void:
+	var path: String = "res://visual_scales.json"
+	if FileAccess.file_exists(path):
+		var f: FileAccess = FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			var txt: String = f.get_as_text()
+			var p: Variant = JSON.parse_string(txt)
+			if p is Dictionary:
+				visual_scales = p
+	if FileAccess.file_exists("user://visual_scales.json"):
+		var fu: FileAccess = FileAccess.open("user://visual_scales.json", FileAccess.READ)
+		if fu != null:
+			var txtu: String = fu.get_as_text()
+			var pu: Variant = JSON.parse_string(txtu)
+			if pu is Dictionary:
+				for k in pu.keys():
+					visual_scales[k] = pu[k]
+
+func get_decor_scale(kind: String, cat: String = "") -> float:
+	var g: float = float(visual_scales.get("decor_global", 1.0))
+	var c: float = float((visual_scales.get("decor_categories", {}) as Dictionary).get(cat, 1.0))
+	var item: float = float((visual_scales.get("decor_custom", {}) as Dictionary).get(kind, 1.0))
+	return clampf(g * c * item, 0.2, 3.0)
+
+func get_vfx_scale(id: String, cat: String = "") -> float:
+	var g: float = float(visual_scales.get("vfx_global", 1.0))
+	var c: float = float((visual_scales.get("vfx_categories", {}) as Dictionary).get(cat, 1.0))
+	var item: float = float((visual_scales.get("vfx_custom", {}) as Dictionary).get(id, 1.0))
+	return clampf(g * c * item, 0.2, 3.0)

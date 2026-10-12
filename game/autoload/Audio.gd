@@ -79,13 +79,24 @@ func sfx(name: String, pitch_var: float = 0.0) -> void:
 	pl.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
 	pl.play()
 
+const MUSIC_FALLBACK: Dictionary = {
+	"cryo": "ice",
+	"reacteur": "tech",
+	"ruche": "swamp",
+	"citadelle": "spaceship",
+}
+
 func music(track: String) -> void:
-	if track == _music_track:
+	var actual_track: String = String(MUSIC_FALLBACK.get(track, track))
+	if actual_track == _music_track:
 		return
-	var p: String = MUSIC_DIR + track + ".ogg"
+	var p: String = MUSIC_DIR + actual_track + ".ogg"
 	if not ResourceLoader.exists(p):
-		return
-	_music_track = track
+		p = MUSIC_DIR + "tech.ogg"
+		actual_track = "tech"
+		if not ResourceLoader.exists(p):
+			return
+	_music_track = actual_track
 	var s: AudioStream = load(p)
 	if s is AudioStreamOggVorbis:
 		(s as AudioStreamOggVorbis).loop = true
