@@ -132,13 +132,13 @@ const DECOR: Dictionary = {
 	              "spot": true, "spot_r": 340.0, "spot_boost": 0.55, "spot_hold": 3.0},
 	"quai":      {"f": "g28", "hp": 130.0, "sz": 140.0, "nature": true, "block": 0.34,
 	              "cycle": true, "cycle_on": 6.0, "cycle_off": 3.0},
-	"convoyeur": {"f": "g27", "hp": 150.0, "sz": 130.0, "destruct": true, "glow": "orange",
-	              "convey": true, "convey_r": 200.0, "convey_cd": 2.2, "convey_dist": 90.0},
+	"convoyeur": {"f": "convoyeur_sol", "hp": 150.0, "sz": 150.0, "destruct": true, "glow": "orange",
+	              "block": 0.0, "conveyor": true, "conveyor_r": 160.0, "conveyor_speed": 75.0},
 
 	# ===== 30/09, refonte decor "Secteur Tech" (plan "15 maps" - maps 1-3 fusionnees en un seul
 	# decor enrichi pour "tech", voir le plan d'implementation). Memes idiomes que ci-dessus. =====
-	"convoyeur_sol":      {"f": "convoyeur_sol", "hp": 150.0, "sz": 130.0, "destruct": true, "glow": "orange",
-	                       "conveyor": true, "conveyor_r": 150.0, "conveyor_speed": 60.0},
+	"convoyeur_sol":      {"f": "convoyeur_sol", "hp": 150.0, "sz": 150.0, "destruct": true, "glow": "orange",
+	                       "block": 0.0, "conveyor": true, "conveyor_r": 160.0, "conveyor_speed": 75.0},
 	"console_convoyeur":  {"f": "console_convoyeur", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
 	                       "console": true, "console_r": 400.0},
 	"bras_presseur":      {"f": "bras_presseur", "hp": 150.0, "sz": 160.0, "destruct": true, "glow": "orange",
@@ -689,11 +689,11 @@ class Prop extends StaticBody2D:
 	var _cannon_beam_core: Line2D = null
 	var _cannon_beam_flash: Sprite2D = null
 	var _cannon_hit_set: Dictionary = {}
-	const CANNON_IDLE: float = 2.4
-	const CANNON_TELL: float = 0.8
-	const CANNON_FIRE: float = 0.38
-	const CANNON_LEN: float = 1800.0
-	const CANNON_HALF_W: float = 24.0
+	const CANNON_IDLE: float = 1.4
+	const CANNON_TELL: float = 0.6
+	const CANNON_FIRE: float = 0.35
+	const CANNON_LEN: float = 2200.0
+	const CANNON_HALF_W: float = 26.0
 	# fuel barrel: arms when you come near, then blows. 4s is enough to walk clear on purpose —
 	# so it's a TOOL (lead the horde over it) as much as a hazard.
 	var _boom: bool = false
@@ -790,12 +790,12 @@ class Prop extends StaticBody2D:
 	# restent dans le rayon - meme nudge que IMPULSION mais CHAQUE frame au lieu d'un burst a
 	# intervalle. Une CONSOLE voisine peut le couper temporairement.
 	var _conveyor: bool = false
-	var _conveyor_r: float = 150.0
-	var _conveyor_speed: float = 60.0
+	var _conveyor_r: float = 160.0
+	var _conveyor_speed: float = 75.0
 	var _conveyor_dir: Vector2 = Vector2.RIGHT
 	var _conveyor_stop_t: float = 0.0   # >0 = coupe, decremente chaque frame ; pose par une console
-	var _conveyor_vfx_t: float = 0.0    # 04/10, WEAK signale par le patron : aucun VFX contrairement
-	                                     # a son frere "convoyeur" - pulse periodique, pas chaque frame
+	var _conveyor_vfx_t: float = 0.0    # pulse periodique via FxKit
+	var _conveyor_ring: Sprite2D = null # halo/zone centree au sol pour le tapis ralentisseur
 
 	# CONSOLE DE CONVOYEUR (Hall d'Assemblage) : DwellZone DEDIEE (pas celle de "terminal", pour
 	# ne jamais risquer de mélanger les deux comportements) -> coupe les convoyeurs proches 8s.
@@ -1197,9 +1197,12 @@ class Prop extends StaticBody2D:
 			_convey_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
 		_conveyor = bool(def.get("conveyor", false))
 		if _conveyor:
-			_conveyor_r = float(def.get("conveyor_r", 150.0))
-			_conveyor_speed = float(def.get("conveyor_speed", 60.0))
+			_conveyor_r = float(def.get("conveyor_r", 160.0))
+			_conveyor_speed = float(def.get("conveyor_speed", 75.0))
 			_conveyor_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
+			_conveyor_ring = _glow_sprite(Color(1.0, 0.55, 0.15), _conveyor_r * 2.0, 0.18)
+			add_child(_conveyor_ring)
+			_core_child(_conveyor_ring, Color(1.0, 0.7, 0.2))
 			add_to_group("tech_convoyeur")
 		_console = bool(def.get("console", false))
 		if _console:
@@ -1449,17 +1452,22 @@ class Prop extends StaticBody2D:
 		# Fixed emplacement gun: derive the FIRING AXIS from the art itself so the bolt always
 		# leaves the barrel we drew, never the opposite side. Mirroring the sprite mirrors both
 		# the axis and the muzzle, which buys a second orientation for free.
-		if _shoot_r > 0.0:
+		# Tourelle canon : tout decor avec _shoot_r > 0 OU utilisant l'art g27 OU nomme tourelle/canon
+		# EST un canon fonctionnel a tir de rayon automatique a intervalle regulier.
+		var is_cannon: bool = _shoot_r > 0.0 or String(def.get("f", "")) == "g27" or kind == "tourelle" or kind.begins_with("canon")
+		if is_cannon:
+			_shoot_r = maxf(_shoot_r, 470.0)
+			set_process(true)
 			_sprite.flip_h = flip
-			var a: float = deg_to_rad(float(def.get("aim", 0.0)))
+			var a: float = deg_to_rad(float(def.get("aim", 140.0)))
 			_cannon = Vector2.RIGHT.rotated(a)
-			var m: Array = def.get("muzzle", [0.0, 0.0])
+			var m: Array = def.get("muzzle", [-162.5, 117.0])
 			_muzzle = Vector2(float(m[0]), float(m[1])) * sc
 			if flip:
 				_cannon.x = -_cannon.x
 				_muzzle.x = -_muzzle.x
 			_cannon_beam = true
-			_cannon_beam_t = randf_range(0.8, CANNON_IDLE)
+			_cannon_beam_t = randf_range(0.2, 0.9)
 			_cannon_beam_glow = _mk_beam(27)
 			_cannon_beam_line = _mk_beam(28)
 			_cannon_beam_core = _mk_beam(29)
@@ -1543,7 +1551,7 @@ class Prop extends StaticBody2D:
 		var dist: float = global_position.distance_to(_plr.global_position)
 
 		# --- CANON A RAYON AUTOMATIQUE A INTERVALLE REGULIER ---
-		if _cannon_beam and (dist < 1600.0 or _cannon_beam_state != 0):
+		if _cannon_beam and (dist < 2200.0 or _cannon_beam_state != 0):
 			_tick_cannon_beam(delta)
 
 		# --- beacon: emit an enemy on a fixed cadence while the player is in range ---
@@ -1677,25 +1685,37 @@ class Prop extends StaticBody2D:
 				if moved and game.has_method("spawn_vfx"):
 					game.spawn_vfx("shockwave", global_position, 0.0, _convey_r / 140.0, Color(1.0, 0.6, 0.2))
 
-		# --- CONVOYEUR SOL (Hall d'Assemblage) : pousse le joueur ET les ennemis en continu, sauf
-		# si une console voisine l'a coupe. Nudge direct de global_position (jamais velocity, voir
-		# la note IMPULSION plus haut), mais applique CHAQUE frame au lieu d'un burst a intervalle.
+		# --- CONVOYEUR SOL / TAPIS RALENTISSEUR (Hall d'Assemblage) :
+		# Zone de tapis ralentisseur centree au sol. Ralentit le joueur (field_slow = 0.52)
+		# et les ennemis, tout en les entrainant en continu selon la direction du tapis.
+		# Une console voisine peut le suspendre temporairement (8s).
 		if _conveyor:
 			if _conveyor_stop_t > 0.0:
 				_conveyor_stop_t -= delta
+				if _conveyor_ring != null:
+					_conveyor_ring.modulate = Color(0.3, 0.7, 0.9, 0.08)
 			else:
+				var puls: float = 0.14 + 0.08 * sin(Time.get_ticks_msec() * 0.005)
+				if _conveyor_ring != null:
+					_conveyor_ring.modulate = Color(1.0, 0.55, 0.15, puls)
 				var cv_step: Vector2 = _conveyor_dir * _conveyor_speed * delta
 				if dist < _conveyor_r:
+					if "field_slow" in _plr:
+						_plr.field_slow = minf(float(_plr.field_slow), 0.52)
 					_plr.global_position += cv_step
-				var r2cv: float = _conveyor_r * _conveyor_r
-				for e in get_tree().get_nodes_in_group("enemies"):
-					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2cv:
-						(e as Node2D).global_position += cv_step
+				if dist < 1400.0:
+					var r2cv: float = _conveyor_r * _conveyor_r
+					for e in get_tree().get_nodes_in_group("enemies"):
+						if e is Node2D and is_instance_valid(e):
+							if global_position.distance_squared_to((e as Node2D).global_position) <= r2cv:
+								if "field_slow" in e:
+									e.field_slow = minf(float(e.field_slow), 0.52)
+								(e as Node2D).global_position += cv_step
 				_conveyor_vfx_t -= delta
 				if _conveyor_vfx_t <= 0.0 and game != null and game.has_method("spawn_vfx"):
-					_conveyor_vfx_t = 1.5
+					_conveyor_vfx_t = 1.3
 					const FxKit = preload("res://scenes/FxKit.gd")
-					FxKit.conveyor_pulse(game, global_position + _conveyor_dir * (_conveyor_r * 0.5), Color(1.0, 0.6, 0.2), _conveyor_dir, _conveyor_r / 180.0)
+					FxKit.conveyor_pulse(game, global_position, Color(1.0, 0.6, 0.18), _conveyor_dir, _conveyor_r / 160.0)
 
 		# --- CONSOLE / VANNE : juste la decrementation du cooldown, le declenchement vient du
 		# signal DwellZone.filled (_on_console_filled/_on_valve_filled plus bas).

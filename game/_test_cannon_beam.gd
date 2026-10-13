@@ -13,6 +13,7 @@ class StubGame extends Node:
 class DummyPlayer extends CharacterBody2D:
 	var hp: float = 100.0
 	var hit_count: int = 0
+	var field_slow: float = 1.0
 	func _init() -> void:
 		add_to_group("player")
 	func take_damage(amount: float, _from_pos: Vector2 = Vector2.ZERO) -> void:
@@ -122,6 +123,30 @@ func _ready() -> void:
 	tourelle.take_damage(1000.0)
 	_ok(not tourelle._cannon_beam_line.visible, "Ligne masquee apres destruction")
 	_ok(not tourelle._cannon_beam_flash.visible, "Flash masque apres destruction")
+
+	# 9. Verification globale : Tous les canons (g27) fonctionnent, tapis ralentisseur recentre
+	var fake_cannon_prop: PropScatter.Prop = PropScatter.Prop.new()
+	fake_cannon_prop.game = game_stub; fake_cannon_prop.kind = "tourelle_test"
+	fake_cannon_prop.def = {"f": "g27", "hp": 100.0, "sz": 150.0}
+	fake_cannon_prop.position = Vector2(0.0, 0.0); fake_cannon_prop.rand_scale = 1.0; fake_cannon_prop.flip = false
+	add_child(fake_cannon_prop)
+	_ok(fake_cannon_prop._cannon_beam, "Tout decor utilisant l'art g27 a bien le rayon de canon active")
+
+	# Tapis ralentisseur recentre : block 0.0, anneau visuel, et ralentissement de vitesse (field_slow)
+	var tapis: PropScatter.Prop = PropScatter.Prop.new()
+	tapis.game = game_stub; tapis.kind = "convoyeur_sol"; tapis.def = PropScatter.DECOR["convoyeur_sol"]
+	tapis.position = Vector2(50.0, 50.0); tapis.rand_scale = 1.0; tapis.skill_roll = 0.0; tapis.flip = false
+	add_child(tapis)
+	_ok(float(tapis.def.get("block", 1.0)) == 0.0, "Tapis ralentisseur : block == 0.0 (infranchissable supprime, 100% marchable)")
+	_ok(tapis._conveyor_ring != null, "Tapis ralentisseur : anneau visuel lumineux centre instancie")
+	plr.global_position = Vector2(50.0, 50.0)
+	plr.set("field_slow", 1.0)
+	tapis._process(0.05)
+	_ok(float(plr.get("field_slow")) < 0.6, "Tapis ralentisseur : applique bien le ralentissement (field_slow <= 0.52)",
+		"field_slow=%.2f" % float(plr.get("field_slow")))
+
+	# Verification convoyeur : n'utilise plus g27 (canon) mais bien son art dedie
+	_ok(String(PropScatter.DECOR["convoyeur"].get("f", "")) != "g27", "convoyeur n'utilise plus l'art g27 du canon")
 
 	print("=== %s (%d echec(s)) ===" % ["SMOKE PASS" if _fail == 0 else "SMOKE FAIL", _fail])
 	get_tree().quit(1 if _fail > 0 else 0)
