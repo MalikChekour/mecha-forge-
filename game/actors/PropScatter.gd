@@ -2881,7 +2881,9 @@ class Prop extends StaticBody2D:
 				if game != null and game.has_method("spawn_ground_zone"):
 					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
 					game.spawn_ground_zone(target_pos, _mortar_r, 1.6, _mortar_dmg, Color(0.4, 0.85, 0.2), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("jungle_fx_cosse_epines", global_position, (_plr.global_position - global_position).angle(), 0.9, 0.45, Color(0.4, 0.9, 0.25))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.5, Color(0.5, 0.8, 0.2))
 					Audio.sfx("shoot", 0.08)
 
@@ -2952,7 +2954,9 @@ class Prop extends StaticBody2D:
 				if game != null and game.has_method("spawn_ground_zone"):
 					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-25.0, 25.0), randf_range(-25.0, 25.0))
 					game.spawn_ground_zone(target_pos, _smortar_r, 1.5, _smortar_dmg, Color(1.0, 0.4, 0.1), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("volcanic_fx_obus_lave", global_position, (_plr.global_position - global_position).angle(), 1.0, 0.45, Color(1.0, 0.45, 0.15))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(1.0, 0.4, 0.1))
 					Audio.sfx("shoot", 0.08)
 
@@ -2963,8 +2967,11 @@ class Prop extends StaticBody2D:
 				_vent_t = _vent_cd
 				if game != null and game.has_method("spawn_ground_zone"):
 					game.spawn_ground_zone(global_position, _vent_r, _vent_tell, _vent_dmg, Color(1.0, 0.35, 0.1), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("volcanic_fx_obus_lave", global_position, 0.0, 1.15, 0.5, Color(1.0, 0.45, 0.15))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.6, Color(1.0, 0.5, 0.1))
+					Audio.sfx("explosion", 0.1)
 
 		# Marteau-pilon géant : frappe écrasante et onde de choc
 		if _power_hammer and dist < 1300.0:
@@ -3038,7 +3045,9 @@ class Prop extends StaticBody2D:
 						var ang: float = float(i) * (PI * 0.5) + randf_range(-0.2, 0.2)
 						var burst_target: Vector2 = _plr.global_position + Vector2.RIGHT.rotated(ang) * randf_range(40.0, 90.0)
 						game.spawn_ground_zone(burst_target, _flak_r * 0.7, 1.2, _flak_dmg, Color(1.0, 0.5, 0.15), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("swamp_fx_obus_fusee", global_position, (_plr.global_position - global_position).angle(), 1.0, 0.45, Color(1.0, 0.55, 0.2))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(1.0, 0.45, 0.2))
 					Audio.sfx("shoot", 0.08)
 
@@ -3061,6 +3070,7 @@ class Prop extends StaticBody2D:
 						_plr.global_position += _gate_dir * 80.0
 					if game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 2.2, Color(0.3, 0.7, 0.8))
+					Audio.sfx("w_plasma", 0.08)
 
 		# Vanne de barrage : RESTER 1,5 s dedans -> assèche la zone (annule slow) pendant 10 s
 		if _swamp_drain_valve:
@@ -3129,7 +3139,9 @@ class Prop extends StaticBody2D:
 				if game != null and game.has_method("spawn_ground_zone"):
 					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
 					game.spawn_ground_zone(target_pos, _ncannon_r, 1.4, _ncannon_dmg, Color(0.6, 0.85, 1.0), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("cryo_fx_orbe_givre", global_position, (_plr.global_position - global_position).angle(), 0.95, 0.45, Color(0.65, 0.88, 1.0))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.6, 0.9, 1.0))
 					Audio.sfx("shoot", 0.08)
 
@@ -3188,7 +3200,9 @@ class Prop extends StaticBody2D:
 						var target_dir: Vector2 = (_plr.global_position - global_position).normalized().rotated(ang)
 						var target_pos: Vector2 = global_position + target_dir * minf(dist, _pcannon_r)
 						game.spawn_ground_zone(target_pos, 70.0, 1.2, _pcannon_dmg, Color(0.4, 1.0, 0.5), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("reacteur_fx_tir_fragmente", global_position, (_plr.global_position - global_position).angle(), 1.0, 0.45, Color(0.45, 1.0, 0.55))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.4, 1.0, 0.5))
 					Audio.sfx("shoot", 0.08)
 
@@ -3207,6 +3221,7 @@ class Prop extends StaticBody2D:
 					gz.global_position = global_position
 					if game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.6, Color(0.5, 1.0, 0.6))
+					Audio.sfx("w_railgun", 0.09)
 
 		# Barre de contrôle : réduit les dégâts de zone d'énergie si le joueur reste à portée
 		if _control_rod:
@@ -3251,7 +3266,9 @@ class Prop extends StaticBody2D:
 					for i in 3:
 						var offset: Vector2 = Vector2.RIGHT.rotated(randf_range(0, TAU)) * randf_range(40.0, _acid_r)
 						game.spawn_ground_zone(global_position + offset, 60.0, 1.0 + float(i) * 0.3, 16.0, Color(0.8, 0.9, 0.3), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("ruche_fx_globule_acide", global_position, (_plr.global_position - global_position).angle(), 0.95, 0.45, Color(0.85, 0.95, 0.25))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.8, 0.9, 0.3))
 					Audio.sfx("shoot", 0.08)
 
@@ -3290,7 +3307,9 @@ class Prop extends StaticBody2D:
 				_glauncher_t = _glauncher_cd
 				if game != null and game.has_method("spawn_ground_zone"):
 					game.spawn_ground_zone(_plr.global_position, 85.0, 1.6, _glauncher_dmg, Color(1.0, 0.5, 0.1), kind)
-					if game.has_method("spawn_vfx"):
+					if game.has_method("spawn_signature_vfx"):
+						game.spawn_signature_vfx("citadelle_fx_missile_plasma", global_position, (_plr.global_position - global_position).angle(), 1.05, 0.5, Color(1.0, 0.45, 0.85))
+					elif game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(1.0, 0.6, 0.2))
 					Audio.sfx("shoot", 0.08)
 
@@ -4118,9 +4137,14 @@ class Prop extends StaticBody2D:
 
 	func _fire_cannon_beam(a: Vector2, b: Vector2, base_col: Color, shot_dir: Vector2 = _cannon) -> void:
 		Audio.sfx("explosion", 0.08)
-		if game != null and game.has_method("spawn_vfx"):
-			game.spawn_vfx("muzzle", a, shot_dir.angle() + PI * 0.5, 0.55, base_col)
-			game.spawn_vfx("energy", a, 0.0, 1.0, base_col)
+		if game != null:
+			if _solar_mirror and game.has_method("spawn_signature_vfx"):
+				game.spawn_signature_vfx("desert_fx_rayon_solaire", a, shot_dir.angle(), 1.25, 0.45, Color(1.0, 0.85, 0.25))
+			elif _welder and game.has_method("spawn_signature_vfx"):
+				game.spawn_signature_vfx("tech_fx_arc_soudure", a, shot_dir.angle(), 1.15, 0.4, Color(0.35, 0.9, 1.0))
+			elif game.has_method("spawn_vfx"):
+				game.spawn_vfx("muzzle", a, shot_dir.angle() + PI * 0.5, 0.55, base_col)
+				game.spawn_vfx("energy", a, 0.0, 1.0, base_col)
 		if _solar_mirror and game != null and "enemy_layer" in game:
 			var mid: Vector2 = (a + b) * 0.5
 			var z: GroundZone = GroundZone.new()
@@ -4146,7 +4170,8 @@ class Prop extends StaticBody2D:
 					e.take_damage(edmg)
 					if game != null and game.has_method("impact_fx"):
 						var col: Color = Color(1.0, 0.85, 0.3) if _solar_mirror else (Color(0.3, 0.9, 1.0) if (_hacked or _welder) else Color(1.0, 0.45, 0.15))
-						game.impact_fx(p, col, "laser", shot_dir, 1.6)
+						var ikind: String = "desert_miroir_solaire" if _solar_mirror else ("tech_tourelle_soudeuse" if (_welder or _hacked) else "laser")
+						game.impact_fx(p, col, ikind, shot_dir, 1.6)
 
 		# Toucher du joueur : seulement si non pirate
 		if not _hacked and _plr != null and is_instance_valid(_plr) and _plr.has_method("take_damage"):
@@ -4159,7 +4184,8 @@ class Prop extends StaticBody2D:
 					Events.screen_shake.emit(6.0)
 					if game != null and game.has_method("impact_fx"):
 						var col: Color = Color(1.0, 0.85, 0.3) if _solar_mirror else (Color(0.3, 0.9, 1.0) if _welder else Color(1.0, 0.4, 0.1))
-						game.impact_fx(pp, col, "laser", shot_dir, 1.8)
+						var ikind: String = "desert_miroir_solaire" if _solar_mirror else ("tech_tourelle_soudeuse" if _welder else "laser")
+						game.impact_fx(pp, col, ikind, shot_dir, 1.8)
 
 	## Fuel barrel detonation: hurts EVERYTHING in BOOM_R, the player included — the 4s fuse is
 	## the fair warning. Leading the horde over a barrel is the reward.

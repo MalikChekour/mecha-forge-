@@ -1473,6 +1473,70 @@ func impact_fx(pos: Vector2, color: Color, kind: String, dir: Vector2 = Vector2.
 			_debris(pos, color, int(6 * dg), 0.26, 150.0, 360.0)
 			_light_pop(pos, dc2, 2.0 * dg, 0.15, 1.1 * dg)
 			Audio.sfx("hit", 0.14)
+		# ---- SIGNATURE BIOME HAZARDS & TURRETS (04/10 + 15/10) -------------------------
+		"volcanic_mortier_scories", "volcanic_event_magma":
+			var b_volc: float = 1.35 * scale
+			spawn_signature_vfx("volcanic_fx_obus_lave", pos, dir.angle(), 1.2 * b_volc, 0.5, Color(1.0, 0.45, 0.15))
+			FxKit.recipe_fire(self, pos, Color(1.0, 0.45, 0.15), b_volc)
+			_light_pop(pos, Color(1.0, 0.55, 0.2), 3.8 * b_volc, 0.45, 2.0 * b_volc)
+			Events.screen_shake.emit(4.5 * b_volc)
+			Audio.sfx("explosion", 0.12)
+		"desert_miroir_solaire", "desert_generateur_tempete":
+			var b_des: float = 1.3 * scale
+			spawn_signature_vfx("desert_fx_rayon_solaire", pos, dir.angle(), 1.2 * b_des, 0.45, Color(1.0, 0.85, 0.25))
+			FxKit.recipe_energy(self, pos, Color(1.0, 0.85, 0.25), b_des)
+			_light_pop(pos, Color(1.0, 0.9, 0.4), 3.6 * b_des, 0.35, 1.8 * b_des)
+			Events.screen_shake.emit(3.8 * b_des)
+			Audio.sfx("explosion", 0.1)
+		"jungle_mortier_plante", "jungle_fruit_grenade":
+			var b_jun: float = 1.25 * scale
+			spawn_signature_vfx("jungle_fx_cosse_epines", pos, dir.angle(), 1.15 * b_jun, 0.45, Color(0.4, 0.9, 0.25))
+			FxKit.recipe_bio(self, pos, Color(0.4, 0.9, 0.25), b_jun)
+			_light_pop(pos, Color(0.5, 0.95, 0.3), 3.2 * b_jun, 0.35, 1.6 * b_jun)
+			Events.screen_shake.emit(3.5 * b_jun)
+			Audio.sfx("hit", 0.12)
+		"swamp_tourelle_dca", "swamp_bouee_mine":
+			var b_swp: float = 1.3 * scale
+			spawn_signature_vfx("swamp_fx_obus_fusee", pos, dir.angle(), 1.2 * b_swp, 0.45, Color(1.0, 0.55, 0.2))
+			FxKit.recipe_fire(self, pos, Color(1.0, 0.55, 0.2), b_swp)
+			_light_pop(pos, Color(1.0, 0.6, 0.25), 3.5 * b_swp, 0.35, 1.8 * b_swp)
+			Events.screen_shake.emit(4.0 * b_swp)
+			Audio.sfx("explosion", 0.12)
+		"tech_tourelle_soudeuse", "tech_soudeuse":
+			var b_tech: float = 1.25 * scale
+			spawn_signature_vfx("tech_fx_arc_soudure", pos, dir.angle(), 1.15 * b_tech, 0.4, Color(0.35, 0.9, 1.0))
+			FxKit.recipe_energy(self, pos, Color(0.35, 0.9, 1.0), b_tech)
+			_light_pop(pos, Color(0.4, 0.95, 1.0), 3.4 * b_tech, 0.3, 1.6 * b_tech)
+			Events.screen_shake.emit(3.0 * b_tech)
+			Audio.sfx("hit", 0.14)
+		"cryo_canon_azote":
+			var b_cryo: float = 1.3 * scale
+			spawn_signature_vfx("cryo_fx_orbe_givre", pos, dir.angle(), 1.2 * b_cryo, 0.5, Color(0.65, 0.88, 1.0))
+			FxKit.recipe_ice(self, pos, Color(0.65, 0.88, 1.0), b_cryo)
+			_light_pop(pos, Color(0.7, 0.95, 1.0), 3.4 * b_cryo, 0.35, 1.7 * b_cryo)
+			Events.screen_shake.emit(3.2 * b_cryo)
+			Audio.sfx("hit", 0.12)
+		"reacteur_canon_particules":
+			var b_reac: float = 1.35 * scale
+			spawn_signature_vfx("reacteur_fx_tir_fragmente", pos, dir.angle(), 1.2 * b_reac, 0.45, Color(0.45, 1.0, 0.55))
+			FxKit.recipe_energy(self, pos, Color(0.45, 1.0, 0.55), b_reac)
+			_light_pop(pos, Color(0.5, 1.0, 0.6), 3.6 * b_reac, 0.35, 1.8 * b_reac)
+			Events.screen_shake.emit(3.8 * b_reac)
+			Audio.sfx("explosion", 0.12)
+		"ruche_organe_acide":
+			var b_ruc: float = 1.25 * scale
+			spawn_signature_vfx("ruche_fx_globule_acide", pos, dir.angle(), 1.15 * b_ruc, 0.45, Color(0.85, 0.95, 0.25))
+			FxKit.recipe_bio(self, pos, Color(0.85, 0.95, 0.25), b_ruc)
+			_light_pop(pos, Color(0.85, 1.0, 0.3), 3.2 * b_ruc, 0.35, 1.6 * b_ruc)
+			Events.screen_shake.emit(3.0 * b_ruc)
+			Audio.sfx("hit", 0.12)
+		"citadelle_lanceur_guide":
+			var b_cit: float = 1.35 * scale
+			spawn_signature_vfx("citadelle_fx_missile_plasma", pos, dir.angle(), 1.25 * b_cit, 0.5, Color(1.0, 0.45, 0.85))
+			FxKit.recipe_energy(self, pos, Color(1.0, 0.45, 0.85), b_cit)
+			_light_pop(pos, Color(1.0, 0.55, 0.9), 3.8 * b_cit, 0.4, 2.0 * b_cit)
+			Events.screen_shake.emit(4.2 * b_cit)
+			Audio.sfx("explosion", 0.14)
 		# ---- DECOR INTERACTIF (04/10 tour 2, « encore bas de gamme ») ----------------------
 		# Chaque famille de danger passe par une RECETTE FxKit en 6 couches (coeur anamorphique,
 		# halo, onde a front net, matiere projetee, fumee/vapeur/eclats, trace au sol qui reste).
@@ -1713,6 +1777,39 @@ func reclaim_vfx(v: VfxSprite) -> void:
 		_vfx_pool.append(v)
 	else:
 		v.queue_free()
+
+var _sig_vfx_tex: Dictionary = {}
+
+## Single-frame 1024x1024 additive signature VFX on solid black background.
+## Tweened ease-out scale & fade to create a high-contrast glowing bloom effect.
+func spawn_signature_vfx(vfx_name: String, pos: Vector2, rot: float = 0.0, scl: float = 1.0, dur: float = 0.45, col: Color = Color.WHITE) -> void:
+	if _headless or fx_layer == null:
+		return
+	if not _sig_vfx_tex.has(vfx_name):
+		var p: String = "res://assets/vfx/%s.png" % vfx_name
+		_sig_vfx_tex[vfx_name] = load(p) if ResourceLoader.exists(p) else null
+	var tex: Texture2D = _sig_vfx_tex[vfx_name]
+	if tex == null:
+		return
+	var s: Sprite2D = Sprite2D.new()
+	s.texture = tex
+	s.centered = true
+	var m: CanvasItemMaterial = CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	s.material = m
+	s.position = pos
+	s.rotation = rot
+	# 1024px single frame: scale base is ~0.24 (245px) scaled by scl
+	var base_sc: float = 0.24 * scl
+	s.scale = Vector2(base_sc * 0.45, base_sc * 0.45)
+	s.modulate = col
+	fx_layer.add_child(s)
+	
+	var tw: Tween = create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(s, "scale", Vector2(base_sc * 1.35, base_sc * 1.35), dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(s, "modulate:a", 0.0, dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(s.queue_free)
 
 func death_fx(pos: Vector2, rank: int, flash: bool = true) -> void:
 	if rank >= 2:

@@ -64,18 +64,25 @@ func _mk_music() -> AudioStreamPlayer:
 	add_child(p)
 	return p
 
+const SFX_ALIASES: Dictionary = {
+	"powerup": "levelup",
+	"dash": "w_autocannon",
+	"teleport": "w_railgun",
+}
+
 func sfx(name: String, pitch_var: float = 0.0) -> void:
-	if not _streams.has(name) or _players.is_empty():
+	var actual_name: String = String(SFX_ALIASES.get(name, name))
+	if not _streams.has(actual_name) or _players.is_empty():
 		return
-	var thr: float = float(_THROTTLE.get(name, 0.0))
+	var thr: float = float(_THROTTLE.get(actual_name, 0.0))
 	if thr > 0.0:
 		var now: float = Time.get_ticks_msec() / 1000.0
-		if now - float(_last.get(name, -10.0)) < thr:
+		if now - float(_last.get(actual_name, -10.0)) < thr:
 			return
-		_last[name] = now
+		_last[actual_name] = now
 	var pl: AudioStreamPlayer = _players[_idx]
 	_idx = (_idx + 1) % _players.size()
-	pl.stream = _streams[name]
+	pl.stream = _streams[actual_name]
 	pl.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
 	pl.play()
 
