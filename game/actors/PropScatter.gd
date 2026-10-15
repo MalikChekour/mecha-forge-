@@ -559,6 +559,24 @@ const RIDGE_CHANCE: float = 0.5   # per chunk, when the biome has a rock-family 
 # natural barrier (mountains / rock / ruins). Purely decorative: the hard clamp on the player and
 # spawns is the real wall, so these carry NO collider and are NOT in cover_list (60 props scanned
 # by 220 enemies every frame would be the opposite of an optimisation).
+# CANONS QUI PIVOTENT (15/10, patron : « si le projectile poursuit, le canon doit pivoter pour etre aligne avec
+# le tir » puis « fais juste pivoter l image, ne casse pas l image en deux ») : l IMAGE ENTIERE tourne.
+# `pivot` = le corps du canon, `muzzle` = le bout du canon dans l image (l axe est deduit pivot -> bouche) ;
+# `tip` (optionnel) = point d ou part le tir quand il differe de la bouche (miroir solaire : la lentille).
+# `cut` n est plus utilise (ancienne decoupe tete/socle abandonnee).
+## Interrupteur de retour arriere : false = les canons ne pivotent plus (image fixe, comme avant 11.46).
+const HEAD_ROTATE: bool = true
+const HEADS: Dictionary = {
+	"g27": {"cut": [[0, 0.90], [0.25, 0.90], [0.28, 0.64], [0.5, 0.60], [1, 0.58]], "pivot": [0.55, 0.45], "muzzle": [0.10, 0.75]},
+	"tech_tourelle_soudeuse": {"cut": [[0, 0.70], [0.25, 0.66], [0.5, 0.66], [0.75, 0.66], [1, 0.70]], "pivot": [0.45, 0.52], "muzzle": [0.10, 0.30]},
+	"desert_tourelle_miroir_solaire": {"cut": [[0, 0.60], [0.3, 0.63], [0.5, 0.64], [0.7, 0.63], [1, 0.60]], "pivot": [0.5, 0.33], "muzzle": [0.5, 0.05], "tip": [0.5, 0.30]},
+	"jungle_tourelle_mortier_plante": {"cut": [[0, 0.66], [0.2, 0.66], [0.22, 0.57], [0.5, 0.58], [0.8, 0.55], [1, 0.62]], "pivot": [0.5, 0.42], "muzzle": [0.08, 0.57]},
+	"volcanic_tourelle_mortier_scories": {"cut": [[0, 0.5], [0.25, 0.45], [0.5, 0.42], [0.75, 0.42], [1, 0.5]], "pivot": [0.5, 0.36], "muzzle": [0.30, 0.27]},
+	"swamp_tourelle_dca_toit": {"cut": [[0, 0.52], [0.25, 0.50], [0.5, 0.52], [0.75, 0.5], [1, 0.55]], "pivot": [0.5, 0.42], "muzzle": [0.04, 0.08]},
+	"cryo_tourelle_canon_azote": {"cut": [[0, 0.80], [0.2, 0.78], [0.3, 0.72], [0.5, 0.70], [0.75, 0.66], [1, 0.66]], "pivot": [0.55, 0.5], "muzzle": [0.03, 0.58]},
+	"reacteur_tourelle_canon_particules": {"cut": [[0, 0.78], [0.2, 0.76], [0.3, 0.72], [0.5, 0.72], [0.8, 0.70], [1, 0.72]], "pivot": [0.55, 0.48], "muzzle": [0.08, 0.64]},
+}
+
 const BIOME_BORDER: Dictionary = {
 	# 14/10 (patron : « ne laisse que ce qui est specifique a chaque niveau ») : chaque piece de mur
 	# n'apparait plus que dans UN seul biome — plus de rocher/arbre/cristaux/glace repetes.
@@ -1552,6 +1570,19 @@ class Prop extends StaticBody2D:
 	var _welder: bool = false
 	var _sweep_half: float = 0.785398
 	var _welder_dmg: float = 28.0
+	var _head: Sprite2D = null        # = _sprite des tourelles a canon : l image entiere pivote (voir HEADS)
+	var _head_axis: float = 0.0
+	var _head_s: int = 1
+	var _head_wh: Vector2 = Vector2.ONE
+	var _head_pivot_px: Vector2 = Vector2.ZERO
+	var _head_muz_px: Vector2 = Vector2.ZERO
+	var _head_tip_px: Vector2 = Vector2.ZERO
+	var _head_override: Vector2 = Vector2.RIGHT
+	var _head_hold_t: float = 0.0
+	var _head_lock: Vector2 = Vector2.RIGHT
+	var _shot_style: String = ""   # soudeuse / miroir solaire : tir propre (TurretShots.gd), plus le moteur a faisceau commun
+	var _shot_cd: float = 6.0
+	var _shot_t: float = 0.0
 
 	var _gantry: bool = false
 	var _gantry_cd: float = 6.0
@@ -1770,6 +1801,7 @@ class Prop extends StaticBody2D:
 	# ===== Bible des niveaux — Niveau 8 (La Ruche / ruche) =====
 	var _acid_turret: bool = false
 	var _acid_cd: float = 4.5
+	var _acid_dmg: float = 24.0
 	var _acid_t: float = 0.0
 	var _acid_r: float = 320.0
 
@@ -2396,6 +2428,7 @@ class Prop extends StaticBody2D:
 			_acid_cd = float(def.get("acid_cd", 4.5))
 			_acid_t = randf_range(1.0, _acid_cd)
 			_acid_r = float(def.get("acid_r", 320.0))
+			_acid_dmg = float(def.get("acid_dmg", 24.0))
 		_spawner_egg = bool(def.get("spawner_egg", false))
 		if _spawner_egg:
 			_egg_spawn_cd = float(def.get("spawn_cd", 5.0))
@@ -2474,6 +2507,8 @@ class Prop extends StaticBody2D:
 		if _conveyor:
 			_sprite.flip_h = flip
 		add_child(_sprite)
+		if HEAD_ROTATE and HEADS.has(String(def.get("f", ""))):
+			_build_head(HEADS[String(def.get("f", ""))], tex)
 
 		# Fixed emplacement gun: derive the FIRING AXIS from the art itself so the bolt always
 		# leaves the barrel we drew, never the opposite side. Mirroring the sprite mirrors both
@@ -2484,15 +2519,28 @@ class Prop extends StaticBody2D:
 		if is_cannon:
 			_shoot_r = maxf(_shoot_r, 470.0)
 			set_process(true)
-			_sprite.flip_h = flip
+			if _head == null:
+				_sprite.flip_h = flip
 			var a: float = deg_to_rad(float(def.get("aim", 135.0 if (_welder or _solar_mirror) else 140.0)))
 			_cannon = Vector2.RIGHT.rotated(a)
-			var m: Array = def.get("muzzle", [0.0, 30.0] if _solar_mirror else ([-20.0, 40.0] if _welder else [-162.5, 117.0]))
+			# 15/10 : les images des tourelles ont ete REDUITES (1700-1800 px -> 640 px) pour passer sous la limite
+			# de 200 Mo d'itch.io. Les bouches par defaut du miroir solaire / de la soudeuse etaient en
+			# pixels de l'image d'origine (1699 / 1813 px de haut) : on les exprime en FRACTION de hauteur,
+			# donc valables quelle que soit la definition de l'image.
+			var m: Array = def.get("muzzle", [0.0, 30.0 / 1699.0 * th] if _solar_mirror else ([-20.0 / 1813.0 * th, 40.0 / 1813.0 * th] if _welder else [-162.5, 117.0]))
 			_muzzle = Vector2(float(m[0]), float(m[1])) * sc
 			if flip:
 				_cannon.x = -_cannon.x
 				_muzzle.x = -_muzzle.x
 			_cannon_beam = true
+			if _welder or _solar_mirror:
+				# 15/10 : ces deux tourelles n'utilisent plus le moteur a faisceau COMMUN (ligne fine puis
+				# faisceau epais, juste recolore) : balayage d'arc de soudure / aiguille solaire a cone
+				# convergent, voir TurretShots.gd.
+				_cannon_beam = false
+				_shot_style = "weld_sweep" if _welder else "solar_needle"
+				_shot_cd = 6.0 if _welder else 5.5
+				_shot_t = randf_range(1.5, 3.0)
 			_cannon_beam_t = randf_range(0.2, 0.9)
 			_cannon_beam_glow = _mk_beam(27)
 			_cannon_beam_line = _mk_beam(28)
@@ -2546,6 +2594,90 @@ class Prop extends StaticBody2D:
 	func get_sprite_texture() -> Texture2D:
 		return _sprite.texture if _sprite != null else null
 
+	## 15/10 (patron : « fais juste pivoter l image, ne casse pas l image en deux ») : c est l IMAGE ENTIERE de
+	## la tourelle qui tourne pour aligner le canon sur le tir. `muzzle` (bouche) et `pivot` (corps) donnent l axe
+	## du canon DANS l image ; on tourne du cote (image normale ou en miroir) qui demande le moins de rotation.
+	func _build_head(hd: Dictionary, tex: Texture2D) -> void:
+		var w: float = float(tex.get_width())
+		var h: float = float(tex.get_height())
+		_head_wh = Vector2(w, h)
+		var center: Vector2 = Vector2(w, h) * 0.5
+		_head_pivot_px = Vector2(float(hd["pivot"][0]) * w, float(hd["pivot"][1]) * h)
+		var muz_abs: Vector2 = Vector2(float(hd["muzzle"][0]) * w, float(hd["muzzle"][1]) * h)
+		_head_muz_px = muz_abs - _head_pivot_px          # vecteur pivot -> bouche (axe du canon)
+		var tip_abs: Vector2 = muz_abs
+		if hd.has("tip"):
+			tip_abs = Vector2(float(hd["tip"][0]) * w, float(hd["tip"][1]) * h)
+		_head_tip_px = tip_abs - center                   # point de depart du tir, relatif au centre de l image
+		_head_axis = _head_muz_px.angle()
+		_head = _sprite
+		_head_lock = Vector2.from_angle(_head_axis)
+
+	func has_head() -> bool:
+		return _head != null
+
+	## Bout du canon (ou point de depart du tir) en coordonnees MONDE, image tournee comprise.
+	func muzzle_world() -> Vector2:
+		if _head == null:
+			return global_position
+		var loc: Vector2 = Vector2(_head_tip_px.x * float(_head_s), _head_tip_px.y)
+		return _head.to_global(loc)
+
+	## Centre du canon (le point autour duquel il vise) en monde : la ligne pivot -> bouche doit passer par la cible.
+	func pivot_world() -> Vector2:
+		if _head == null:
+			return global_position
+		return _head.to_global(Vector2((_head_pivot_px.x - _head_wh.x * 0.5) * float(_head_s), _head_pivot_px.y - _head_wh.y * 0.5))
+
+	## Direction dans laquelle pointe le canon, en monde.
+	func head_dir() -> Vector2:
+		if _head == null:
+			return Vector2.RIGHT
+		var v: Vector2 = Vector2(_head_muz_px.x * float(_head_s), _head_muz_px.y)
+		var d: Vector2 = v.rotated(_head.rotation)
+		return d.normalized() if d.length_squared() > 0.0001 else Vector2.RIGHT
+
+	## Force le canon a viser `d` pendant `hold` secondes (balayage de la soudeuse, orbe, verrou solaire...).
+	func head_override(d: Vector2, hold: float = 0.2) -> void:
+		_head_override = d.normalized()
+		_head_hold_t = hold
+
+	func _update_head(delta: float, dist: float) -> void:
+		var d: Vector2
+		if _head_hold_t > 0.0:
+			_head_hold_t -= delta
+			d = _head_override
+		elif _plr != null and dist < 1500.0:
+			d = (_plr.global_position - pivot_world()).normalized()
+		else:
+			return
+		if d.length_squared() < 0.0001:
+			return
+		var th: float = d.angle()
+		var best_s: int = 1
+		var best_diff: float = 0.0
+		var best_abs: float = 99.0
+		var cur_diff: float = 0.0
+		for sg in [1, -1]:
+			var ax: float = _head_axis if sg == 1 else PI - _head_axis
+			var df: float = wrapf(th - ax, -PI, PI)
+			if sg == _head_s:
+				cur_diff = df
+			if absf(df) < best_abs:
+				best_abs = absf(df)
+				best_diff = df
+				best_s = sg
+		# hysteresis du miroir : on ne retourne l image que si l autre cote est NETTEMENT plus proche
+		if best_s != _head_s and absf(cur_diff) <= best_abs + 0.4:
+			best_s = _head_s
+			best_diff = cur_diff
+		if best_s != _head_s:
+			_head_s = best_s
+			_head.flip_h = best_s == -1
+			_head.rotation = best_diff   # le miroir change le sens : on saute directement a la bonne pose
+		else:
+			_head.rotation = lerp_angle(_head.rotation, best_diff, clampf(delta * 9.0, 0.0, 1.0))
+
 	## Cheap additive glow used instead of a real Light2D (see call sites): same soft halo look,
 	## none of the per-frame dynamic-light re-render cost that was hurting mobile.
 	func _glow_sprite(c: Color, diameter: float, alpha: float) -> Sprite2D:
@@ -2579,10 +2711,19 @@ class Prop extends StaticBody2D:
 			if _plr == null:
 				return
 		var dist: float = global_position.distance_to(_plr.global_position)
+		if _head != null:
+			_update_head(delta, dist)
 
 		# --- CANON A RAYON AUTOMATIQUE A INTERVALLE REGULIER ---
 		if _cannon_beam and (dist < 2200.0 or _cannon_beam_state != 0):
 			_tick_cannon_beam(delta)
+
+		# --- soudeuse (niveau 1) / miroir solaire (niveau 2) : tirs propres a leur niveau ---
+		if _shot_style != "" and dist < 1300.0:
+			_shot_t -= delta
+			if _shot_t <= 0.0:
+				_shot_t = _shot_cd
+				TurretShot.fire(_shot_style, self, game, _plr, _welder_dmg if _welder else _solar_dmg, kind)
 
 		# --- beacon: emit an enemy on a fixed cadence while the player is in range ---
 		if _beacon:
@@ -2877,15 +3018,9 @@ class Prop extends StaticBody2D:
 		if _plant_mortar and dist < 1300.0:
 			_mortar_t -= delta
 			if _mortar_t <= 0.0:
-				_mortar_t = _mortar_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
-					game.spawn_ground_zone(target_pos, _mortar_r, 1.6, _mortar_dmg, Color(0.4, 0.85, 0.2), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("jungle_fx_cosse_epines", global_position, (_plr.global_position - global_position).angle(), 0.9, 0.45, Color(0.4, 0.9, 0.25))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 1.5, Color(0.5, 0.8, 0.2))
-					Audio.sfx("shoot", 0.08)
+				_mortar_t = maxf(_mortar_cd, 3.5)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("lob_pod", self, game, _plr, _mortar_dmg, kind)
 
 		# Liane-fouet : fouette un arc de 120° autour de sa base
 		if _whip_vine and dist < 1200.0:
@@ -2950,15 +3085,9 @@ class Prop extends StaticBody2D:
 		if _slag_mortar and dist < 1300.0:
 			_smortar_t -= delta
 			if _smortar_t <= 0.0:
-				_smortar_t = _smortar_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-25.0, 25.0), randf_range(-25.0, 25.0))
-					game.spawn_ground_zone(target_pos, _smortar_r, 1.5, _smortar_dmg, Color(1.0, 0.4, 0.1), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("volcanic_fx_obus_lave", global_position, (_plr.global_position - global_position).angle(), 1.0, 0.45, Color(1.0, 0.45, 0.15))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(1.0, 0.4, 0.1))
-					Audio.sfx("shoot", 0.08)
+				_smortar_t = maxf(_smortar_cd, 4.5)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("lob_slag", self, game, _plr, _smortar_dmg, kind)
 
 		# Évent de magma : éruption volcanique périodique
 		if _magma_vent and dist < 1200.0:
@@ -3039,17 +3168,9 @@ class Prop extends StaticBody2D:
 		if _flak_turret and dist < 1300.0:
 			_flak_t -= delta
 			if _flak_t <= 0.0:
-				_flak_t = _flak_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					for i in 4:
-						var ang: float = float(i) * (PI * 0.5) + randf_range(-0.2, 0.2)
-						var burst_target: Vector2 = _plr.global_position + Vector2.RIGHT.rotated(ang) * randf_range(40.0, 90.0)
-						game.spawn_ground_zone(burst_target, _flak_r * 0.7, 1.2, _flak_dmg, Color(1.0, 0.5, 0.15), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("swamp_fx_obus_fusee", global_position, (_plr.global_position - global_position).angle(), 1.0, 0.45, Color(1.0, 0.55, 0.2))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(1.0, 0.45, 0.2))
-					Audio.sfx("shoot", 0.08)
+				_flak_t = maxf(_flak_cd, 3.5)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("flak", self, game, _plr, _flak_dmg, kind)
 
 		# Vanne de crue : vague torrentielle qui balaie 400 u et pousse
 		if _flood_gate and dist < 1300.0:
@@ -3135,15 +3256,9 @@ class Prop extends StaticBody2D:
 		if _nitrogen_cannon and dist < 1300.0:
 			_ncannon_t -= delta
 			if _ncannon_t <= 0.0:
-				_ncannon_t = _ncannon_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
-					game.spawn_ground_zone(target_pos, _ncannon_r, 1.4, _ncannon_dmg, Color(0.6, 0.85, 1.0), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("cryo_fx_orbe_givre", global_position, (_plr.global_position - global_position).angle(), 0.95, 0.45, Color(0.65, 0.88, 1.0))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.6, 0.9, 1.0))
-					Audio.sfx("shoot", 0.08)
+				_ncannon_t = maxf(_ncannon_cd, 6.0)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("orb_frost", self, game, _plr, _ncannon_dmg, kind)
 
 		# Condenseur à givre : anneaux de givre périodiques qui s'étendent et ralentissent
 		if _frost_condenser and dist < 1200.0:
@@ -3193,18 +3308,9 @@ class Prop extends StaticBody2D:
 		if _particle_cannon and dist < 1400.0:
 			_pcannon_t -= delta
 			if _pcannon_t <= 0.0:
-				_pcannon_t = _pcannon_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					for frag in 3:
-						var ang: float = float(frag - 1) * 0.4
-						var target_dir: Vector2 = (_plr.global_position - global_position).normalized().rotated(ang)
-						var target_pos: Vector2 = global_position + target_dir * minf(dist, _pcannon_r)
-						game.spawn_ground_zone(target_pos, 70.0, 1.2, _pcannon_dmg, Color(0.4, 1.0, 0.5), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("reacteur_fx_tir_fragmente", global_position, (_plr.global_position - global_position).angle(), 1.0, 0.45, Color(0.45, 1.0, 0.55))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.4, 1.0, 0.5))
-					Audio.sfx("shoot", 0.08)
+				_pcannon_t = maxf(_pcannon_cd, 5.5)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("plasma", self, game, _plr, _pcannon_dmg, kind)
 
 		# Bobine de Tesla : arc électrique reliant à distance
 		if _tesla_coil and dist < 1200.0:
@@ -3261,16 +3367,9 @@ class Prop extends StaticBody2D:
 		if _acid_turret and dist < 1300.0:
 			_acid_t -= delta
 			if _acid_t <= 0.0:
-				_acid_t = _acid_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					for i in 3:
-						var offset: Vector2 = Vector2.RIGHT.rotated(randf_range(0, TAU)) * randf_range(40.0, _acid_r)
-						game.spawn_ground_zone(global_position + offset, 60.0, 1.0 + float(i) * 0.3, 16.0, Color(0.8, 0.9, 0.3), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("ruche_fx_globule_acide", global_position, (_plr.global_position - global_position).angle(), 0.95, 0.45, Color(0.85, 0.95, 0.25))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.8, 0.9, 0.3))
-					Audio.sfx("shoot", 0.08)
+				_acid_t = maxf(_acid_cd, 3.5)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("acid_burst", self, game, _plr, _acid_dmg, kind)
 
 		# Pondoir : génère des petites larves
 		if _spawner_egg and dist < 1200.0:
@@ -3304,14 +3403,9 @@ class Prop extends StaticBody2D:
 		if _guided_launcher and dist < 1400.0:
 			_glauncher_t -= delta
 			if _glauncher_t <= 0.0:
-				_glauncher_t = _glauncher_cd
-				if game != null and game.has_method("spawn_ground_zone"):
-					game.spawn_ground_zone(_plr.global_position, 85.0, 1.6, _glauncher_dmg, Color(1.0, 0.5, 0.1), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("citadelle_fx_missile_plasma", global_position, (_plr.global_position - global_position).angle(), 1.05, 0.5, Color(1.0, 0.45, 0.85))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(1.0, 0.6, 0.2))
-					Audio.sfx("shoot", 0.08)
+				_glauncher_t = maxf(_glauncher_cd, 6.5)
+				# 15/10 : tir propre au niveau (voir TurretShots.gd) - plus de cercle + ogive communs
+				TurretShot.fire("missile_swarm", self, game, _plr, _glauncher_dmg, kind)
 
 		# Relais satellite : pulsations orbitales périodiques
 		if _satellite_relay and dist < 1300.0:
@@ -4064,6 +4158,14 @@ class Prop extends StaticBody2D:
 			var cur_angle: float = lerpf(-_sweep_half, _sweep_half, progress)
 			cur_cannon = _cannon.rotated(cur_angle)
 		var a: Vector2 = global_position + _muzzle
+		if _head != null:
+			# tourelle a tete pivotante : le faisceau part de la bouche et suit le canon (verrouille pendant le tir)
+			a = muzzle_world()
+			if _cannon_beam_state != 2:
+				_head_lock = head_dir()
+			cur_cannon = _head_lock
+			if _cannon_beam_state == 2:
+				head_override(_head_lock, 0.2)
 		var b: Vector2 = a + cur_cannon * CANNON_LEN
 		var pts: PackedVector2Array = PackedVector2Array([a, b])
 		var base_col: Color = Color(1.0, 0.9, 0.4) if _solar_mirror else (Color(0.2, 0.85, 1.0) if (_hacked or _welder) else Color(1.0, 0.35, 0.1))

@@ -74,8 +74,9 @@ func _ready() -> void:
 	_ok(tourelle._cannon_beam_core.visible, "Ligne de coeur visible pendant la charge")
 
 	# 3. Positionnement d'un ennemi et du joueur sur l'axe du rayon
-	var muzzle_pt: Vector2 = tourelle.global_position + tourelle._muzzle
-	var ray_axis: Vector2 = tourelle._cannon
+	# 15/10 : la tourelle a canon pivotant tire depuis le bout de son canon, dans l'axe de l'image
+	var muzzle_pt: Vector2 = tourelle.muzzle_world() if tourelle.has_head() else tourelle.global_position + tourelle._muzzle
+	var ray_axis: Vector2 = tourelle.head_dir() if tourelle.has_head() else tourelle._cannon
 	plr.global_position = muzzle_pt + ray_axis * 200.0
 
 	var enemy: DummyEnemy = DummyEnemy.new()
