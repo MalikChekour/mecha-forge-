@@ -62,6 +62,8 @@ const GRAMMAR: Dictionary = {
 static func fire(shot_style: String, prop: Node2D, g: Node, p: Node2D, damage: float, k: String) -> void:
 	if g == null or p == null or not is_instance_valid(p) or not ("fx_layer" in g) or g.fx_layer == null:
 		return
+	if prop.has_method("head_snap"):
+		prop.head_snap(p.global_position)   # le canon est deja dans l axe quand le tir part
 	var s: Vector2 = _muzzle_of(prop)
 	var to_p: Vector2 = p.global_position
 	var lead: Vector2 = Vector2.ZERO

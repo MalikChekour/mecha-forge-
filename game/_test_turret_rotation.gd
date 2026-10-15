@@ -40,7 +40,7 @@ func _ready() -> void:
 	add_child(plr)
 	plr.add_to_group("player")
 	var kinds: Array = ["tourelle", "tech_soudeuse", "desert_miroir_solaire", "jungle_mortier_plante", "volcanic_mortier_scories",
-		"swamp_tourelle_dca", "cryo_canon_azote", "reacteur_canon_particules"]
+		"swamp_tourelle_dca", "cryo_canon_azote", "reacteur_canon_particules", "ruche_organe_acide"]
 	for k in kinds:
 		var p: PropScatter.Prop = PropScatter.Prop.new()
 		p.game = g; p.kind = k; p.def = PropScatter.DECOR[k]

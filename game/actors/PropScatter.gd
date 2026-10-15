@@ -573,6 +573,7 @@ const HEADS: Dictionary = {
 	"jungle_tourelle_mortier_plante": {"cut": [[0, 0.66], [0.2, 0.66], [0.22, 0.57], [0.5, 0.58], [0.8, 0.55], [1, 0.62]], "pivot": [0.5, 0.42], "muzzle": [0.08, 0.57]},
 	"volcanic_tourelle_mortier_scories": {"cut": [[0, 0.5], [0.25, 0.45], [0.5, 0.42], [0.75, 0.42], [1, 0.5]], "pivot": [0.5, 0.36], "muzzle": [0.30, 0.27]},
 	"swamp_tourelle_dca_toit": {"cut": [[0, 0.52], [0.25, 0.50], [0.5, 0.52], [0.75, 0.5], [1, 0.55]], "pivot": [0.5, 0.42], "muzzle": [0.04, 0.08]},
+	"ruche_tourelle_organe_acide": {"cut": [], "pivot": [0.55, 0.45], "muzzle": [0.17, 0.45]},
 	"cryo_tourelle_canon_azote": {"cut": [[0, 0.80], [0.2, 0.78], [0.3, 0.72], [0.5, 0.70], [0.75, 0.66], [1, 0.66]], "pivot": [0.55, 0.5], "muzzle": [0.03, 0.58]},
 	"reacteur_tourelle_canon_particules": {"cut": [[0, 0.78], [0.2, 0.76], [0.3, 0.72], [0.5, 0.72], [0.8, 0.70], [1, 0.72]], "pivot": [0.55, 0.48], "muzzle": [0.08, 0.64]},
 }
@@ -2651,6 +2652,16 @@ class Prop extends StaticBody2D:
 			d = (_plr.global_position - pivot_world()).normalized()
 		else:
 			return
+		_apply_head_dir(d, clampf(delta * 9.0, 0.0, 1.0))
+
+	## Cale le canon SUR la cible a l instant du tir (sans attendre l interpolation) : le projectile part
+	## exactement dans l axe du canon.
+	func head_snap(point: Vector2) -> void:
+		if _head == null:
+			return
+		_apply_head_dir((point - pivot_world()).normalized(), 1.0)
+
+	func _apply_head_dir(d: Vector2, k: float) -> void:
 		if d.length_squared() < 0.0001:
 			return
 		var th: float = d.angle()
@@ -2676,7 +2687,7 @@ class Prop extends StaticBody2D:
 			_head.flip_h = best_s == -1
 			_head.rotation = best_diff   # le miroir change le sens : on saute directement a la bonne pose
 		else:
-			_head.rotation = lerp_angle(_head.rotation, best_diff, clampf(delta * 9.0, 0.0, 1.0))
+			_head.rotation = lerp_angle(_head.rotation, best_diff, k)
 
 	## Cheap additive glow used instead of a real Light2D (see call sites): same soft halo look,
 	## none of the per-frame dynamic-light re-render cost that was hurting mobile.
