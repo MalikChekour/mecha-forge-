@@ -95,6 +95,10 @@ const CUT_LINES: Dictionary = {
 ## decoupage par map -> absents ici, _map_phase_shown reste simplement a -1 pour eux).
 const MAP_PHASE_NAMES: Dictionary = {
 	"tech":      ["Hall d'Assemblage", "Fonderie des Pistons", "Quai de Chargement"],
+	"desert":    ["Dunes de Silice", "Mer de Verre", "Cratère Solaire"],
+	"jungle":    ["Lisière Envahie", "Canopée Profonde", "Cœur Végétal"],
+	"volcanic":  ["Failles de Lave", "Haut Fourneau", "Cœur de Magma"],
+	"swamp":     ["Quartiers Noyés", "Ponts Submergés", "Centre Inondé"],
 	"cryo":      ["Cryo-Voute", "Serres Gelees", "Lac de Permafrost"],
 	"reacteur":  ["Bassins Toxiques", "Salle des Turbines", "Noyau Fissure"],
 	"ruche":     ["Couvoir Mecanique", "Veines Vivantes", "Jardin de Spores"],
@@ -115,6 +119,7 @@ var last_sp: int = 0            # skill points earned by the run just ended (sho
 
 
 var _cmod: CanvasModulate
+var _ambient: Ambient = null
 var _plight: PointLight2D
 ## Headless smoke normally ends at frame 1400 (a short vertical slice). The SANS FIN regression
 ## (`-- --fast-bosses`) needs a long soak so waves can actually accumulate.
@@ -319,9 +324,11 @@ func _ready() -> void:
 	if not get_viewport().size_changed.is_connected(_update_cam_zoom):
 		get_viewport().size_changed.connect(_update_cam_zoom)
 
-	var amb: Ambient = Ambient.new()
-	add_child(amb)
-	amb.setup(player)
+	_ambient = Ambient.new()
+	add_child(_ambient)
+	_ambient.setup(player)
+	_ambient.apply_biome(BIOMES[clampi(_biome, 0, BIOMES.size() - 1)])
+	_apply_biome_lighting(BIOMES[clampi(_biome, 0, BIOMES.size() - 1)])
 
 	spawner = EnemySpawner.new()
 	spawner.game = self
@@ -895,7 +902,13 @@ func _show_chapter_select() -> void:
 	cl.add_child(center_root)
 
 	var col: VBoxContainer = VBoxContainer.new()
-	var col_h: float = maxf(vp.y - 32.0, 300.0)
+	# 14/10 (patron : « le menu des niveaux n'est pas centre au milieu ») : la colonne prenait TOUJOURS
+	# toute la hauteur de l'ecran -> sur un telephone en portrait, 9 cartes occupaient le haut, RETOUR
+	# restait colle en bas et un grand vide les separait. La hauteur est maintenant celle du contenu
+	# (centre verticalement par le CenterContainer) tant qu'il tient ; au-dela, ecran plein + defilement.
+	var head_h: float = float(Palette.fs(32)) * 1.75 + float(Palette.fs(14)) * 1.75 + 6.0
+	var content_est: float = head_h + 10.0 + float(CHAPTERS.size()) * card_h 		+ float(CHAPTERS.size() - 1) * 10.0 + 10.0 + 50.0 + 24.0
+	var col_h: float = clampf(content_est, 300.0, maxf(vp.y - 32.0, 300.0))
 	col.custom_minimum_size = Vector2(card_w + 16.0, col_h)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 10)
@@ -1180,6 +1193,58 @@ func _on_chapter_chosen(idx: int, overlay: CanvasLayer) -> void:
 	_begin_run()
 
 
+func _apply_biome_lighting(biome_name: String) -> void:
+	if _cmod == null:
+		return
+	var c: Color = Color(0.92, 0.94, 0.98)
+	var plight_c: Color = Color(0.5, 0.85, 1.0)
+	var plight_e: float = 0.45
+	match biome_name:
+		"tech":
+			c = Color(0.90, 0.94, 1.00)
+			plight_c = Color(0.3, 0.85, 1.0)
+			plight_e = 0.50
+		"desert":
+			c = Color(1.02, 0.95, 0.82)
+			plight_c = Color(1.0, 0.85, 0.5)
+			plight_e = 0.35
+		"jungle":
+			c = Color(0.84, 0.96, 0.84)
+			plight_c = Color(0.4, 1.0, 0.5)
+			plight_e = 0.45
+		"volcanic":
+			c = Color(0.95, 0.80, 0.72)
+			plight_c = Color(1.0, 0.6, 0.2)
+			plight_e = 0.55
+		"swamp":
+			c = Color(0.85, 0.92, 0.82)
+			plight_c = Color(0.3, 0.9, 0.7)
+			plight_e = 0.45
+		"cryo", "ice":
+			c = Color(0.84, 0.94, 1.04)
+			plight_c = Color(0.6, 0.95, 1.0)
+			plight_e = 0.50
+		"reacteur":
+			c = Color(0.82, 1.02, 0.84)
+			plight_c = Color(0.3, 1.0, 0.4)
+			plight_e = 0.55
+		"ruche":
+			c = Color(0.92, 0.78, 0.96)
+			plight_c = Color(0.85, 0.35, 1.0)
+			plight_e = 0.50
+		"citadelle", "spaceship":
+			c = Color(0.96, 0.96, 1.02)
+			plight_c = Color(0.4, 0.8, 1.0)
+			plight_e = 0.45
+		_:
+			c = Color(0.92, 0.94, 0.98)
+			plight_c = Color(0.5, 0.85, 1.0)
+			plight_e = 0.40
+	_cmod.color = c
+	if _plight != null:
+		_plight.color = plight_c
+		_plight.energy = plight_e
+
 ## Force le biome d'un chapitre (sol + décor + pool d'ennemis + musique) — même logique que
 ## next_map() mais sans incrémenter les zones (on démarre pile sur ce biome).
 func _apply_chapter_biome(biome_name: String) -> void:
@@ -1191,6 +1256,9 @@ func _apply_chapter_biome(biome_name: String) -> void:
 	if _floor_mat != null:
 		_apply_biome_floor(biome_name)
 	_scatter_decor(biome_name)
+	if _ambient != null and _ambient.has_method("apply_biome"):
+		_ambient.apply_biome(biome_name)
+	_apply_biome_lighting(biome_name)
 	if spawner != null:
 		spawner.speed_mult = float(_mods.get("enemy_speed_mult", 1.0))
 		spawner.spawn_mult = float(_mods.get("enemy_spawn_mult", 1.0))
@@ -1881,6 +1949,217 @@ func hint_prop_destroyed() -> void:
 	show_hint("Détruisez les caisses et éléments du décor : ils lâchent XP, ferraille, soin ou une compétence.",
 		Color(0.85, 0.95, 0.6), 5.0)
 
+## PANCARTE de decor (14/10, patron : « certains decors n'ont aucun effet visible, on ne sait pas
+## a quoi ils servent ») : la PREMIERE fois qu'un decor a effet (PropScatter.INFO) passe a portee de
+## vue, une pancarte l'explique — nom, effet, et l'action a faire pour l'activer. Une seule fois par
+## type de decor dans toute la vie du joueur (SaveManager.data["seen_props"]) ; file d'attente pour
+## que deux decors vus ensemble ne se recouvrent pas. Le drapeau est consomme AU MOMENT de
+## l'affichage (pas a la fin) : un joueur qui meurt pendant la pancarte l'a bien lue.
+var _pancarte_queue: Array = []   # [cle, texture, id du decor/ennemi, info]
+const PANCARTE_PROX: float = 460.0   # le joueur doit etre encore PRES du decor au moment d'afficher
+
+## ENNEMIS (14/10) : meme pancarte, meme regle (une fois, a proximite). Cle = comportement, pas le
+## nom du chassis : tout nouvel ennemi d'un comportement deja explique reste couvert. (Le roster est
+## vide pour la publication — ces pancartes servent des que des ennemis reviennent, boss compris.)
+const ENEMY_INFO: Dictionary = {
+	"rush": ["Ennemi de mêlée", "Fonce sur vous au corps à corps et peut charger : gardez vos distances en tirant.", "orange"],
+	"ranged": ["Tireur", "Garde ses distances et vous tire dessus : rapprochez-vous ou esquivez ses tirs.", "orange"],
+	"dasher": ["Bondisseur", "Il se fige et clignote en rouge, puis fonce en ligne droite : esquivez de côté juste après.", "orange"],
+	"healer": ["Réparateur", "Soigne les ennemis proches (rayon vert) : cible prioritaire.", "green"],
+	"carrier": ["Porteur", "Il fuit devant vous mais laisse un bonus à sa mort : poursuivez-le si le risque en vaut la peine.", "gold"],
+	"pusher": ["Disperseur", "N'attaque pas, mais repousse les ennemis proches pour casser vos positions statiques.", "magenta"],
+	"miner": ["Mineur", "Pose des zones explosives au sol (cercle marqué) : sortez du cercle avant l'explosion.", "orange"],
+	"kamikaze": ["Kamikaze", "Fonce, allume une mèche puis explose sur vous : tuez-le avant, ou reculez.", "orange"],
+	"boss": ["Boss", "Bien plus résistant ; il change d'attaques quand sa vie descend (50 % puis 20 %).", "magenta"],
+}
+
+func pancarte_prop(kind: String, tex: Texture2D, prop: Node2D = null) -> void:
+	if PropScatter.INFO.has(kind):
+		_pancarte_add(kind, PropScatter.INFO[kind], tex, prop)
+
+func pancarte_enemy(key: String, tex: Texture2D, node: Node2D = null) -> void:
+	if ENEMY_INFO.has(key):
+		_pancarte_add("enemy:" + key, ENEMY_INFO[key], tex, node)
+
+var _pancarte_migre: bool = false
+
+func _pancarte_add(key: String, info: Array, tex: Texture2D, node: Node2D) -> void:
+	if _bot or _headless:
+		return
+	# 14/10 : les premieres versions des pancartes marquaient « vu » un decor des la mise en file, avant
+	# tout affichage (et plusieurs versions ne les affichaient jamais). Les sauvegardes existantes
+	# contiennent donc des decors « vus » qui n'ont jamais ete lus -> remise a zero UNE fois.
+	if not _pancarte_migre:
+		_pancarte_migre = true
+		if int(SaveManager.data.get("seen_props_ver", 0)) < 2:
+			SaveManager.data["seen_props"] = {}
+			SaveManager.data["seen_props_ver"] = 2
+			SaveManager.save_data()
+	var seen: Dictionary = SaveManager.data.get("seen_props", {}) as Dictionary
+	if bool(seen.get(key, false)):
+		return
+	for q in _pancarte_queue:   # deja en attente : le balayage la redemande toutes les 0,3 s
+		if q[0] == key:
+			return
+	# l'ID, jamais l'objet : le decor peut etre libere (chunk dechargé) pendant l'attente, et caster un
+	# objet libere plante l'export Web (« memory access out of bounds » / « null function »).
+	_pancarte_queue.append([key, tex, node.get_instance_id() if node != null else 0, info])
+
+## Balayage des ennemis proches (appele par Game._process, cadence limitee).
+var _pancarte_enemy_t: float = 0.0
+func _scan_enemy_pancartes(delta: float) -> void:
+	_pancarte_enemy_t -= delta
+	if _pancarte_enemy_t > 0.0 or _bot or _headless or player == null or not is_instance_valid(player):
+		return
+	_pancarte_enemy_t = 0.3
+	var r2: float = 320.0 * 320.0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not (e is Enemy) or not is_instance_valid(e):
+			continue
+		var en: Enemy = e as Enemy
+		if en.global_position.distance_squared_to(player.global_position) > r2:
+			continue
+		var key: String = "boss" if (en.rank >= 2 or en.is_final) else en.behavior
+		var tex: Texture2D = en._spr.texture if en._spr != null else null
+		pancarte_enemy(key, tex, en)
+
+## « Le joueur est-il encore pres de ce qui a declenche la pancarte ? » Pour un decor on interroge le
+## scatter COURANT par TYPE (le scatter est reconstruit au demarrage / a chaque changement de map :
+## l'objet repere au moment de la mise en file peut avoir ete libere entre-temps, et en garder la
+## reference plantait l'export Web). Pour un ennemi on garde l'ID de l'instance.
+func _pancarte_dist(key: String, node_id: int) -> float:
+	if player == null or not is_instance_valid(player):
+		return 1e9
+	if key.begins_with("enemy:"):
+		var o: Object = instance_from_id(node_id) if node_id != 0 else null
+		if o == null or not is_instance_valid(o) or not (o is Node2D):
+			return 1e9
+		return (o as Node2D).global_position.distance_to(player.global_position)
+	if _scatter == null or not is_instance_valid(_scatter):
+		return 1e9
+	return (_scatter as PropScatter).kind_dist(key, player.global_position)
+
+## Pancarte COURANTE : une seule a l'ecran. 14/10 (patron : « elle doit s'afficher des qu'on passe pres
+## de quelque chose, et CHANGER immediatement des qu'on croise autre chose de nouveau ») : plus
+## d'attente de 17 s, plus de file qui s'egrene — une nouveaute proche REMPLACE la pancarte affichee,
+## apres un minimum de 0,5 s de lecture (sinon deux nouveautes dans le meme balayage se mangeraient
+## sans qu'aucune soit lue ; la seconde patiente, non memorisee, jusqu'a ce delai). Pas de coroutine
+## (un `await` en boucle plantait l'export Web — « null function ») : Game._process appelle ceci a
+## chaque frame.
+const PANCARTE_MIN_LECTURE: float = 0.5   # 14/10 : etait 1,5 s -> la nouveaute remplace la pancarte quasi tout de suite
+var _pancarte_layer: CanvasLayer = null
+var _pancarte_tween: Tween = null
+var _pancarte_t0: float = 0.0   # Time.get_ticks_msec() de l'affichage courant
+
+func _pancarte_pump() -> void:
+	if _pancarte_queue.is_empty() or not GameState.alive:
+		return
+	if _pancarte_layer != null and is_instance_valid(_pancarte_layer) 			and float(Time.get_ticks_msec() - _pancarte_t0) < PANCARTE_MIN_LECTURE * 1000.0:
+		return
+	# la nouveaute la PLUS PROCHE encore a portee gagne ; celles qui ne le sont plus sont oubliees
+	# (non memorisees : elles reviendront a la prochaine approche)
+	var best_i: int = -1
+	var best_d: float = PANCARTE_PROX
+	var i: int = _pancarte_queue.size() - 1
+	while i >= 0:
+		var q: Array = _pancarte_queue[i]
+		var d: float = _pancarte_dist(String(q[0]), int(q[2]))
+		if d > PANCARTE_PROX:
+			_pancarte_queue.remove_at(i)
+		elif d <= best_d:
+			best_d = d
+			best_i = i
+		i -= 1
+	if best_i < 0 or best_i >= _pancarte_queue.size():
+		return
+	var it: Array = _pancarte_queue[best_i]
+	_pancarte_queue.remove_at(best_i)
+	var seen: Dictionary = SaveManager.data.get("seen_props", {}) as Dictionary
+	seen[String(it[0])] = true   # memorise AU MOMENT de l'affichage (un joueur qui meurt l'a lue)
+	SaveManager.data["seen_props"] = seen
+	SaveManager.save_data()
+	_pancarte_show(it[3] as Array, it[1] as Texture2D)
+
+func _pancarte_show(info: Array, tex: Texture2D) -> void:
+	var col: Color = Palette.CYAN
+	match String(info[2]):
+		"orange": col = Color(1.0, 0.62, 0.25)
+		"green": col = Color(0.5, 1.0, 0.6)
+		"magenta": col = Color(1.0, 0.45, 0.9)
+		"gold": col = Color(1.0, 0.85, 0.35)
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var k: float = clampf(minf(vp.x, vp.y) / 720.0, 0.62, 1.75)
+	# remplace sans transition la pancarte precedente (voir _pancarte_pump)
+	if _pancarte_tween != null and _pancarte_tween.is_valid():
+		_pancarte_tween.kill()
+	if _pancarte_layer != null and is_instance_valid(_pancarte_layer):
+		_pancarte_layer.queue_free()
+	var cl: CanvasLayer = CanvasLayer.new()
+	cl.layer = 23   # au-dessus des indices (22), sous l'ecran de resultats (40)
+	add_child(cl)
+	_pancarte_layer = cl
+	_pancarte_t0 = float(Time.get_ticks_msec())
+	var pc: PanelContainer = PanelContainer.new()
+	pc.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	pc.offset_left = 20.0 * k
+	pc.offset_right = -20.0 * k
+	pc.offset_top = -(318.0 * k)
+	pc.offset_bottom = -(206.0 * k)
+	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.05, 0.06, 0.09, 0.9)
+	sb.border_color = col
+	sb.set_border_width_all(maxi(2, int(3.0 * k)))
+	sb.border_width_top = maxi(4, int(6.0 * k))   # liseré haut epais = « planche » de pancarte
+	sb.set_corner_radius_all(int(6.0 * k))
+	sb.content_margin_left = 14.0 * k
+	sb.content_margin_right = 14.0 * k
+	sb.content_margin_top = 8.0 * k
+	sb.content_margin_bottom = 8.0 * k
+	pc.add_theme_stylebox_override("panel", sb)
+	cl.add_child(pc)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(14.0 * k))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pc.add_child(row)
+	if tex != null:
+		var icon: TextureRect = TextureRect.new()
+		icon.texture = tex
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(76.0 * k, 76.0 * k)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+	var col_txt: VBoxContainer = VBoxContainer.new()
+	col_txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col_txt.alignment = BoxContainer.ALIGNMENT_CENTER
+	col_txt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(col_txt)
+	var title: Label = Label.new()
+	title.text = String(info[0]).to_upper()
+	title.add_theme_font_size_override("font_size", Palette.fs(19))
+	title.add_theme_color_override("font_color", col)
+	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	title.add_theme_constant_override("outline_size", 4)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col_txt.add_child(title)
+	var body: Label = Label.new()
+	body.text = String(info[1])
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", Palette.fs(16))
+	body.add_theme_color_override("font_color", Color(0.93, 0.96, 1.0))
+	body.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	body.add_theme_constant_override("outline_size", 3)
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col_txt.add_child(body)
+	pc.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.tween_property(pc, "modulate:a", 1.0, 0.08)
+	tw.tween_interval(6.5)
+	tw.tween_property(pc, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(cl.queue_free)
+	_pancarte_tween = tw
+
 ## 04/10 tour 2 : textures FX procedurales generees au chargement de la partie (cachees dans
 ## l'autoload Tex -> une seule fois par session), sinon le 1er impact de chaque type saccade.
 func _prewarm_fx() -> void:
@@ -2136,6 +2415,9 @@ func next_map() -> void:
 	if _floor_mat != null:
 		_apply_biome_floor(biome_name)
 	_scatter_decor(biome_name)   # rebuild decor for the new biome (else ruines props never appear)
+	if _ambient != null and _ambient.has_method("apply_biome"):
+		_ambient.apply_biome(biome_name)
+	_apply_biome_lighting(biome_name)
 	if spawner != null:
 		spawner.speed_mult = float(_mods.get("enemy_speed_mult", 1.0))
 		spawner.spawn_mult = float(_mods.get("enemy_spawn_mult", 1.0))
@@ -2581,6 +2863,8 @@ func revive_player() -> void:
 # ---- main loop + headless bot ----
 func _process(delta: float) -> void:
 	_frames += 1
+	_scan_enemy_pancartes(delta)
+	_pancarte_pump()
 	_spark_tokens = minf(SPARK_BURST, _spark_tokens + SPARK_RATE * delta)
 	if _perf and _frames % 60 == 0:
 		var obj: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))

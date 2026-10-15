@@ -481,7 +481,13 @@ func chapters_cleared_count() -> int:
 	return int(data.get("chapters_cleared", 0))
 
 ## Chapitre N (1-based) jouable ? Le chapitre 1 est toujours ouvert ; N s'ouvre en battant N-1.
+## 🚨 TEMPORAIRE (14/10, demande du patron : « deverrouille tous les niveaux pour que je verifie ») :
+## true = tous les chapitres jouables d'emblee. A REMETTRE A false avant une vraie publication.
+const DEBUG_UNLOCK_ALL: bool = true
+
 func chapter_unlocked(n: int) -> bool:
+	if DEBUG_UNLOCK_ALL:
+		return true
 	return n <= int(data.get("chapters_cleared", 0)) + 1
 
 ## Marque le chapitre N battu. Renvoie true si c'est un PREMIER clear (nouveau chapitre debloque).

@@ -2,7 +2,10 @@ extends Node2D
 class_name DirectionalMecha
 ## Directional, animated mecha rendered from baked 4-direction Meshy spritesheets:
 ##   res://assets/mecha/<chassis>_<anim>_<dir>.png   (8 frames horizontal each)
-## dir in {front, back, left, right}. Falls back to the single-direction sheet
+## dir in {front, back, left, right} + (14/10) les 4 DIAGONALES {front_right, front_left, back_right,
+## back_left} quand le chassis en a (planches `<chassis>_<anim>_<diag>.png`) — le mecha fait alors un
+## tour complet a 8 directions ; sans planches diagonales, comportement 4 directions d'origine.
+## Falls back to the single-direction sheet
 ## (<chassis>_<anim>.png) then to a placeholder, so missing art never crashes.
 ##
 ## Used for the player (and can back animated enemies too). Replaces the procedural
@@ -32,7 +35,21 @@ var _oneshot: bool = false
 var _static: bool = false
 var _bob_t: float = 0.0
 var _recoil_t: float = 0.0
-const _DIRVEC: Dictionary = {"front": Vector2(0, 1), "back": Vector2(0, -1), "left": Vector2(-1, 0), "right": Vector2(1, 0)}
+const _DIAG: float = 0.70710678
+const _DIRVEC: Dictionary = {
+	"front": Vector2(0, 1), "back": Vector2(0, -1), "left": Vector2(-1, 0), "right": Vector2(1, 0),
+	"front_right": Vector2(_DIAG, _DIAG), "front_left": Vector2(-_DIAG, _DIAG),
+	"back_right": Vector2(_DIAG, -_DIAG), "back_left": Vector2(-_DIAG, -_DIAG),
+}
+## Centre angulaire (degres, repere ecran : +x droite, +y BAS = face camera) de chaque direction.
+const _DIR_ANGLE: Dictionary = {
+	"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0,
+	"left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0,
+}
+const _DIAG_NAMES: Array = ["front_right", "front_left", "back_right", "back_left"]
+## Demi-largeur de la zone « on garde la direction courante » (hysteresis) : 22,5 deg = frontiere
+## exacte entre deux secteurs ; +8 deg de marge evite de papillonner pres d'une frontiere.
+const _HYST_DEG: float = 30.5
 # AIM LEAN: the sprite is baked in 4 cardinal yaws, but the shot follows the exact 360° aim. To keep
 # the cannon pointing where it actually fires (instead of "leaning" off to a cardinal), the whole mech
 # is rotated a little toward the exact aim, clamped so the body never tips over. The gun/head anchors
@@ -58,11 +75,38 @@ func _ready() -> void:
 	_static = frame_count <= 1        # a single-frame chassis -> drive it procedurally
 	_apply()
 
+## Repli d'une direction DIAGONALE dont la planche manque (animation non bakee en diagonale : hit,
+## die, melee...) : la cardinale horizontale voisine (right/left), comme avant l'ajout des diagonales.
+static func _cardinal_of(dir: String) -> String:
+	if dir.contains("_"):
+		return dir.get_slice("_", 1)
+	return dir
+
 func _tex(anim: String, dir: String) -> Texture2D:
 	var key: String = "%s_%s" % [anim, dir]
 	if _cache.has(key):
 		return _cache[key]
 	var t: Texture2D = null
+	if dir.contains("_"):
+		var dp: String = "res://assets/mecha/%s_%s_%s.png" % [chassis, anim, dir]
+		if ResourceLoader.exists(dp):
+			var dr: Variant = load(dp)
+			if dr is Texture2D:
+				_cache[key] = dr
+				return dr
+		# Chassis qui n'a PAS de planche cardinale pour cette animation (ex. BLUESTRIKE : une seule planche,
+		# 'walk', sert a tout) : sa diagonale de MARCHE joue ce role, comme sa cardinale de marche le fait.
+		var cp: String = "res://assets/mecha/%s_%s_%s.png" % [chassis, anim, _cardinal_of(dir)]
+		if anim != "walk" and not ResourceLoader.exists(cp):
+			var wp: String = "res://assets/mecha/%s_walk_%s.png" % [chassis, dir]
+			if ResourceLoader.exists(wp):
+				var wr: Variant = load(wp)
+				if wr is Texture2D:
+					_cache[key] = wr
+					return wr
+		t = _tex(anim, _cardinal_of(dir))
+		_cache[key] = t
+		return t
 	var candidates: Array[String] = [
 		"res://assets/mecha/%s_%s_%s.png" % [chassis, anim, dir],
 		"res://assets/mecha/%s_%s.png" % [chassis, anim],
@@ -102,8 +146,21 @@ const _GRIP_ANCHOR: Dictionary = {
 	"right": Vector2(-0.1, -22.4),
 }
 
+## Ancre pour la direction courante dans un dict {front/back/left/right -> Vector2}. Une DIAGONALE n'a
+## pas d'ancre mesuree : moyenne des deux cardinales voisines (ex. front_right = (front+right)/2) —
+## approximation de quelques pixels, suffisante pour la gerbe de tir ; a mesurer si le canon derive.
+func _anchor_in(d: Dictionary, fallback: Vector2) -> Vector2:
+	if d.has(_dir):
+		return d[_dir]
+	if _dir.contains("_"):
+		var v: String = _dir.get_slice("_", 0)   # front | back
+		var h: String = _dir.get_slice("_", 1)   # left | right
+		if d.has(v) and d.has(h):
+			return ((d[v] as Vector2) + (d[h] as Vector2)) * 0.5
+	return fallback
+
 func grip_anchor() -> Vector2:
-	var a: Vector2 = _GRIP_ANCHOR.get(_dir, Vector2(0.0, -23.0))
+	var a: Vector2 = _anchor_in(_GRIP_ANCHOR, Vector2(0.0, -23.0))
 	return a * (display_height / 190.0)   # anchors were measured at display_height 190
 
 ## Chassis that hold their weapons baked into the mesh (cannon in the RIGHT hand, energy
@@ -130,7 +187,10 @@ const _GUN_ANCHORS: Dictionary = {
 	# the exact bake framing), so the muzzle flash + laser leave the very end of the barrel.
 	"vortex": {
 		"front": Vector2(-11.7, 6.7), "back": Vector2(8.9, -81.6),
-		"left": Vector2(-67.5, -43.9), "right": Vector2(66.8, -31.9)},
+		"left": Vector2(-67.5, -43.9), "right": Vector2(66.8, -31.9),
+		# diagonales (14/10) : bout de canon MESURE (tools/_muzzle_measure_diag.py, meme methode)
+		"front_right": Vector2(38.5, -2.8), "front_left": Vector2(-54.4, -12.1),
+		"back_right": Vector2(53.0, -64.1), "back_left": Vector2(-40.1, -72.7)},
 	"titan": {
 		"front": Vector2(-16.0, -14.0), "back": Vector2(16.0, -12.0),
 		"left": Vector2(14.0, -22.0), "right": Vector2(-14.0, -12.0)},
@@ -176,7 +236,7 @@ func gun_at_tip() -> bool:
 
 func gun_anchor() -> Vector2:
 	var d: Dictionary = _GUN_ANCHORS.get(chassis, {})
-	var a: Vector2 = d.get(_dir, Vector2(-15.0, -25.0))
+	var a: Vector2 = _anchor_in(d, Vector2(-15.0, -25.0))
 	return a * (display_height / 190.0)
 
 func has_head_anchor() -> bool:
@@ -184,12 +244,12 @@ func has_head_anchor() -> bool:
 
 func head_anchor() -> Vector2:
 	var d: Dictionary = _HEAD_ANCHORS.get(chassis, {})
-	var a: Vector2 = d.get(_dir, Vector2(0.0, -44.0))
+	var a: Vector2 = _anchor_in(d, Vector2(0.0, -44.0))
 	return a * (display_height / 190.0)
 
 func blade_anchor() -> Vector2:
 	var d: Dictionary = _BLADE_ANCHORS.get(chassis, {})
-	var a: Vector2 = d.get(_dir, Vector2(15.0, -20.0))
+	var a: Vector2 = _anchor_in(d, Vector2(15.0, -20.0))
 	return a * (display_height / 190.0)
 
 func facing() -> String:
@@ -210,6 +270,9 @@ func set_tint(c: Color) -> void:
 func set_facing_from(v: Vector2) -> void:
 	if v.length() < 0.05:
 		return
+	if _has_diagonals():
+		_set_facing_8(v)
+		return
 	var ax: float = absf(v.x)
 	var ay: float = absf(v.y)
 	if maxf(ax, ay) < 1.05 * minf(ax, ay):
@@ -221,6 +284,38 @@ func set_facing_from(v: Vector2) -> void:
 		d = "front" if v.y > 0.0 else "back"
 	if d != _dir:
 		_dir = d
+		_apply()
+
+## Le chassis a-t-il ses 4 diagonales bakees ? (idle ET walk : sinon on s'arrete/repart avec un autre profil.)
+var _diag_ok: int = -1   # -1 inconnu, 0 non, 1 oui (invalide par set_chassis)
+func _has_diagonals() -> bool:
+	if _diag_ok < 0:
+		_diag_ok = 1
+		for dn in _DIAG_NAMES:
+			if not ResourceLoader.exists("res://assets/mecha/%s_walk_%s.png" % [chassis, dn]):
+				_diag_ok = 0
+			# idle : sa diagonale, OU pas d'idle cardinal du tout (la marche sert d'idle, cf. _tex)
+			if not ResourceLoader.exists("res://assets/mecha/%s_idle_%s.png" % [chassis, dn]) 					and ResourceLoader.exists("res://assets/mecha/%s_idle_%s.png" % [chassis, _cardinal_of(dn)]):
+				_diag_ok = 0
+
+	return _diag_ok == 1
+
+## Facing sur 8 secteurs de 45 deg, avec hysteresis : on ne change de direction que lorsque le
+## vecteur sort de +-_HYST_DEG autour du centre de la direction courante -> pas de papillonnement
+## sur une frontiere de secteur (le defaut qui avait fait garder 4 directions « stables »).
+func _set_facing_8(v: Vector2) -> void:
+	var ang: float = rad_to_deg(atan2(v.y, v.x))
+	if _DIR_ANGLE.has(_dir) and absf(wrapf(ang - float(_DIR_ANGLE[_dir]) + 180.0, 0.0, 360.0) - 180.0) <= _HYST_DEG:
+		return
+	var best: String = _dir
+	var bd: float = 1e9
+	for k in _DIR_ANGLE:
+		var dd: float = absf(wrapf(ang - float(_DIR_ANGLE[k]) + 180.0, 0.0, 360.0) - 180.0)
+		if dd < bd:
+			bd = dd
+			best = k
+	if best != _dir:
+		_dir = best
 		_apply()
 
 func play(anim: String) -> void:
@@ -267,6 +362,7 @@ func _process_static(delta: float) -> void:
 func set_chassis(c: String) -> void:
 	chassis = c
 	_cache.clear()
+	_diag_ok = -1
 	_apply()
 
 func _process(delta: float) -> void:

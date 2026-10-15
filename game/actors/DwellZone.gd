@@ -16,6 +16,10 @@ var progress: float = 0.0     # 0..1, lecture seule pour le prop appelant
 var active: bool = true       # le prop peut suspendre la zone (ex: en recharge) sans la detruire
 var col: Color = Color(0.4, 0.9, 1.0, 0.85)
 var _filled_emitted: bool = false
+var _was_active: bool = true
+
+func _ready() -> void:
+	queue_redraw()
 
 func _physics_process(delta: float) -> void:
 	if player == null or not is_instance_valid(player):
@@ -40,7 +44,22 @@ func _physics_process(delta: float) -> void:
 	if progress != before:
 		queue_redraw()
 
+func _process(_d: float) -> void:
+	if _was_active != active:
+		_was_active = active
+		queue_redraw()
+	# 14/10 (patron : « decor sans effet, pas active, on ne sait pas a quoi il sert ») : la jauge
+	# n'etait dessinee QUE pendant le remplissage -> au repos rien n'indiquait qu'il fallait
+	# s'arreter la. Anneau pointille toujours visible qui respire ; la jauge se remplit par-dessus.
+	modulate.a = 0.55 + 0.35 * sin(Time.get_ticks_msec() * 0.004) if progress <= 0.0 else 1.0
+
 func _draw() -> void:
+	if active:
+		var n: int = 16
+		for i in n:   # anneau pointille : « zone a occuper », distinct d'un danger (plein)
+			var a0: float = TAU * float(i) / float(n)
+			draw_arc(Vector2.ZERO, radius * 0.9, a0, a0 + TAU / float(n) * 0.55, 6,
+				Color(col.r, col.g, col.b, 0.45), 3.0, true)
 	if progress <= 0.0:
 		return
-	draw_arc(Vector2.ZERO, radius * 0.9, -PI / 2.0, -PI / 2.0 + TAU * progress, 32, col, 4.0, true)
+	draw_arc(Vector2.ZERO, radius * 0.9, -PI / 2.0, -PI / 2.0 + TAU * progress, 32, col, 5.0, true)

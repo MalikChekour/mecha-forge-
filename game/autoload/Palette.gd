@@ -22,6 +22,11 @@ const BIOME_TINT: Dictionary = {
 	"ice":       Color(0.80, 0.93, 1.00),
 	"jungle":    Color(0.70, 0.94, 0.62),
 	"swamp":     Color(0.76, 0.84, 0.54),
+	"cryo":      Color(0.78, 0.94, 1.00),
+	"reacteur":  Color(0.75, 1.05, 0.75),
+	"ruche":     Color(1.05, 0.78, 1.08),
+	"citadelle": Color(1.08, 1.02, 0.82),
+	"ruines":    Color(0.95, 0.88, 0.80),
 }
 
 static func biome_tint(name: String) -> Color:

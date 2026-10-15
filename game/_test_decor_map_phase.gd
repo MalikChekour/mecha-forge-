@@ -60,8 +60,12 @@ func _ready() -> void:
 
 	var map5: Array = PropScatter.BIOME_MAP_SEGMENTS["cryo"][1]
 	var map5_at_5: int = _count_segment(ps, kinds_cryo, map5, 300.0, N)
-	_ok(map5_at_5 > map4_at_0, "cryo t=5min : Map5 (milieu) domine a son propre pic",
-		"map5@5min=%d vs map4@0min=%d" % [map5_at_5, map4_at_0])
+	var map4_at_5: int = _count_segment(ps, kinds_cryo, map4, 300.0, N)
+	var map6_at_5: int = _count_segment(ps, kinds_cryo, map6, 300.0, N)
+	# (14/10 : plus de base generique -> tous les tirages sont thematiques ; on compare les 3 maps
+	# entre elles a leur propre phase, plus a une autre phase)
+	_ok(map5_at_5 > map4_at_5 and map5_at_5 > map6_at_5, "cryo t=5min : Map5 (milieu) domine a son propre pic",
+		"map4=%d map5=%d map6=%d" % [map4_at_5, map5_at_5, map6_at_5])
 
 	# --- Noyau Instable : meme principe, biome a 3 segments inegaux (2/3/3) ---
 	ps.biome = "reacteur"
@@ -77,15 +81,30 @@ func _ready() -> void:
 	_ok(r_map9_10 > r_map7_10 * 3, "reacteur t=10min : Map9 domine largement Map7",
 		"map7=%d map9=%d" % [r_map7_10, r_map9_10])
 
-	# --- Base generique (tourelle/capaciteur/...) : toujours tiree, peu importe la phase ---
-	var base_0: int = _count_segment(ps, kinds_r, ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses"], 0.0, N)
-	var base_10: int = _count_segment(ps, kinds_r, ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses"], 600.0, N)
-	_ok(base_0 > 0 and base_10 > 0, "reacteur : la base generique reste tiree a toute phase",
-		"base@0=%d base@10min=%d" % [base_0, base_10])
+	# --- 14/10 : AUCUN decor partage entre niveaux (patron) : ni base generique ni doublon ---
+	var generiques: Array = ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses", "antenne", "emetteur", "conduit", "container"]
+	var base_r: int = _count_segment(ps, kinds_r, generiques, 600.0, N)
+	_ok(base_r == 0, "reacteur : aucun decor generique (tourelle, caisses...) : tout est propre au niveau", "base=%d" % base_r)
+	var vus: Dictionary = {}
+	var doublons: Array = []
+	for b in PropScatter.BIOME_DECOR:
+		for k in PropScatter.BIOME_DECOR[b]:
+			if vus.has(k) and vus[k] != b:
+				doublons.append("%s (%s + %s)" % [k, vus[k], b])
+			vus[k] = b
+	_ok(doublons.is_empty(), "chaque decor n'apparait que dans UN seul biome", str(doublons))
+	var vus_b: Dictionary = {}
+	var doublons_b: Array = []
+	for b in PropScatter.BIOME_BORDER:
+		for k in PropScatter.BIOME_BORDER[b]:
+			if vus_b.has(k) and vus_b[k] != b:
+				doublons_b.append("%s (%s + %s)" % [k, vus_b[k], b])
+			vus_b[k] = b
+	_ok(doublons_b.is_empty(), "chaque piece de mur d'arene n'apparait que dans UN seul biome", str(doublons_b))
 
 	# --- Biome LEGACY (hors plan 15 maps) : tirage inchange, pas de phase ---
-	ps.biome = "earth"
-	var kinds_earth: Array = PropScatter.BIOME_DECOR["earth"]
+	ps.biome = "ice"
+	var kinds_earth: Array = PropScatter.BIOME_DECOR["ice"]
 	GameState.run_time = 0.0
 	var rng_e: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng_e.seed = 1
@@ -93,7 +112,7 @@ func _ready() -> void:
 	for i in 200:
 		if not kinds_earth.has(ps._pick_kind(kinds_earth, rng_e)):
 			all_valid = false
-	_ok(all_valid, "earth (biome legacy, hors BIOME_MAP_SEGMENTS) : tirage toujours valide, inchange")
+	_ok(all_valid, "ice (biome legacy, hors BIOME_MAP_SEGMENTS) : tirage toujours valide, inchange")
 
 	# --- 04/10, trou signale par le patron : 10 decors "tech" herites n'etaient dans AUCUN segment
 	# -> maintenant rattaches aux 3 maps, ne reste que la vraie base neutre (5 items) orpheline ---
@@ -101,12 +120,12 @@ func _ready() -> void:
 	var tech_all_segmented: Array = []
 	for seg in tech_segs:
 		tech_all_segmented.append_array(seg)
-	var tech_orphelins_attendus: Array = ["conduit", "antenne", "emetteur", "cristaux", "container", "aimant", "terminal", "archives", "quai", "convoyeur"]
+	var tech_orphelins_attendus: Array = ["conduit", "antenne", "emetteur", "container", "aimant", "terminal", "archives", "quai", "convoyeur"]
 	var tech_bien_rattaches: bool = true
 	for k in tech_orphelins_attendus:
 		if not tech_all_segmented.has(k):
 			tech_bien_rattaches = false
-	_ok(tech_bien_rattaches, "tech : les 10 decors herites sont bien rattaches a une map (plus d'orphelins)")
+	_ok(tech_bien_rattaches, "tech : les decors herites sont bien rattaches a une map (plus d'orphelins)")
 	var tech_base_restante: Array = ["generateur", "capaciteur", "tourelle", "baril", "caisses"]
 	var tech_base_hors_segments: bool = true
 	for k in tech_base_restante:
@@ -125,8 +144,8 @@ func _ready() -> void:
 	GameState.run_time = 9999.0
 	_ok(ps.current_map_phase() == 2, "current_map_phase() : reste a la phase 2 au-dela (jamais hors limites)")
 
-	# --- MAP_PHASE_NAMES (Game.gd) : un triplet par biome "15 maps", aligne avec BIOME_MAP_SEGMENTS ---
-	for b in ["tech", "cryo", "reacteur", "ruche", "citadelle"]:
+	# --- MAP_PHASE_NAMES (Game.gd) : un triplet par biome, aligne avec BIOME_MAP_SEGMENTS ---
+	for b in ["tech", "desert", "jungle", "volcanic", "swamp", "cryo", "reacteur", "ruche", "citadelle"]:
 		_ok(GameScript.MAP_PHASE_NAMES.has(b) and GameScript.MAP_PHASE_NAMES[b].size() == 3,
 			"MAP_PHASE_NAMES['%s'] a bien 3 noms" % b)
 

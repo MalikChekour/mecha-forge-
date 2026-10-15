@@ -32,8 +32,19 @@ const PER_CHUNK: int = 2           # props per chunk (density 2.0 per million un
 const MARGIN: float = 170.0        # inset from chunk edges >= max gap -> no cross-border overlap
 const CLEAR_R: float = 340.0       # never drop a prop on top of the player
 # props that threaten the player — capped at one per chunk so you meet them at a readable cadence
-const HAZARDS: Array = ["generateur", "antenne", "conduit", "tourelle", "capaciteur", "baril", "emetteur",
-	"bras_presseur", "surchauffe_sol", "zone_chargement"]
+const HAZARDS: Array = [
+	"generateur", "antenne", "conduit", "tourelle", "capaciteur", "baril", "emetteur",
+	"bras_presseur", "surchauffe_sol", "zone_chargement",
+	"tech_soudeuse", "tech_portique_laser",
+	"desert_miroir_solaire", "desert_generateur_tempete", "desert_ver_foreur", "desert_fumerolle_vapeur",
+	"jungle_mortier_plante", "jungle_liane_fouet", "jungle_arbre_ruche", "jungle_fruit_grenade",
+	"volcanic_mortier_scories", "volcanic_event_magma", "volcanic_marteau_pilon", "volcanic_creuset_basculant", "volcanic_soufflerie_braises",
+	"swamp_tourelle_dca", "swamp_vanne_crue", "swamp_bouee_mine", "swamp_lampadaire_phare",
+	"cryo_canon_azote", "cryo_condenseur_givre", "jet_de_cryo", "pic_de_glace",
+	"reacteur_canon_particules", "reacteur_bobine_tesla", "grille_ventilation", "zone_alternante", "pulse_energie",
+	"ruche_organe_acide", "ruche_pondoir", "ruche_vessie_explosive", "tentacule_emergence",
+	"citadelle_lanceur_guide", "citadelle_relais_satellite", "emetteur_laser_rotatif", "zone_depressurisation"
+]
 
 var _chunks: Dictionary = {}       # Vector2i -> Array[Prop]  (ALL chunks, placed once, never freed)
 var _last_cell: Vector2i = Vector2i(9999999, 9999999)
@@ -133,12 +144,12 @@ const DECOR: Dictionary = {
 	"quai":      {"f": "g28", "hp": 130.0, "sz": 140.0, "nature": true, "block": 0.34,
 	              "cycle": true, "cycle_on": 6.0, "cycle_off": 3.0},
 	"convoyeur": {"f": "convoyeur_sol", "hp": 150.0, "sz": 150.0, "destruct": true, "glow": "orange",
-	              "block": 0.0, "conveyor": true, "conveyor_r": 160.0, "conveyor_speed": 75.0},
+	              "block": 0.0, "conveyor": true, "conveyor_r": 280.0, "conveyor_speed": 75.0},
 
 	# ===== 30/09, refonte decor "Secteur Tech" (plan "15 maps" - maps 1-3 fusionnees en un seul
 	# decor enrichi pour "tech", voir le plan d'implementation). Memes idiomes que ci-dessus. =====
 	"convoyeur_sol":      {"f": "convoyeur_sol", "hp": 150.0, "sz": 150.0, "destruct": true, "glow": "orange",
-	                       "block": 0.0, "conveyor": true, "conveyor_r": 160.0, "conveyor_speed": 75.0},
+	                       "block": 0.0, "conveyor": true, "conveyor_r": 280.0, "conveyor_speed": 75.0},
 	"console_convoyeur":  {"f": "console_convoyeur", "hp": 90.0,  "sz": 118.0, "destruct": true, "glow": "cyan",
 	                       "console": true, "console_r": 400.0},
 	"bras_presseur":      {"f": "bras_presseur", "hp": 150.0, "sz": 160.0, "destruct": true, "glow": "orange",
@@ -156,6 +167,94 @@ const DECOR: Dictionary = {
 	"container_mobile":   {"f": "container_mobile", "hp": 160.0, "sz": 185.0, "destruct": true,
 	                       "rail": true, "rail_span": 220.0, "rail_speed": 15.0},
 
+	# ===== Bible des niveaux — Niveau 1 (L'Usine / tech) =====
+	"tech_soudeuse":          {"f": "tech_tourelle_soudeuse", "hp": 160.0, "sz": 165.0, "destruct": true, "glow": "cyan",
+	                           "welder": true, "sweep_half": 45.0, "fire_dur": 3.0, "idle_dur": 2.0, "welder_dmg": 28.0},
+	"tech_portique_laser":    {"f": "tech_emetteur_portique_laser", "hp": 150.0, "sz": 170.0, "destruct": true, "glow": "cyan",
+	                           "gantry": true, "gantry_cd": 6.0, "gantry_tell": 1.2, "gantry_len": 240.0, "gantry_dmg": 22.0},
+	"tech_bac_composants":    {"f": "tech_butin_bac_composants", "hp": 45.0,  "sz": 125.0, "destruct": true,  "skill": 0.55, "glow": "cyan"},
+	"tech_cuve_vapeur":       {"f": "tech_terrain_cuve_vapeur", "hp": 220.0, "sz": 180.0, "nature": true, "block": 0.38},
+	"tech_chariot_robot":     {"f": "tech_terrain_chariot_robot", "hp": 140.0, "sz": 125.0, "nature": true, "block": 0.30, "glow": "cyan"},
+	"tech_bordure_paroi_usine": {"f": "tech_bordure_paroi_usine", "hp": 260.0, "sz": 220.0, "nature": true, "block": 0.45},
+
+	# ===== Bible des niveaux — Niveau 2 (Terres Calcinées / desert) =====
+	"desert_miroir_solaire":      {"f": "desert_tourelle_miroir_solaire", "hp": 160.0, "sz": 165.0, "destruct": true, "glow": "orange",
+	                               "solar_mirror": true, "aim": 135.0, "solar_cd": 4.5, "solar_charge": 1.8, "solar_dmg": 32.0, "burn_trail": 3.0},
+	"desert_generateur_tempete":  {"f": "desert_emetteur_generateur_tempete", "hp": 180.0, "sz": 190.0, "destruct": true, "glow": "orange",
+	                               "storm_gen": true, "storm_cd": 9.0, "storm_dur": 8.0, "storm_speed": 40.0, "storm_dmg": 12.0},
+	"desert_malle_survie":        {"f": "desert_butin_malle_survie", "hp": 45.0,  "sz": 125.0, "destruct": true,  "skill": 0.55, "glow": "orange"},
+	"desert_fosse_aspiration":    {"f": "desert_inter_fosse_aspiration", "hp": 90.0, "sz": 150.0, "nature": true, "block": 0.0,
+	                               "sinkhole": true, "sinkhole_r": 150.0, "sinkhole_pull": 55.0, "sinkhole_slow": 0.5},
+	"desert_collecteur_solaire":  {"f": "desert_inter_collecteur_solaire", "hp": 110.0, "sz": 145.0, "destruct": true, "glow": "orange",
+	                               "solar_collector": true, "dwell_r": 100.0, "dwell_time": 1.5, "collector_cd": 40.0},
+	"desert_projecteur_mirage":   {"f": "desert_inter_projecteur_mirage", "hp": 90.0,  "sz": 135.0, "destruct": true, "glow": "cyan",
+	                               "mirage": true, "mirage_cd": 20.0, "mirage_dur": 6.0, "mirage_r": 340.0},
+	"desert_ver_foreur":          {"f": "desert_inter_ver_foreur", "hp": 140.0, "sz": 175.0, "destruct": true, "glow": "orange",
+	                               "sandworm": true, "sandworm_r": 220.0, "sandworm_tell": 1.0, "sandworm_dmg": 25.0},
+	"desert_fumerolle_vapeur":    {"f": "desert_inter_fumerolle_vapeur", "hp": 90.0,  "sz": 125.0, "nature": true, "block": 0.0,
+	                               "fumerolle": true, "fumerolle_cd": 5.0, "fumerolle_tell": 1.0, "fumerolle_r": 120.0, "fumerolle_dmg": 15.0, "fumerolle_push": 300.0},
+	"desert_char_enfoui":         {"f": "desert_terrain_char_enfoui", "hp": 240.0, "sz": 195.0, "nature": true, "block": 0.40},
+	"desert_arche_verre":         {"f": "desert_terrain_arche_verre", "hp": 200.0, "sz": 210.0, "nature": true, "block": 0.42},
+	"desert_bordure_mesa":        {"f": "desert_bordure_mesa", "hp": 280.0, "sz": 230.0, "nature": true, "block": 0.45},
+
+	# ===== Bible des niveaux — Niveau 3 (La Ruine Verte / jungle) =====
+	"jungle_mortier_plante":      {"f": "jungle_tourelle_mortier_plante", "hp": 160.0, "sz": 170.0, "destruct": true, "glow": "green",
+	                               "plant_mortar": true, "mortar_cd": 4.5, "mortar_dmg": 26.0, "mortar_r": 90.0},
+	"jungle_liane_fouet":         {"f": "jungle_emetteur_liane_fouet", "hp": 170.0, "sz": 180.0, "destruct": true, "glow": "green",
+	                               "whip_vine": true, "whip_cd": 5.0, "whip_dmg": 22.0, "whip_arc": 120.0, "whip_r": 160.0},
+	"jungle_cosse_geante":        {"f": "jungle_butin_cosse_geante", "hp": 50.0,  "sz": 130.0, "destruct": true,  "skill": 0.55, "glow": "green"},
+	"jungle_fleur_catapulte":     {"f": "jungle_inter_fleur_catapulte", "hp": 90.0, "sz": 135.0, "nature": true, "block": 0.0,
+	                               "catapult": true, "catapult_dist": 300.0, "catapult_cd": 3.0},
+	"jungle_plante_lasso":        {"f": "jungle_inter_plante_lasso", "hp": 100.0, "sz": 140.0, "destruct": true, "glow": "orange",
+	                               "lasso": true, "lasso_snare": 1.5, "lasso_cd": 8.0, "lasso_r": 85.0},
+	"jungle_nuee_lucioles":       {"f": "jungle_inter_nuee_lucioles", "hp": 80.0,  "sz": 120.0, "nature": true, "block": 0.0,
+	                               "fireflies": true, "heal_dps": 3.0, "firefly_r": 110.0, "firefly_dur": 10.0},
+	"jungle_arbre_ruche":         {"f": "jungle_inter_arbre_ruche", "hp": 200.0, "sz": 200.0, "destruct": true, "glow": "orange",
+	                               "beacon": 9.0},
+	"jungle_fruit_grenade":       {"f": "jungle_inter_fruit_grenade", "hp": 35.0,  "sz": 110.0, "destruct": true, "boom": true, "glow": "orange"},
+	"jungle_colonne_racines":     {"f": "jungle_terrain_colonne_racines", "hp": 240.0, "sz": 195.0, "nature": true, "block": 0.40},
+	"jungle_statue_mecha":        {"f": "jungle_terrain_statue_mecha", "hp": 300.0, "sz": 220.0, "nature": true, "block": 0.45},
+	"jungle_mur_vegetal":         {"f": "jungle_bordure_mur_vegetal", "hp": 280.0, "sz": 230.0, "nature": true, "block": 0.45},
+
+	# ===== Bible des niveaux — Niveau 4 (La Forge / volcanic) =====
+	"volcanic_mortier_scories":   {"f": "volcanic_tourelle_mortier_scories", "hp": 170.0, "sz": 175.0, "destruct": true, "glow": "orange",
+	                               "slag_mortar": true, "mortar_cd": 5.0, "mortar_dmg": 28.0, "mortar_r": 95.0, "burn_dur": 5.0},
+	"volcanic_event_magma":       {"f": "volcanic_emetteur_event_magma", "hp": 160.0, "sz": 160.0, "nature": true, "block": 0.0,
+	                               "magma_vent": true, "vent_cd": 4.5, "vent_tell": 1.2, "vent_dmg": 20.0, "vent_r": 110.0},
+	"volcanic_lingotiere":        {"f": "volcanic_butin_lingotiere", "hp": 50.0,  "sz": 125.0, "destruct": true,  "skill": 0.55, "glow": "orange"},
+	"volcanic_marteau_pilon":     {"f": "volcanic_inter_marteau_pilon", "hp": 250.0, "sz": 200.0, "destruct": true, "glow": "orange",
+	                               "power_hammer": true, "hammer_cd": 7.0, "hammer_tell": 1.4, "hammer_dmg": 35.0, "hammer_r": 140.0},
+	"volcanic_creuset_basculant": {"f": "volcanic_inter_creuset_basculant", "hp": 180.0, "sz": 180.0, "destruct": true, "glow": "orange",
+	                               "crucible": true, "crucible_cd": 6.0, "crucible_tell": 1.2, "crucible_dmg": 24.0, "crucible_len": 260.0},
+	"volcanic_bassin_trempe":     {"f": "volcanic_inter_bassin_trempe", "hp": 120.0, "sz": 160.0, "nature": true, "block": 0.0,
+	                               "quench_pool": true, "quench_r": 120.0},
+	"volcanic_electroaimant":     {"f": "volcanic_inter_electroaimant", "hp": 140.0, "sz": 155.0, "destruct": true, "glow": "cyan",
+	                               "scrap_magnet": true, "magnet_r": 450.0},
+	"volcanic_soufflerie_braises":{"f": "volcanic_inter_soufflerie_braises", "hp": 110.0, "sz": 140.0, "destruct": true, "glow": "orange",
+	                               "ember_bellows": true, "bellows_cd": 5.5, "bellows_tell": 1.0, "bellows_r": 170.0, "bellows_dmg": 18.0},
+	"volcanic_cheminee_fonderie": {"f": "volcanic_terrain_cheminee_fonderie", "hp": 260.0, "sz": 190.0, "nature": true, "block": 0.40},
+	"volcanic_pont_roulant":      {"f": "volcanic_terrain_pont_roulant", "hp": 280.0, "sz": 215.0, "nature": true, "block": 0.42},
+	"volcanic_bordure_basalte":   {"f": "volcanic_bordure_basalte", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
+
+	# ===== Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) =====
+	"swamp_tourelle_dca":         {"f": "swamp_tourelle_dca_toit", "hp": 180.0, "sz": 170.0, "destruct": true, "glow": "orange",
+	                               "flak_turret": true, "flak_cd": 5.0, "flak_dmg": 18.0, "flak_r": 110.0},
+	"swamp_vanne_crue":           {"f": "swamp_emetteur_vanne_crue", "hp": 170.0, "sz": 170.0, "nature": true, "block": 0.0,
+	                               "flood_gate": true, "gate_cd": 6.0, "gate_tell": 1.5, "gate_dmg": 22.0, "gate_len": 400.0, "gate_w": 120.0, "gate_push": 380.0},
+	"swamp_coffre_banque":        {"f": "swamp_butin_coffre_banque", "hp": 50.0,  "sz": 125.0, "destruct": true,  "skill": 0.60, "glow": "magenta"},
+	"swamp_vanne_barrage":        {"f": "swamp_inter_vanne_barrage", "hp": 150.0, "sz": 160.0, "destruct": true, "glow": "orange",
+	                               "drain_valve": true, "drain_r": 130.0, "drain_dur": 10.0, "drain_cd": 25.0},
+	"swamp_bouee_mine":           {"f": "swamp_inter_bouee_mine", "hp": 45.0,  "sz": 120.0, "destruct": true, "glow": "magenta",
+	                               "floating_mine": true, "mine_trigger_r": 160.0, "mine_dmg": 35.0, "mine_boom_r": 140.0},
+	"swamp_lampadaire_phare":     {"f": "swamp_inter_lampadaire_phare", "hp": 130.0, "sz": 180.0, "destruct": true, "glow": "orange",
+	                               "searchlight": true, "searchlight_cd": 4.0, "searchlight_r": 280.0},
+	"swamp_barricade_vehicules":  {"f": "swamp_inter_barricade_vehicules", "hp": 350.0, "sz": 220.0, "destruct": true, "glow": "orange", "block": 0.45},
+	"swamp_brouilleur_radio":     {"f": "swamp_inter_brouilleur_radio", "hp": 160.0, "sz": 190.0, "destruct": true, "glow": "magenta",
+	                               "radio_jammer": true, "jammer_r": 300.0},
+	"swamp_gratte_ciel":          {"f": "swamp_terrain_gratte_ciel", "hp": 300.0, "sz": 230.0, "nature": true, "block": 0.48},
+	"swamp_pont_brise":           {"f": "swamp_terrain_pont_brise", "hp": 280.0, "sz": 210.0, "nature": true, "block": 0.45},
+	"swamp_bordure_facades":      {"f": "swamp_bordure_facades", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
+
 	# ===== 03/10, refonte decor "Zone Cryo" (plan 15 maps, maps 4-6, nouveau biome "cryo").
 	# Memes idiomes que le Secteur Tech ci-dessus. Tous ont recu leur art dedie (03/10) sauf
 	# brouillard_froid qui reste procedural (g20, aucun art externe necessaire, cf. nuage_spores).
@@ -168,17 +267,42 @@ const DECOR: Dictionary = {
 	"brouillard_froid":   {"f": "g20", "hp": 90.0,  "sz": 20.0,  "nature": true, "block": 0.0,
 	                       "fog": true, "fog_r": 260.0},
 	"radiateur":          {"f": "radiateur", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "orange",
-	                       "defroster": true, "defroster_r": 180.0},
+	                       "defroster": true, "defroster_r": 320.0},
 	"pic_de_glace":       {"f": "pic_de_glace", "hp": 110.0, "sz": 120.0, "destruct": true, "glow": "cyan",
 	                       "ice_spike": true},
 	"borne_thermique":    {"f": "borne_thermique", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "orange",
 	                       "thermal": true, "thermal_r": 150.0},
 	"glace_fragile":      {"f": "glace_fragile", "hp": 90.0,  "sz": 130.0, "nature": true, "block": 0.0,
 	                       "fragile_ice": true},
+	# ===== Bible des niveaux — Niveau 6 (Le Cryo-Laboratoire / cryo) =====
+	"cryo_canon_azote":           {"f": "cryo_tourelle_canon_azote", "hp": 180.0, "sz": 170.0, "destruct": true, "glow": "cyan",
+	                               "nitrogen_cannon": true, "ncannon_cd": 4.5, "ncannon_dmg": 24.0, "ncannon_r": 100.0},
+	"cryo_condenseur_givre":      {"f": "cryo_emetteur_condenseur_givre", "hp": 160.0, "sz": 165.0, "destruct": true, "glow": "cyan",
+	                               "frost_condenser": true, "condenser_cd": 6.0, "condenser_r": 250.0},
+	"cryo_caisson_echantillons":  {"f": "cryo_butin_caisson_echantillons", "hp": 50.0,  "sz": 125.0, "destruct": true,  "skill": 0.55, "glow": "cyan"},
+	"cryo_teleporteur_paire":     {"f": "cryo_inter_teleporteur_paire", "hp": 200.0, "sz": 160.0, "destruct": true, "glow": "cyan",
+	                               "teleporter": true, "teleport_cd": 6.0, "teleport_r": 80.0},
+	"cryo_mur_glace_regen":       {"f": "cryo_inter_mur_glace_regen", "hp": 150.0, "sz": 170.0, "destruct": true, "glow": "cyan", "block": 0.45,
+	                               "regen_ice_wall": true, "regen_time": 10.0},
+	"cryo_cuve_stase":            {"f": "cryo_terrain_cuve_stase", "hp": 260.0, "sz": 200.0, "nature": true, "block": 0.42},
+	"cryo_serveur_givre":         {"f": "cryo_terrain_serveur_givre", "hp": 280.0, "sz": 190.0, "nature": true, "block": 0.40},
+	"cryo_bordure_cloison":       {"f": "cryo_bordure_cloison", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
 
 	# ===== 03/10, refonte decor "Noyau Instable" (plan 15 maps, maps 7-9, nouveau biome
 	# "reacteur"). Memes idiomes que ci-dessus. Les 8 ont leur art final (zone_alternante/
 	# pulse_energie integres le 03/10).
+	"reacteur_canon_particules":   {"f": "reacteur_tourelle_canon_particules", "hp": 180.0, "sz": 160.0, "destruct": true, "glow": "green",
+	                                "particle_cannon": true, "cannon_cd": 4.0, "cannon_dmg": 22.0, "cannon_r": 350.0},
+	"reacteur_bobine_tesla":       {"f": "reacteur_emetteur_bobine_tesla", "hp": 200.0, "sz": 150.0, "destruct": true, "glow": "green",
+	                                "tesla_coil": true, "tesla_cd": 3.0, "tesla_r": 300.0},
+	"reacteur_barre_combustible":  {"f": "reacteur_butin_barre_combustible", "hp": 50.0, "sz": 125.0, "destruct": true, "skill": 0.55, "glow": "green"},
+	"reacteur_barre_controle":     {"f": "reacteur_inter_barre_controle", "hp": 200.0, "sz": 160.0, "destruct": true, "glow": "green",
+	                                "control_rod": true, "control_rod_r": 120.0},
+	"reacteur_cellule_confinement": {"f": "reacteur_inter_cellule_confinement", "hp": 180.0, "sz": 150.0, "destruct": true, "glow": "green",
+	                                "containment_cell": true, "containment_r": 220.0, "containment_cd": 25.0},
+	"reacteur_turbine_hs":         {"f": "reacteur_terrain_turbine_hs", "hp": 300.0, "sz": 200.0, "nature": true, "block": 0.45},
+	"reacteur_cuve_plomb":         {"f": "reacteur_terrain_cuve_plomb", "hp": 320.0, "sz": 190.0, "nature": true, "block": 0.48},
+	"reacteur_bordure_blindage":   {"f": "reacteur_bordure_blindage", "hp": 350.0, "sz": 240.0, "nature": true, "block": 0.50},
 	"bassin_toxique":     {"f": "bassin_liquide_toxique", "hp": 90.0, "sz": 180.0, "nature": true, "block": 0.0,
 	                       "toxic_pool": true, "toxic_r": 150.0, "toxic_dps": 6.0},
 	"vanne_drainage":     {"f": "vanne_drainage", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "cyan",
@@ -201,6 +325,18 @@ const DECOR: Dictionary = {
 	# "ruche"). Memes idiomes que ci-dessus. 4/6 ont deja leur art final ; nuage_spores est
 	# procedural comme brouillard_froid (aucun art externe necessaire) ; residu_biomecanique
 	# (ajoute 03/10, separee de sol_collant qui etait a tort fusionnee avec elle) en placeholder.
+	"ruche_organe_acide":          {"f": "ruche_tourelle_organe_acide", "hp": 180.0, "sz": 150.0, "destruct": true, "glow": "green",
+	                                "acid_turret": true, "acid_cd": 4.5, "acid_r": 320.0},
+	"ruche_pondoir":               {"f": "ruche_emetteur_pondoir", "hp": 220.0, "sz": 165.0, "destruct": true, "glow": "magenta",
+	                                "spawner_egg": true, "spawn_cd": 5.0},
+	"ruche_bulbe_nutritif":        {"f": "ruche_butin_bulbe_nutritif", "hp": 50.0, "sz": 125.0, "destruct": true, "skill": 0.55, "glow": "cyan"},
+	"ruche_veine_pulsatile":       {"f": "ruche_inter_veine_pulsatile", "hp": 150.0, "sz": 160.0, "destruct": true, "glow": "magenta",
+	                                "vein_pulse": true, "vein_r": 250.0, "vein_force": 180.0},
+	"ruche_vessie_explosive":      {"f": "ruche_inter_vessie_explosive", "hp": 1.0, "sz": 130.0, "destruct": true, "glow": "orange",
+	                                "acid_bladder": true, "barrel": true},
+	"ruche_colonne_os":            {"f": "ruche_terrain_colonne_os", "hp": 280.0, "sz": 190.0, "nature": true, "block": 0.42},
+	"ruche_champignon_geant":      {"f": "ruche_terrain_champignon_geant", "hp": 260.0, "sz": 180.0, "nature": true, "block": 0.40},
+	"ruche_bordure_paroi_chair":   {"f": "ruche_bordure_paroi_chair", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
 	"cocon":              {"f": "cocon", "hp": 60.0, "sz": 155.0, "destruct": true, "glow": "cyan",
 	                       "capsule": true},
 	"residu_biomecanique": {"f": "g33", "hp": 90.0, "sz": 140.0, "nature": true, "block": 0.0,
@@ -212,11 +348,25 @@ const DECOR: Dictionary = {
 	"nuage_spores":       {"f": "g20", "hp": 90.0, "sz": 20.0, "nature": true, "block": 0.0,
 	                       "spore_cloud": true, "spore_r": 220.0, "spore_dps": 5.0},
 	"plante_lumineuse":   {"f": "plante_lumineuse", "hp": 60.0, "sz": 115.0, "destruct": true, "glow": "green",
-	                       "light_plant": true, "light_plant_r": 180.0},
+	                       "light_plant": true, "light_plant_r": 300.0},
 
 	# ===== 03/10, refonte decor "Forge Finale" (plan 15 maps, maps 13-15, nouveau biome
 	# "citadelle"). Memes idiomes que ci-dessus. Les 6 ont leur art final (zone_depressurisation/
 	# zone_push_pull integres le 03/10).
+	"citadelle_lanceur_guide":     {"f": "citadelle_tourelle_lanceur_guide", "hp": 220.0, "sz": 165.0, "destruct": true, "glow": "orange",
+	                                "guided_launcher": true, "launcher_cd": 5.0, "launcher_dmg": 25.0, "launcher_r": 400.0},
+	"citadelle_relais_satellite":  {"f": "citadelle_emetteur_relais_satellite", "hp": 200.0, "sz": 155.0, "destruct": true, "glow": "cyan",
+	                                "satellite_relay": true, "relay_cd": 6.0, "relay_r": 350.0},
+	"citadelle_module_ravitaillement": {"f": "citadelle_butin_module_ravitaillement", "hp": 60.0, "sz": 130.0, "destruct": true, "skill": 0.60, "glow": "gold"},
+	"citadelle_sas_pressurise":    {"f": "citadelle_inter_sas_pressurise", "hp": 200.0, "sz": 170.0, "nature": true, "block": 0.40,
+	                                "airlock": true, "airlock_cd": 6.0},
+	"citadelle_dome_bouclier":     {"f": "citadelle_inter_dome_bouclier", "hp": 200.0, "sz": 160.0, "destruct": true, "glow": "cyan",
+	                                "dome_shield": true, "dome_r": 200.0, "dome_cd": 20.0},
+	"citadelle_grappin_magnetique": {"f": "citadelle_inter_grappin_magnetique", "hp": 160.0, "sz": 150.0, "destruct": true, "glow": "cyan",
+	                                "magnetic_hook": true, "hook_r": 250.0, "hook_force": 120.0, "hook_cd": 4.0},
+	"citadelle_panneau_solaire":   {"f": "citadelle_terrain_panneau_solaire", "hp": 260.0, "sz": 190.0, "nature": true, "block": 0.40},
+	"citadelle_reacteur_orbital":  {"f": "citadelle_terrain_reacteur_orbital", "hp": 320.0, "sz": 220.0, "nature": true, "block": 0.48},
+	"citadelle_bordure_coque":     {"f": "citadelle_bordure_coque", "hp": 380.0, "sz": 240.0, "nature": true, "block": 0.50},
 	"porte_securite_orbitale": {"f": "porte_securite_orbitale", "hp": 170.0, "sz": 185.0, "nature": true, "block": 0.40,
 	                       "cycle": true, "cycle_on": 6.0, "cycle_off": 5.0},
 	"zone_depressurisation": {"f": "zone_depressurisation", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "orange",
@@ -229,6 +379,160 @@ const DECOR: Dictionary = {
 	                       "pillar": true},
 	"segment_mur_modulaire": {"f": "segment_mur_modulaire", "hp": 220.0, "sz": 170.0, "nature": true, "block": 0.40,
 	                       "cycle": true, "cycle_on": 10.0, "cycle_off": 8.0},
+}
+
+# PANCARTES (14/10, patron : « certains decors n'ont aucun effet visible, on ne sait pas a quoi
+# ils servent ») : chaque decor qui FAIT quelque chose affiche, la PREMIERE fois qu'on le croise
+# (toutes parties confondues, memorise dans SaveManager.data["seen_props"]), une pancarte avec son
+# nom, son effet et — quand il y en a une — l'ACTION a faire pour l'activer. kind -> [nom, texte,
+# teinte]. Un decor absent d'ici (rocher, arbre...) est du simple terrain : pas de pancarte.
+const INFO: Dictionary = {
+	"baril": ["Baril explosif", "S'arme quand vous approchez, puis explose. Tirez dessus de loin pour blesser la horde.", "orange"],
+	"caisses": ["Caisse", "Détruisez-la : XP, ferraille, soin ou compétence (lueur dorée = compétence garantie).", "gold"],
+	"container": ["Container", "Détruisez-le : XP, ferraille, soin ou compétence (lueur dorée = compétence garantie).", "gold"],
+	"generateur": ["Pylône à arc", "Foudroie les ennemis proches. Détruit, il libère une onde EMP.", "cyan"],
+	"antenne": ["Balise d'invasion", "Fait apparaître des drones tant qu'elle est debout : détruisez-la en priorité.", "orange"],
+	"conduit": ["Champ ralentisseur", "Ralentit vous ET la horde dans sa zone. Détruisez-le pour l'éteindre.", "cyan"],
+	"emetteur": ["Nœud de réparation", "Soigne les ennemis proches : cible prioritaire.", "green"],
+	"epave": ["Épave dormante", "Un robot s'y réveille si vous approchez. Détruisez-la de loin pour l'achever dans son sommeil.", "orange"],
+	"tourelle": ["Tourelle ennemie", "Tire un rayon selon un axe fixe. Affaiblie, elle est piratée et foudroie les ennemis.", "orange"],
+	"capaciteur": ["Capaciteur", "Balaie un rayon à cycle fixe qui blesse vous ET la horde (bien plus la horde). Esquivez latéralement.", "magenta"],
+	"cristaux": ["Cristaux", "Brisés, ils projettent des éclats qui blessent la horde.", "cyan"],
+	"plante": ["Plante toxique", "Nuage de spores : poison et ralentissement autour d'elle, pour vous comme pour la horde.", "green"],
+	"glace": ["Bloc de glace", "Ralentit fortement les ennemis proches : attirez la horde à côté.", "cyan"],
+	"lave": ["Flaque de lave", "Brûle tout ce qui s'y tient, vous compris.", "orange"],
+	"racines": ["Racines", "Piège : ralentit à l'extrême ce qui entre dans leur zone.", "green"],
+	"impulsion": ["Pulseur", "Repousse vous ET les ennemis proches à intervalle régulier.", "cyan"],
+	"aimant": ["Aimant de garde", "Tant que vous restez près de lui, il repousse les ennemis.", "cyan"],
+	"terminal": ["Terminal de délestage", "RESTEZ dans son cercle ~1 s : onde de choc qui repousse les ennemis proches.", "cyan"],
+	"archives": ["Archives-machines", "Marque l'ennemi le plus proche : vos tirs le visent en priorité.", "cyan"],
+	"quai": ["Caisse-écran", "Apparaît et disparaît : bloque le passage par intervalles.", "orange"],
+	"convoyeur": ["Tapis roulant", "Pousse les ennemis proches sur son axe.", "orange"],
+	"convoyeur_sol": ["Tapis ralentisseur", "Vous ralentit et vous entraîne dans le sens des chevrons, vous et la horde. Une console voisine l'arrête 8 s.", "orange"],
+	"console_convoyeur": ["Console de tapis", "RESTEZ dans son cercle : arrête les tapis proches pendant 8 s.", "cyan"],
+	"bras_presseur": ["Bras presseur", "Écrase une ligne au sol à intervalle. Quittez la bande marquée avant l'impact.", "orange"],
+	"piston_hydraulique": ["Piston hydraulique", "Barrière qui sort et rentre toutes les 2 s : passez quand elle est rentrée.", "orange"],
+	"vanne_refroidissement": ["Vanne de refroidissement", "RESTEZ dans son cercle : soigne 20 % de vos PV et éteint les sols en surchauffe proches (recharge 30 s).", "cyan"],
+	"surchauffe_sol": ["Sol en surchauffe", "Zone de feu qui grandit par à-coups : ne restez pas dessus.", "orange"],
+	"porte_automatique": ["Porte automatique", "S'ouvre et se ferme à intervalle : franchissez-la quand elle est ouverte.", "orange"],
+	"zone_chargement": ["Zone de chargement", "Marque des impacts au sol à intervalle : sortez des cercles.", "orange"],
+	"container_mobile": ["Container mobile", "Glisse sur un rail : obstacle mouvant, ne vous faites pas coincer.", "orange"],
+	"tech_soudeuse": ["Soudeuse-sentinelle", "Balaie un arc de soudure électrique sur ±45° pendant 3 s puis se refroidit. Restez hors de son arc !", "cyan"],
+	"tech_portique_laser": ["Portique laser", "Une tête laser glisse et trace une ligne de découpe au sol toutes les 6 s (marquée 1,2 s avant). Évitez la ligne !", "orange"],
+	"tech_bac_composants": ["Bac de composants", "Détruisez-le : pièces, XP, ferraille, soin ou compétence.", "gold"],
+	"tech_cuve_vapeur": ["Cuve à vapeur", "Réservoir sous pression solide : bloque les tirs et les trajectoires.", "cyan"],
+	"tech_chariot_robot": ["Chariot-robot", "Châssis d'usine éteint servant d'obstacle et de couverture basse.", "cyan"],
+	"desert_miroir_solaire": ["Canon à miroir solaire", "Charge 1,8 s puis tire un rayon qui vitrifie le sol pendant 3 s : restez hors du sillon.", "orange"],
+	"desert_generateur_tempete": ["Générateur de tempête", "Libère périodiquement un tourbillon de sable qui pousse et blesse pendant 8 s.", "orange"],
+	"desert_malle_survie": ["Malle ensablée", "Détruisez-la : XP, ferraille, soin ou compétence (lueur dorée = compétence garantie).", "gold"],
+	"desert_fosse_aspiration": ["Fosse d'aspiration", "Attire vers son centre et ralentit tout ce qui entre dans ses sables mouvants.", "orange"],
+	"desert_collecteur_solaire": ["Collecteur solaire", "RESTEZ 1,5 s dedans : recharge +25 % de votre jauge de surcharge (recharge 40 s).", "gold"],
+	"desert_projecteur_mirage": ["Projecteur de mirage", "RESTEZ dedans : projette un leurre holographique qui détourne la horde pendant 6 s.", "cyan"],
+	"desert_ver_foreur": ["Ver foreur enfoui", "Épave piégée : si vous approchez, le ver jaillit du sol. Écartez-vous de la zone !", "orange"],
+	"desert_fumerolle_vapeur": ["Fumerolle surchauffée", "Geyser brûlant à intervalle régulier : repousse et inflige des dégâts.", "orange"],
+	"desert_char_enfoui": ["Char enfoui", "Carcasse blindée ensevelie dans les dunes : couverture lourde arrêtant les tirs.", "orange"],
+	"desert_arche_verre": ["Arche de verre fondu", "Formation naturelle de verre fondu translucide : obstacle rocheux solide.", "cyan"],
+	# ===== Bible des niveaux — Niveau 3 (jungle) =====
+	"jungle_mortier_plante": ["Plante-mortier", "Tire des cosses de graines en cloche par-dessus les obstacles : explose en nuage d'épines.", "green"],
+	"jungle_liane_fouet": ["Liane-fouet épineuse", "Fouette violemment un arc de 120 degrés autour de sa base : surveillez le sol.", "green"],
+	"jungle_cosse_geante": ["Cosse de graines géante", "Détruisez-la : XP, ferraille, soin ou compétence (lueur dorée = compétence garantie).", "gold"],
+	"jungle_fleur_catapulte": ["Fleur-catapulte", "Marchez dessus pour être propulsé de 300 unités dans votre direction de déplacement.", "green"],
+	"jungle_plante_lasso": ["Plante-lasso", "Piège naturel : se referme sur la première cible qui entre et l'immobilise pendant 1,5 s.", "orange"],
+	"jungle_nuee_lucioles": ["Nuée de lucioles", "RESTEZ dans la lueur : régénère vos PV (+3 PV/s) pendant 10 s avant de s'épuiser.", "gold"],
+	"jungle_arbre_ruche": ["Arbre-balise", "Arbre-ruche biomécanique : génère des drones-guêpes tant qu'il n'est pas abattu.", "orange"],
+	"jungle_fruit_grenade": ["Fruit-grenade", "Fruit instable : explose après amorçage si vous restez trop près ou s'il est touché.", "orange"],
+	"jungle_colonne_racines": ["Colonne envahie", "Vestige de béton armé étranglé par de massives racines végétales : obstacle solide.", "green"],
+	"jungle_statue_mecha": ["Statue de mecha envahie", "Carcasse d'un titan antique figée sous la végétation tropicale : couverture lourde.", "green"],
+	"jungle_mur_vegetal": ["Mur végétal", "Frontière impénétrable de jungle dense et de ruines enchevêtrées.", "green"],
+	# ===== Bible des niveaux — Niveau 4 (volcanic) =====
+	"volcanic_mortier_scories": ["Mortier à scories", "Tire des obus de lave en cloche qui laissent une flaque de magma brûlante pendant 5 s.", "orange"],
+	"volcanic_event_magma": ["Évent de magma", "Éruption volcanique périodique : jaillissement de lave qui enflamme le sol pendant 3 s.", "orange"],
+	"volcanic_lingotiere": ["Lingotière de fonderie", "Détruisez-la : XP, ferraille, soin ou compétence (lueur dorée = compétence garantie).", "gold"],
+	"volcanic_marteau_pilon": ["Marteau-pilon géant", "Frappe lourde toutes les 7 s : onde de choc écrasante qui repousse et inflige de lourds dégâts.", "orange"],
+	"volcanic_creuset_basculant": ["Creuset basculant", "Bascule périodiquement et déverse une ligne de métal en fusion incandescente.", "orange"],
+	"volcanic_bassin_trempe": ["Bassin de trempe", "RESTEZ 1 s dedans : éteint les brûlures et réduit de 50 % les dégâts de feu pendant 8 s.", "cyan"],
+	"volcanic_electroaimant": ["Électroaimant de ferrailleur", "Approchez-vous : attire puissamment tous les pickups et gemmes dans un rayon de 450 u.", "cyan"],
+	"volcanic_soufflerie_braises": ["Soufflerie à braises", "Rafale brûlante périodique : repousse violemment et applique une brûlure pendant 4 s.", "orange"],
+	"volcanic_cheminee_fonderie": ["Cheminée de fonderie", "Cheminée en briques noircies et scories : obstacle solide bloquant tirs et déplacements.", "orange"],
+	"volcanic_pont_roulant": ["Pont roulant effondré", "Poutrelle d'acier torsadée et chaînes pendantes : couverture lourde de fonderie.", "orange"],
+	"volcanic_bordure_basalte": ["Paroi de basalte", "Muraille infranchissable de colonnes de basalte noir et de veines de lave.", "orange"],
+	# ===== Bible des niveaux — Niveau 5 (swamp) =====
+	"swamp_tourelle_dca": ["Batterie antiaérienne", "Tire une salve de 4 obus à fusée qui éclatent en anneau de shrapnel dévastateur.", "orange"],
+	"swamp_vanne_crue": ["Vanne de crue", "Libère périodiquement une vague torrentielle sur 400 u qui repousse violemment.", "cyan"],
+	"swamp_coffre_banque": ["Coffre de banque éventré", "Détruisez-le : XP, ferraille, soin ou compétence (lueur dorée = compétence).", "gold"],
+	"swamp_vanne_barrage": ["Vanne de barrage", "RESTEZ 1,5 s dedans : assèche la zone et annule le ralentissement de l'eau pendant 10 s.", "cyan"],
+	"swamp_bouee_mine": ["Bouée-mine dérivante", "Mine dérivante armée : explose au contact ou après amorçage si vous vous approchez.", "orange"],
+	"swamp_lampadaire_phare": ["Phare de toit", "Projecteur rotatif : balaye la zone et excite les ennemis touchés. Destructible.", "orange"],
+	"swamp_barricade_vehicules": ["Barricade de véhicules", "Épaves de véhicules de métropole empilées : couverture lourde arrêtant tous les tirs.", "orange"],
+	"swamp_brouilleur_radio": ["Brouilleur radio", "Tour de brouillage : ralentit de 50 % tous les projectiles ennemis dans un rayon de 300 u.", "magenta"],
+	"swamp_gratte_ciel": ["Gratte-ciel effondré", "Vestige de tour de verre et de béton noyé dans l'eau trouble : obstacle massif.", "cyan"],
+	"swamp_pont_brise": ["Pont suspendu brisé", "Tablier de pont affaissé et câbles rompus : obstacle infranchissable.", "cyan"],
+	"swamp_bordure_facades": ["Façades noyées", "Ligne d'immeubles submergés et néons brisés marquant la limite de l'arène.", "cyan"],
+	"plaque_de_glace": ["Plaque de glace", "Vous fait glisser : votre mecha perd de l'adhérence tant que vous êtes dessus.", "cyan"],
+	"capsule_cryogenique": ["Capsule cryogénique", "Détruisez-la : un bonus… ou un ennemi en sort (1 chance sur 3).", "cyan"],
+	"jet_de_cryo": ["Jet cryogénique", "Gèle (étourdit) quiconque reste dans le cercle marqué.", "cyan"],
+	"brouillard_froid": ["Brouillard glacial", "Nuage glacial mobile : ralentit tout ce qui le traverse, vous comme la horde. Un radiateur proche le dissipe.", "cyan"],
+	"radiateur": ["Radiateur", "Dissipe le brouillard glacial proche, donc supprime son ralentissement.", "orange"],
+	"pic_de_glace": ["Pic de glace", "Éclat périodique au sol : ralentit si vous êtes dessus.", "cyan"],
+	"borne_thermique": ["Borne thermique", "RESTEZ dans son cercle : soigne 20 % de vos PV (recharge 25 s).", "orange"],
+	"glace_fragile": ["Glace fragile", "Se fissure puis s'effondre en obstacle solide au bout de 10 à 20 s.", "cyan"],
+	# ===== Bible des niveaux — Niveau 6 (cryo) =====
+	"cryo_canon_azote": ["Canon à azote", "Tire des orbes de givre lents explosant en nova glacée qui ralentit et laisse du verglas.", "cyan"],
+	"cryo_condenseur_givre": ["Condenseur à givre", "Émet des anneaux de givre concentriques qui s'étendent et ralentissent les mechas.", "cyan"],
+	"cryo_caisson_echantillons": ["Caisson d'échantillons", "Détruisez-le : XP, ferraille, soin ou compétence (lueur cyan = cryo-technologie).", "cyan"],
+	"cryo_teleporteur_paire": ["Téléporteur de laboratoire", "Marcher sur la dalle vous téléporte instantanément sur sa balise jumelle (recharge 6 s).", "cyan"],
+	"cryo_mur_glace_regen": ["Mur de glace régénérant", "Bloc de glace défensif arrêtant les tirs : se reforme entièrement 10 s après destruction.", "cyan"],
+	"cryo_cuve_stase": ["Cuve de stase", "Cylindre de stase fendu et givré avec câbles au sol : obstacle solide de laboratoire.", "cyan"],
+	"cryo_serveur_givre": ["Baie serveur givrée", "Armoire informatique congelée avec voyants clignotants : couverture résistante.", "cyan"],
+	"cryo_bordure_cloison": ["Cloison de laboratoire", "Panneaux isolés blancs et hublots givrés formant la paroi hermétique du secteur.", "cyan"],
+	"bassin_toxique": ["Bassin toxique", "Dégâts continus tant que vous restez dedans. Une vanne de drainage le suspend.", "green"],
+	"vanne_drainage": ["Vanne de drainage", "RESTEZ dans son cercle : suspend les bassins toxiques proches pendant 10 s.", "cyan"],
+	"poche_de_vent": ["Turbine géante", "Pousse en continu vous ET les ennemis dans une direction. Une console de vent l'inverse.", "orange"],
+	"console_vent": ["Console de vent", "RESTEZ dans son cercle : inverse le sens des turbines proches.", "cyan"],
+	"grille_ventilation": ["Grille de ventilation", "Souffle à intervalle : sortez du cercle marqué.", "orange"],
+	"zone_alternante": ["Dalle alternante", "Alterne danger et sécurité : le cercle clignote juste avant de devenir dangereux.", "green"],
+	"cristal_instable": ["Cristal instable", "Le toucher l'arme : il explose 3 s plus tard. Éloignez-vous (ou attirez-y la horde).", "green"],
+	"pulse_energie": ["Pulsation d'énergie", "Émet trois anneaux qui s'étendent : sortez de leur trajet.", "green"],
+	"cocon": ["Cocon", "Détruisez-le : un bonus… ou un ennemi en sort (1 chance sur 3).", "cyan"],
+	"residu_biomecanique": ["Résidu biomécanique", "Vous ralentit et attire les ennemis vers son centre.", "green"],
+	"sol_collant": ["Sol collant", "Ralentit fortement tout ce qui y marche.", "green"],
+	"tentacule_emergence": ["Tentacule", "Jaillit du sol à intervalle : quittez le cercle marqué.", "green"],
+	"nuage_spores": ["Nuage de spores", "Dérive et inflige des dégâts continus. Une plante lumineuse proche le dissipe.", "green"],
+	"plante_lumineuse": ["Plante lumineuse", "RESTEZ dans son cercle : dissipe les nuages de spores proches pendant 8 s.", "green"],
+	"porte_securite_orbitale": ["Porte de sécurité", "S'ouvre et se ferme à intervalle : franchissez-la quand elle est ouverte.", "orange"],
+	"zone_depressurisation": ["Zone de dépressurisation", "Aspire vers son centre à intervalle (clignote avant) : éloignez-vous avant l'aspiration.", "orange"],
+	"zone_push_pull": ["Anneau de gravité", "Repousse puis attire en alternance : teinte bleue = pousse, orange = attire.", "cyan"],
+	"emetteur_laser_rotatif": ["Laser rotatif", "Balaie une ligne qui tourne à chaque tir : évitez la bande marquée.", "orange"],
+	"pilier_energie": ["Pilier d'énergie", "Détruit, il repousse violemment les ennemis proches.", "orange"],
+	"segment_mur_modulaire": ["Mur modulaire", "Apparaît et disparaît par intervalles : bloque le passage quand il est là.", "orange"],
+	# ===== Bible des niveaux — Niveau 7 (reacteur) =====
+	"reacteur_canon_particules": ["Canon à particules", "Tir à charge qui se divise en 3 fragments. En surchauffe, il explose.", "green"],
+	"reacteur_bobine_tesla": ["Bobine de Tesla", "Deux bobines reliées par un arc électrique continu qui inflige de lourds dégâts.", "green"],
+	"reacteur_barre_combustible": ["Barre de combustible", "Détruisez-la : XP, ferraille, soin ou compétence radioactive.", "green"],
+	"reacteur_barre_controle": ["Barre de contrôle", "RESTEZ 1,5 s près d'elle : réduit de 60 % tous les dégâts d'énergie pendant 8 s.", "yellow"],
+	"reacteur_cellule_confinement": ["Cellule de confinement", "Active un dôme protecteur de 220 u bloquant tous les projectiles ennemis pendant 6 s.", "green"],
+	"reacteur_turbine_hs": ["Turbine de refroidissement HS", "Rotor géant broyé et tordu d'une turbine nucléaire : obstacle métallique massif.", "green"],
+	"reacteur_cuve_plomb": ["Cuve de plomb éventrée", "Réservoir lourd de rétention fissuré fuyant des vapeurs toxiques : couverture solide.", "green"],
+	"reacteur_bordure_blindage": ["Blindage lourd du réacteur", "Paroi de confinement renforcée au plomb marquant la limite du secteur radioactif.", "green"],
+	# ===== Bible des niveaux — Niveau 8 (ruche) =====
+	"ruche_organe_acide": ["Organe cracheur d'acide", "Crache 3 globules d'acide en cloche créant des flaques toxiques corrosives.", "green"],
+	"ruche_pondoir": ["Pondoir de la ruche", "Pond régulièrement des larves agressives : cible prioritaire à détruire.", "magenta"],
+	"ruche_bulbe_nutritif": ["Bulbe nutritif", "Détruisez-le : XP, ferraille, soin ou compétence bioluminescente.", "cyan"],
+	"ruche_veine_pulsatile": ["Veine pulsatile", "Pulse violemment toutes les 3 s et repousse tout le long de son axe.", "magenta"],
+	"ruche_vessie_explosive": ["Vessie explosive", "Touchée, elle explose violemment en projetant une gerbe d'acide corrosive.", "orange"],
+	"ruche_colonne_os": ["Colonne d'ossements fusionnés", "Pilier imposant de chitine et de structures osseuses fossilisées : obstacle infranchissable.", "magenta"],
+	"ruche_champignon_geant": ["Champignon parasite géant", "Spécimen fongique boursouflé et spongieux servant d'obstacle organique dans le nid.", "green"],
+	"ruche_bordure_paroi_chair": ["Paroi organique de la ruche", "Biomasse alien dense et pulsatile formant les parois étanches du nid xénomorphe.", "magenta"],
+	# ===== Bible des niveaux — Niveau 9 (citadelle) =====
+	"citadelle_lanceur_guide": ["Lanceur orbital", "Tire des missiles guidés à tête chercheuse qui traquent le mecha.", "orange"],
+	"citadelle_relais_satellite": ["Relais satellite", "Émet des pulsations orbitales périodiques électrifiant la zone.", "cyan"],
+	"citadelle_module_ravitaillement": ["Module de ravitaillement", "Détruisez-le : cargaison de haute technologie, ferraille et compétences.", "gold"],
+	"citadelle_sas_pressurise": ["Sas pressurisé", "Sas orbital étanche qui s'ouvre et se ferme selon un cycle régulier.", "orange"],
+	"citadelle_dome_bouclier": ["Dôme-bouclier", "Projette une barrière énergétique impénétrable repoussant les assauts.", "cyan"],
+	"citadelle_grappin_magnetique": ["Grappin magnétique", "Attire périodiquement les ennemis et débris vers son ancrage.", "cyan"],
+	"citadelle_panneau_solaire": ["Panneau solaire orbital", "Réseau de capteurs photovoltaïques spatiaux déployés : structure réfléchissante fragile.", "cyan"],
+	"citadelle_reacteur_orbital": ["Réacteur à fusion orbital", "Noyau de propulsion secondaire suspendu : générateur massif faisant obstacle aux tirs.", "orange"],
+	"citadelle_bordure_coque": ["Coque orbitale blindée", "Blindage spatial composite formant la limite extérieure de la station orbitale.", "cyan"],
 }
 
 # What a smashed man-made prop leaves. A gold-glow crate ("skill" pre-rolled at spawn) always
@@ -256,23 +560,22 @@ const RIDGE_CHANCE: float = 0.5   # per chunk, when the biome has a rock-family 
 # spawns is the real wall, so these carry NO collider and are NOT in cover_list (60 props scanned
 # by 220 enemies every frame would be the opposite of an optimisation).
 const BIOME_BORDER: Dictionary = {
-	"earth":     ["rocher", "arbre"],
-	"volcanic":  ["lave", "rocher"],
-	"desert":    ["arche", "rocher"],
-	"ice":       ["glace", "cristaux"],
-	"jungle":    ["arbre", "racines"],
-	"swamp":     ["arbre", "racines"],
-	"tech":      ["rocher", "cristaux"],
-	"spaceship": ["rocher", "cristaux"],
-	"ruines":    ["rocher", "cristaux"],   # immeuble/gravats2 supprimes -> mur de roche generique
-	"cryo":      ["glace", "cristaux"],
-	# 03/10, trou signale par le patron : ces 3 biomes retombaient sur le defaut ["rocher","arbre"]
-	# (faute d'entree dediee), incoherent avec leur theme. Reutilisent des kinds DECOR deja en art
-	# reel (aucune generation necessaire) choisis pour leur silhouette large/imposante, adaptee a
-	# un mur de bordure oversized.
-	"reacteur":  ["poche_de_vent", "rocher"],   # poche_de_vent = sprite turbine_geante.png
-	"ruche":     ["tentacule_emergence", "racines"],
-	"citadelle": ["segment_mur_modulaire", "pilier_energie"],
+	# 14/10 (patron : « ne laisse que ce qui est specifique a chaque niveau ») : chaque piece de mur
+	# n'apparait plus que dans UN seul biome — plus de rocher/arbre/cristaux/glace repetes.
+	"tech":      ["tech_bordure_paroi_usine"],
+	"desert":    ["desert_bordure_mesa"],
+	"jungle":    ["jungle_mur_vegetal"],
+	"volcanic":  ["volcanic_bordure_basalte"],
+	"swamp":     ["swamp_bordure_facades"],
+	"ice":       ["glace"],
+	"spaceship": ["impulsion"],
+	"cryo":      ["cryo_bordure_cloison"],
+	"reacteur":  ["reacteur_bordure_blindage"],
+	"ruche":     ["ruche_bordure_paroi_chair"],
+	"citadelle": ["citadelle_bordure_coque"],
+	# earth / ruines : plus aucun decor propre (tout etait partage) -> pas de mur decoratif
+	"earth":     [],
+	"ruines":    [],
 }
 const BORDER_STEP: float = 300.0    # spacing along the wall (props are rendered wider -> they overlap)
 const BORDER_SZ: float = 320.0      # oversized wall props: big enough to touch at BORDER_STEP
@@ -280,7 +583,9 @@ const BORDER_SZ: float = 320.0      # oversized wall props: big enough to touch 
 ## Build the arena wall: a packed ring of oversized biome props along the square perimeter at
 ## ±half. Called from Game._scatter_decor, so it is rebuilt with the right material each biome.
 func build_border(half: float) -> void:
-	var kinds: Array = BIOME_BORDER.get(biome, ["rocher", "arbre"])
+	var kinds: Array = BIOME_BORDER.get(biome, [])
+	if kinds.is_empty():
+		return
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash("border:%s" % biome)
 	var n_side: int = int((half * 2.0) / BORDER_STEP) + 1
@@ -318,7 +623,7 @@ func _place_border(kind: String, pos: Vector2, scl: float, flip: bool) -> void:
 	s.position = pos
 	s.scale = Vector2.ONE * sc
 	s.flip_h = flip
-	s.z_index = int(pos.y)   # y-sort against actors so the wall overlaps correctly
+	s.z_index = clampi(int(pos.y), -4090, 4090)   # y-sort against actors so the wall overlaps correctly
 	add_child(s)
 # BIOME COHERENCE — every NATURE prop belongs ONLY to its own map: no rocks on the ice sheet,
 # no trees in the desert, no ice in the spaceship. The ONLY props allowed everywhere are the
@@ -331,38 +636,62 @@ func _place_border(kind: String, pos: Vector2, scl: float, flip: bool) -> void:
 # on top of its native flora/terrain — it is a ROBOT WAR, war-machines and wreckage litter every zone.
 # So no level is ever a passive stroll: cannons fire, beams sweep, nests spew, whatever the biome.
 static func _decor_cat(k: String) -> String:
-	if k in ["baril", "caisses", "container", "crate"]:
+	if k in ["baril", "caisses", "container", "crate", "tech_bac_composants", "desert_malle_survie", "jungle_cosse_geante", "volcanic_lingotiere", "swamp_coffre_banque", "cryo_caisson_echantillons", "reacteur_barre_combustible", "ruche_bulbe_nutritif", "citadelle_module_ravitaillement", "ruche_vessie_explosive"]:
 		return "crates_barrels"
-	if k in ["generateur", "antenne", "conduit", "emetteur", "epave", "tourelle", "capaciteur", "archives"]:
+	if k in ["generateur", "antenne", "conduit", "emetteur", "epave", "tourelle", "capaciteur", "archives", "tech_soudeuse", "tech_portique_laser", "desert_miroir_solaire", "desert_generateur_tempete", "desert_ver_foreur", "jungle_mortier_plante", "jungle_liane_fouet", "jungle_arbre_ruche", "jungle_fruit_grenade", "volcanic_mortier_scories", "volcanic_event_magma", "volcanic_marteau_pilon", "volcanic_creuset_basculant", "volcanic_soufflerie_braises", "swamp_tourelle_dca", "swamp_brouilleur_radio", "swamp_lampadaire_phare", "cryo_canon_azote", "cryo_condenseur_givre", "reacteur_canon_particules", "reacteur_bobine_tesla", "ruche_organe_acide", "ruche_pondoir", "citadelle_lanceur_guide", "citadelle_relais_satellite"]:
 		return "machines_towers"
-	if k in ["convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "surchauffe_sol", "plaque_de_glace", "jet_de_cryo", "bassin_toxique", "poche_de_vent", "zone_alternante", "zone_depressurisation"]:
+	if k in ["convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "surchauffe_sol", "plaque_de_glace", "jet_de_cryo", "bassin_toxique", "poche_de_vent", "zone_alternante", "zone_depressurisation", "desert_fosse_aspiration", "desert_collecteur_solaire", "desert_projecteur_mirage", "desert_fumerolle_vapeur", "jungle_fleur_catapulte", "jungle_plante_lasso", "jungle_nuee_lucioles", "volcanic_bassin_trempe", "volcanic_electroaimant", "swamp_vanne_crue", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_barricade_vehicules", "cryo_teleporteur_paire", "cryo_mur_glace_regen", "reacteur_barre_controle", "reacteur_cellule_confinement", "ruche_veine_pulsatile", "citadelle_sas_pressurise", "citadelle_dome_bouclier", "citadelle_grappin_magnetique"]:
 		return "interactive_hazards"
-	if k in ["rocher", "cristaux", "arbre", "plante", "glace", "arche", "lave", "racines", "pilier_energie"]:
+	if k in ["rocher", "cristaux", "arbre", "plante", "glace", "arche", "lave", "racines", "pilier_energie", "tech_cuve_vapeur", "tech_chariot_robot", "desert_char_enfoui", "desert_arche_verre", "jungle_colonne_racines", "jungle_statue_mecha", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "swamp_gratte_ciel", "swamp_pont_brise", "cryo_cuve_stase", "cryo_serveur_givre", "reacteur_turbine_hs", "reacteur_cuve_plomb", "ruche_colonne_os", "ruche_champignon_geant", "citadelle_panneau_solaire", "citadelle_reacteur_orbital"]:
 		return "nature_minerals"
 	return "borders"
 
+# Decor « de support » -> [cible a poser juste a cote, distance]. Voir _load_chunk. La distance reste
+# SOUS le rayon d'action du support (console_convoyeur/console_vent 400, vanne_drainage 250,
+# plante_lumineuse 300, radiateur 320). Les nuages (brouillard/spores) exigent > ~280 u d'espacement
+# avec tout autre decor (lisibilite, cf. _load_chunk) : leurs supports ont donc un rayon d'action large.
+# Les nuages derivent lentement (14-18 u/s) : le support agit tant qu'ils passent a portee.
+const COMPANION: Dictionary = {
+	"console_convoyeur": ["convoyeur_sol", 190.0],
+	"vanne_drainage":    ["bassin_toxique", 190.0],
+	"console_vent":      ["poche_de_vent", 200.0],
+	"plante_lumineuse":  ["nuage_spores", 290.0],
+	"radiateur":         ["brouillard_froid", 300.0],
+}
+
 const BIOME_DECOR: Dictionary = {
-	# EVERY biome carries the full trap set: canon (tourelle) + rayon (capaciteur) + pylône-arc
-	# (generateur) + mine (baril), on top of its native flora/terrain. No map is ever short on traps.
-	"earth":     ["rocher", "tourelle", "capaciteur", "generateur", "baril", "antenne", "arbre", "epave", "caisses"],
-	"volcanic":  ["lave", "tourelle", "capaciteur", "generateur", "baril", "lave", "rocher", "epave", "caisses"],
-	"spaceship": ["generateur", "conduit", "capaciteur", "tourelle", "antenne", "emetteur", "baril", "cristaux", "container", "caisses", "impulsion"],
-	"tech":      ["generateur", "conduit", "antenne", "capaciteur", "tourelle", "emetteur", "baril", "cristaux", "container", "caisses", "aimant", "terminal", "archives", "quai", "convoyeur",
+	# 14/10 (patron : « ne laisse que ce qui est specifique a chaque niveau ») : CHAQUE decor n'apparait
+	# plus que dans UN SEUL biome. Avant, tourelle/capaciteur/generateur/baril/caisses/epave se
+	# repetaient dans les 13 biomes, et rocher/arbre/cristaux/glace/plante/racines dans 2 a 4.
+	# Le « kit generique » (tourelle, capaciteur, generateur, baril, antenne, emetteur, caisses,
+	# container, conduit) appartient au niveau 1 (L'Usine) ; les nouveaux decors propres a chaque
+	# niveau arriveront avec leurs images (voir la bible des niveaux). Une liste vide = biome sans decor.
+	"tech":      ["tech_soudeuse", "tech_portique_laser", "tech_bac_composants", "tech_cuve_vapeur", "tech_chariot_robot",
+	              "generateur", "conduit", "antenne", "capaciteur", "tourelle", "emetteur", "baril", "container", "caisses", "aimant", "terminal", "archives", "quai", "convoyeur",
 	              "convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "vanne_refroidissement", "surchauffe_sol", "porte_automatique", "zone_chargement", "container_mobile"],
-	"cryo": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
-	         "plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "brouillard_froid", "radiateur", "pic_de_glace", "borne_thermique", "glace_fragile"],
-	"reacteur": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
-	         "bassin_toxique", "vanne_drainage", "poche_de_vent", "console_vent", "grille_ventilation", "zone_alternante", "cristal_instable", "pulse_energie"],
-	"ruche": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
-	         "cocon", "residu_biomecanique", "sol_collant", "tentacule_emergence", "nuage_spores", "plante_lumineuse"],
-	"citadelle": ["tourelle", "capaciteur", "generateur", "baril", "epave", "caisses",
-	         "porte_securite_orbitale", "zone_depressurisation", "zone_push_pull", "emetteur_laser_rotatif", "pilier_energie", "segment_mur_modulaire"],
-	"desert":    ["arche", "tourelle", "capaciteur", "generateur", "baril", "antenne", "rocher", "epave", "caisses"],
-	"ice":       ["glace", "tourelle", "capaciteur", "generateur", "baril", "conduit", "cristaux", "epave", "caisses"],
-	"jungle":    ["plante", "tourelle", "capaciteur", "generateur", "baril", "antenne", "racines", "arbre", "epave", "caisses"],
-	"swamp":     ["racines", "tourelle", "capaciteur", "generateur", "baril", "conduit", "plante", "arbre", "epave", "caisses"],
-	# ruines repeuple avec les decors SURVIVANTS (robot-war wreckage) apres suppression des nos 19-35
-	"ruines":    ["epave", "rocher", "capaciteur", "tourelle", "epave", "caisses", "baril", "container", "cristaux"],
+	"desert":    ["desert_miroir_solaire", "desert_generateur_tempete", "desert_malle_survie", "desert_fosse_aspiration",
+	              "desert_collecteur_solaire", "desert_projecteur_mirage", "desert_ver_foreur", "desert_fumerolle_vapeur",
+	              "desert_char_enfoui", "desert_arche_verre"],
+	"jungle":    ["jungle_mortier_plante", "jungle_liane_fouet", "jungle_cosse_geante",
+	              "jungle_fleur_catapulte", "jungle_plante_lasso", "jungle_nuee_lucioles",
+	              "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_colonne_racines", "jungle_statue_mecha"],
+	"volcanic":  ["volcanic_mortier_scories", "volcanic_event_magma", "volcanic_lingotiere",
+	              "volcanic_marteau_pilon", "volcanic_creuset_basculant", "volcanic_bassin_trempe",
+	              "volcanic_electroaimant", "volcanic_soufflerie_braises", "volcanic_cheminee_fonderie", "volcanic_pont_roulant"],
+	"swamp":     ["swamp_tourelle_dca", "swamp_vanne_crue", "swamp_coffre_banque", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_lampadaire_phare", "swamp_barricade_vehicules", "swamp_brouilleur_radio", "swamp_gratte_ciel", "swamp_pont_brise"],
+	"cryo":      ["cryo_canon_azote", "cryo_condenseur_givre", "cryo_caisson_echantillons", "cryo_teleporteur_paire", "cryo_mur_glace_regen", "cryo_cuve_stase", "cryo_serveur_givre",
+	              "plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "brouillard_froid", "radiateur", "pic_de_glace", "borne_thermique", "glace_fragile"],
+	"reacteur":  ["reacteur_canon_particules", "reacteur_bobine_tesla", "reacteur_barre_combustible", "reacteur_barre_controle", "reacteur_cellule_confinement", "reacteur_turbine_hs", "reacteur_cuve_plomb",
+	              "bassin_toxique", "vanne_drainage", "poche_de_vent", "console_vent", "grille_ventilation", "zone_alternante", "cristal_instable", "pulse_energie"],
+	"ruche":     ["ruche_organe_acide", "ruche_pondoir", "ruche_bulbe_nutritif", "ruche_veine_pulsatile", "ruche_vessie_explosive", "ruche_colonne_os", "ruche_champignon_geant",
+	              "cocon", "residu_biomecanique", "sol_collant", "tentacule_emergence", "nuage_spores", "plante_lumineuse"],
+	"citadelle": ["citadelle_lanceur_guide", "citadelle_relais_satellite", "citadelle_module_ravitaillement", "citadelle_sas_pressurise", "citadelle_dome_bouclier", "citadelle_grappin_magnetique", "citadelle_panneau_solaire", "citadelle_reacteur_orbital",
+	              "porte_securite_orbitale", "zone_depressurisation", "zone_push_pull", "emetteur_laser_rotatif", "pilier_energie", "segment_mur_modulaire"],
+	# biomes hors campagne (SANS FIN) : un seul decor propre, ou aucun
+	"ice":       ["glace"],
+	"spaceship": ["impulsion"],
+	"earth":     [],
+	"ruines":    [],
 }
 
 # ===== 03/10, PROGRESSION PAR MAP (plan "15 maps") =====
@@ -384,29 +713,49 @@ const BIOME_MAP_SEGMENTS: Dictionary = {
 		# progression. Rattaches par affinite thematique avec chaque map du document source ; les 5
 		# restants (generateur/capaciteur/tourelle/baril/caisses) deviennent la vraie base neutre de
 		# "tech", symetrique avec les 6 items de base des 4 autres biomes "15 maps".
-		["convoyeur_sol", "console_convoyeur", "bras_presseur", "convoyeur", "terminal", "archives"],      # Map 1 - Hall d'Assemblage
-		["piston_hydraulique", "vanne_refroidissement", "surchauffe_sol", "conduit", "emetteur", "aimant"], # Map 2 - Fonderie des Pistons
-		["porte_automatique", "zone_chargement", "container_mobile", "antenne", "cristaux", "container", "quai"], # Map 3 - Quai de Chargement
+		["convoyeur_sol", "console_convoyeur", "bras_presseur", "convoyeur", "terminal", "archives", "tech_soudeuse", "tech_cuve_vapeur"],      # Map 1 - Hall d'Assemblage
+		["piston_hydraulique", "vanne_refroidissement", "surchauffe_sol", "conduit", "emetteur", "aimant", "tech_portique_laser", "tech_chariot_robot"], # Map 2 - Fonderie des Pistons
+		["porte_automatique", "zone_chargement", "container_mobile", "antenne", "container", "quai", "tech_bac_composants"], # Map 3 - Quai de Chargement
+	],
+	"desert": [
+		["desert_arche_verre", "desert_fosse_aspiration", "desert_fumerolle_vapeur"],    # Map 1 - Dunes de Silice
+		["desert_char_enfoui", "desert_generateur_tempete", "desert_projecteur_mirage"], # Map 2 - Mer de Verre
+		["desert_miroir_solaire", "desert_collecteur_solaire", "desert_ver_foreur", "desert_malle_survie"], # Map 3 - Cratère Solaire
+	],
+	"jungle": [
+		["jungle_colonne_racines", "jungle_plante_lasso", "jungle_fleur_catapulte"],     # Map 1 - Lisière Envahie
+		["jungle_statue_mecha", "jungle_liane_fouet", "jungle_nuee_lucioles"],        # Map 2 - Canopée Profonde
+		["jungle_mortier_plante", "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_cosse_geante"], # Map 3 - Cœur Végétal
+	],
+	"volcanic": [
+		["volcanic_cheminee_fonderie", "volcanic_event_magma", "volcanic_soufflerie_braises"], # Map 1 - Failles de Lave
+		["volcanic_pont_roulant", "volcanic_creuset_basculant", "volcanic_marteau_pilon"],       # Map 2 - Haut Fourneau
+		["volcanic_mortier_scories", "volcanic_bassin_trempe", "volcanic_electroaimant", "volcanic_lingotiere"], # Map 3 - Cœur de Magma
+	],
+	"swamp": [
+		["swamp_gratte_ciel", "swamp_bouee_mine", "swamp_barricade_vehicules"],          # Map 1 - Quartiers Noyés
+		["swamp_pont_brise", "swamp_vanne_crue", "swamp_lampadaire_phare"],           # Map 2 - Ponts Submergés
+		["swamp_tourelle_dca", "swamp_brouilleur_radio", "swamp_vanne_barrage", "swamp_coffre_banque"], # Map 3 - Centre Inondé
 	],
 	"cryo": [
-		["plaque_de_glace", "capsule_cryogenique", "jet_de_cryo"],           # Map 4 - Cryo-Voute
-		["brouillard_froid", "radiateur", "pic_de_glace"],                   # Map 5 - Serres Gelees
-		["borne_thermique", "glace_fragile"],                                # Map 6 - Lac de Permafrost
+		["plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "cryo_canon_azote", "cryo_cuve_stase"],           # Map 4 - Cryo-Voute
+		["brouillard_froid", "radiateur", "pic_de_glace", "cryo_condenseur_givre", "cryo_serveur_givre"],           # Map 5 - Serres Gelees
+		["borne_thermique", "glace_fragile", "cryo_caisson_echantillons", "cryo_teleporteur_paire", "cryo_mur_glace_regen"], # Map 6 - Lac de Permafrost
 	],
 	"reacteur": [
-		["bassin_toxique", "vanne_drainage"],                                # Map 7 - Bassins Toxiques
-		["poche_de_vent", "console_vent", "grille_ventilation"],             # Map 8 - Salle des Turbines
-		["zone_alternante", "cristal_instable", "pulse_energie"],            # Map 9 - Noyau Fissure
+		["bassin_toxique", "vanne_drainage", "reacteur_canon_particules", "reacteur_cuve_plomb"],                    # Map 7 - Bassins Toxiques
+		["poche_de_vent", "console_vent", "grille_ventilation", "reacteur_bobine_tesla", "reacteur_turbine_hs"],    # Map 8 - Salle des Turbines
+		["zone_alternante", "cristal_instable", "pulse_energie", "reacteur_barre_combustible", "reacteur_barre_controle", "reacteur_cellule_confinement"], # Map 9 - Noyau Fissure
 	],
 	"ruche": [
-		["cocon", "residu_biomecanique"],                                    # Map 10 - Couvoir Mecanique
-		["sol_collant", "tentacule_emergence"],                              # Map 11 - Veines Vivantes
-		["nuage_spores", "plante_lumineuse"],                                # Map 12 - Jardin de Spores
+		["cocon", "residu_biomecanique", "ruche_organe_acide", "ruche_champignon_geant"],                           # Map 10 - Couvoir Mecanique
+		["sol_collant", "tentacule_emergence", "ruche_veine_pulsatile", "ruche_colonne_os"],                       # Map 11 - Veines Vivantes
+		["nuage_spores", "plante_lumineuse", "ruche_pondoir", "ruche_bulbe_nutritif", "ruche_vessie_explosive"],    # Map 12 - Jardin de Spores
 	],
 	"citadelle": [
-		["porte_securite_orbitale", "zone_depressurisation"],                # Map 13 - Pont Orbital
-		["zone_push_pull", "emetteur_laser_rotatif"],                        # Map 14 - Anneau de Gravite
-		["pilier_energie", "segment_mur_modulaire"],                         # Map 15 - Chambre de la Forge
+		["porte_securite_orbitale", "zone_depressurisation", "citadelle_lanceur_guide", "citadelle_panneau_solaire"], # Map 13 - Pont Orbital
+		["zone_push_pull", "emetteur_laser_rotatif", "citadelle_relais_satellite", "citadelle_sas_pressurise", "citadelle_reacteur_orbital"], # Map 14 - Anneau de Gravite
+		["pilier_energie", "segment_mur_modulaire", "citadelle_module_ravitaillement", "citadelle_dome_bouclier", "citadelle_grappin_magnetique"], # Map 15 - Chambre de la Forge
 	],
 }
 
@@ -473,6 +822,7 @@ func _pick_kind(kinds: Array, rng: RandomNumberGenerator) -> String:
 ## or out as you move (that pop-in was what read as "the decor isn't fixed"). Props exist for the
 ## whole run and block the player physically via the collision engine (free, broad-phase). Only the
 ## ENEMY-steering list (cover_list) is kept small — see _refresh_cover.
+
 func populate(_count: int = 28) -> void:
 	if arena_half > 0.0:
 		var cr: int = int(ceil(arena_half / CHUNK))   # chunks out to the wall (border hides any spill)
@@ -511,7 +861,7 @@ func _player_pos() -> Vector2:
 func _cell_of(p: Vector2) -> Vector2i:
 	return Vector2i(int(floor(p.x / CHUNK)), int(floor(p.y / CHUNK)))
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# decor is fixed (placed once); only the near-player cover set is refreshed, and only when the
 	# player crosses into a new chunk.
 	var cell: Vector2i = _cell_of(_player_pos())
@@ -521,6 +871,81 @@ func _process(_delta: float) -> void:
 			_refresh_cover(cell)
 		else:
 			_refresh(cell)
+	_scan_new_kinds(delta)
+
+# --- PANCARTES : premiere rencontre d'un decor a effet -------------------------------------
+const SIGN_R: float = 380.0        # 14/10 (patron : « pas assez reactif ») : se declenche des qu'on approche (~3 longueurs de mecha)
+const SIGN_SCAN: float = 0.1       # periode du balayage (etait 0,3 s : jusqu'a 0,3 s de retard avant meme la file)
+var _sign_scan_t: float = 0.0
+
+## Toutes les 0,3 s, cherche un decor a effet (INFO) a portee de vue dont la pancarte n'a jamais ete
+## montree et la demande a Game.pancarte_prop (qui memorise + met en file). Un seul passage par
+## decor : Game refuse un kind deja vu, donc le cout reste un simple balayage de quelques centaines
+## de props toutes les 0,3 s.
+func _scan_new_kinds(delta: float) -> void:
+	_sign_scan_t -= delta
+	if _sign_scan_t > 0.0 or game == null or not game.has_method("pancarte_prop"):
+		return
+	_sign_scan_t = SIGN_SCAN
+	# Position du VRAI joueur (Game.player) : _player_pos() renvoie (0,0) tant que le joueur n'existe
+	# pas, et le balayage d'avant sa creation mettait en file des decors proches de l'origine — que
+	# le rechargement des chunks liberait ensuite. Pas de joueur = pas de balayage.
+	var pp: Vector2 = Vector2.ZERO
+	if "player" in game:
+		var gp: Variant = game.get("player")
+		if gp == null or not is_instance_valid(gp):
+			return
+		pp = (gp as Node2D).global_position
+	else:
+		pp = _player_pos()   # bancs de test (StubGame sans joueur)
+	var r2: float = SIGN_R * SIGN_R
+	# seuls les chunks voisins du joueur (3x3 de 1000 u) peuvent contenir un decor a <= SIGN_R :
+	# balayage 3x plus frequent sans surcout.
+	var pc: Vector2i = _cell_of(pp)
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var ck: Vector2i = pc + Vector2i(dx, dy)
+			if not _chunks.has(ck):
+				continue
+			_scan_chunk_for_signs(ck, pp, r2)
+
+func _scan_chunk_for_signs(c: Vector2i, pp: Vector2, r2: float) -> void:
+	if true:
+		for p in _chunks[c]:
+			if not is_instance_valid(p) or not INFO.has((p as Prop).kind):
+				continue
+			# le tapis : la pancarte apparait des qu'on entre dans sa ZONE d'effet (rayon > SIGN_R)
+			var rr2: float = r2
+			if (p as Prop)._conveyor:
+				rr2 = maxf(r2, (p as Prop)._conveyor_r * (p as Prop)._conveyor_r)
+			if (p as Node2D).global_position.distance_squared_to(pp) <= rr2:
+				game.pancarte_prop((p as Prop).kind, (p as Prop).get_sprite_texture(), p as Node2D)
+
+## Distance (unites) au decor de ce type LE PLUS PROCHE de `pos` (1e9 s'il n'y en a aucun). Pancartes :
+## la nouveaute la plus proche passe en premier (voir Game._pancarte_pump).
+func kind_dist(kind: String, pos: Vector2) -> float:
+	var best: float = 1e9
+	var pc: Vector2i = _cell_of(pos)
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var ck: Vector2i = pc + Vector2i(dx, dy)
+			if not _chunks.has(ck):
+				continue
+			for p in _chunks[ck]:
+				if is_instance_valid(p) and (p as Prop).kind == kind:
+					best = minf(best, (p as Node2D).global_position.distance_to(pos))
+	return best
+
+## Un decor de ce type se trouve-t-il a moins de `r` unites de `pos` ? (pancartes : voir Game.)
+func kind_near(kind: String, pos: Vector2, r: float) -> bool:
+	var r2: float = r * r
+	for c in _chunks:
+		for p in _chunks[c]:
+			if not is_instance_valid(p) or (p as Prop).kind != kind:
+				continue
+			if (p as Node2D).global_position.distance_squared_to(pos) <= r2:
+				return true
+	return false
 
 func _refresh(cell: Vector2i) -> void:
 	_last_cell = cell
@@ -559,10 +984,25 @@ func _nonhazard(kinds: Array) -> String:
 	for k in kinds:
 		if not HAZARDS.has(String(k)):
 			return String(k)
-	return "caisses"
+	return String(kinds[0]) if not kinds.is_empty() else ""
+
+## Rayon d'encombrement d'un decor (les nuages et zones larges comptent pour leur VRAIE taille).
+func _gap_of(kind: String) -> float:
+	var kdef: Dictionary = DECOR.get(kind, {}) as Dictionary
+	var eff_sz: float = float(kdef.get("sz", 110.0))
+	if kdef.has("fog_r"): eff_sz = maxf(eff_sz, float(kdef["fog_r"]) * 2.2)
+	if kdef.has("spore_r"): eff_sz = maxf(eff_sz, float(kdef["spore_r"]) * 2.2)
+	if kdef.has("sinkhole_r"): eff_sz = maxf(eff_sz, float(kdef["sinkhole_r"]) * 1.8)
+	if kdef.has("toxic_r"): eff_sz = maxf(eff_sz, float(kdef["toxic_r"]) * 1.8)
+	if kdef.has("sticky_r"): eff_sz = maxf(eff_sz, float(kdef["sticky_r"]) * 1.8)
+	if kdef.has("bio_residue_r"): eff_sz = maxf(eff_sz, float(kdef["bio_residue_r"]) * 1.8)
+	return 55.0 + eff_sz * 0.45
 
 func _load_chunk(c: Vector2i) -> void:
 	var kinds: Array = BIOME_DECOR.get(biome, BIOME_DECOR["tech"])
+	if kinds.is_empty():
+		_chunks[c] = []   # biome sans decor propre
+		return
 	# deterministic per chunk (and per biome) -> revisiting a zone shows the same scenery
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash("%s:%d:%d" % [biome, c.x, c.y])
@@ -608,11 +1048,7 @@ func _load_chunk(c: Vector2i) -> void:
 		# grand (fog_r/spore_r * 2.2, ~500-600 unites) - l'espacement calcule sur le seul "sz"
 		# laissait donc poser d'autres decors presque DANS le nuage, illisible. Utilise le plus
 		# grand des deux (generalise a tout futur "nuage procedural", pas un cas particulier fige).
-		var kdef: Dictionary = DECOR.get(kind, {}) as Dictionary
-		var eff_sz: float = float(kdef.get("sz", 110.0))
-		if kdef.has("fog_r"): eff_sz = maxf(eff_sz, float(kdef["fog_r"]) * 2.2)
-		if kdef.has("spore_r"): eff_sz = maxf(eff_sz, float(kdef["spore_r"]) * 2.2)
-		var gap: float = 55.0 + eff_sz * 0.45
+		var gap: float = _gap_of(kind)
 		var ok: bool = true
 		for e in placed:
 			if pos.distance_to(e["pos"]) < gap + float(e["gap"]):
@@ -628,6 +1064,41 @@ func _load_chunk(c: Vector2i) -> void:
 		if _destroyed.has(Vector2i(pos.round())):
 			continue                     # smashed earlier this run — the spot stays empty
 		made.append(_place(kind, pos, rs, sr, fl))
+		# 14/10 (patron : decors « sans effet ») : une console/vanne/radiateur n'agit que sur SA cible
+		# a portee (tapis, bassin, turbine, nuage). Avec 2-3 props par chunk de 1000 unites, la
+		# cible se trouvait rarement a moins de 400 unites -> la console ne faisait jamais rien.
+		# On pose donc toujours une cible juste a cote (rng DEDIE : ne decale pas le flux du chunk).
+		if COMPANION.has(kind):
+			var cp: Array = COMPANION[kind]
+			var rc: RandomNumberGenerator = RandomNumberGenerator.new()
+			rc.seed = hash("comp:%s:%d:%d:%d:%d" % [biome, c.x, c.y, int(pos.x), int(pos.y)])
+			var cgap: float = _gap_of(String(cp[0]))
+			var cdist: float = float(cp[1])
+			var cpos: Vector2 = Vector2.ZERO
+			var cfound: bool = false
+			for _t in 16:   # meme regle d'espacement que le reste du chunk (lisibilite des nuages)
+				var ang: float = rc.randf() * TAU
+				var cand: Vector2 = pos + Vector2(cos(ang), sin(ang)) * cdist
+				if cand.x < origin.x + 60.0 or cand.x > origin.x + CHUNK - 60.0 						or cand.y < origin.y + 60.0 or cand.y > origin.y + CHUNK - 60.0:
+					continue
+				if cand.distance_to(ppos) < CLEAR_R:
+					continue
+				var free: bool = true
+				for e2 in placed:
+					if e2["pos"] != pos and cand.distance_to(e2["pos"]) < cgap + float(e2["gap"]):
+						free = false; break
+				if free:
+					cpos = cand; cfound = true; break
+			var cflip: bool = rc.randf() < 0.5
+			if cfound and not _destroyed.has(Vector2i(cpos.round())):
+				placed.append({"pos": cpos, "gap": cgap})
+				made.append(_place(String(cp[0]), cpos, 1.0, 0.5, cflip))
+			elif not cfound:
+				# aucune place pour la cible : un support SANS cible serait un decor « sans effet »
+				# -> on le retire plutot que de le laisser inerte.
+				var orphan: Node = made.pop_back()
+				placed.erase(placed.back())
+				orphan.queue_free()
 	_chunks[c] = made
 
 func _unload_chunk(c: Vector2i) -> void:
@@ -795,7 +1266,8 @@ class Prop extends StaticBody2D:
 	var _conveyor_dir: Vector2 = Vector2.RIGHT
 	var _conveyor_stop_t: float = 0.0   # >0 = coupe, decremente chaque frame ; pose par une console
 	var _conveyor_vfx_t: float = 0.0    # pulse periodique via FxKit
-	var _conveyor_ring: Sprite2D = null # halo/zone centree au sol pour le tapis ralentisseur
+	var _conveyor_ring: Sprite2D = null # disque de zone centre au sol pour le tapis ralentisseur
+	var _conveyor_edge: Sprite2D = null # bord net de la zone (meme rayon que l'effet)
 
 	# CONSOLE DE CONVOYEUR (Hall d'Assemblage) : DwellZone DEDIEE (pas celle de "terminal", pour
 	# ne jamais risquer de mélanger les deux comportements) -> coupe les convoyeurs proches 8s.
@@ -1076,6 +1548,272 @@ class Prop extends StaticBody2D:
 	# mur qui apparait/disparait, pas une vraie reconfiguration dynamique de la geometrie de
 	# l'arene (chantier a part entiere, hors scope decor).
 
+	# ===== Bible des niveaux — Niveau 1 (tech) =====
+	var _welder: bool = false
+	var _sweep_half: float = 0.785398
+	var _welder_dmg: float = 28.0
+
+	var _gantry: bool = false
+	var _gantry_cd: float = 6.0
+	var _gantry_t: float = 0.0
+	var _gantry_tell: float = 1.2
+	var _gantry_len: float = 240.0
+	var _gantry_dmg: float = 22.0
+	var _gantry_dir: Vector2 = Vector2.RIGHT
+
+	# ===== Bible des niveaux — Niveau 2 (desert) =====
+	var _solar_mirror: bool = false
+	var _solar_dmg: float = 32.0
+	var _solar_charge: float = 1.8
+	var _burn_trail: float = 3.0
+
+	var _storm_gen: bool = false
+	var _storm_cd: float = 9.0
+	var _storm_t: float = 0.0
+	var _storm_dur: float = 8.0
+	var _storm_speed: float = 40.0
+	var _storm_dmg: float = 12.0
+
+	var _sinkhole: bool = false
+	var _sinkhole_r: float = 150.0
+	var _sinkhole_pull: float = 55.0
+	var _sinkhole_slow: float = 0.5
+	var _sinkhole_ring: Sprite2D = null
+
+	var _solar_collector: bool = false
+	var _collector_cd: float = 40.0
+	var _collector_cd_t: float = 0.0
+	var _collector_zone: DwellZone = null
+
+	var _mirage: bool = false
+	var _mirage_cd: float = 20.0
+	var _mirage_cd_t: float = 0.0
+	var _mirage_dur: float = 6.0
+	var _mirage_active_t: float = 0.0
+	var _mirage_r: float = 340.0
+	var _mirage_zone: DwellZone = null
+
+	var _sandworm: bool = false
+	var _sandworm_r: float = 220.0
+	var _sandworm_tell: float = 1.0
+	var _sandworm_dmg: float = 25.0
+	var _sandworm_t: float = 0.0
+
+	var _fumerolle: bool = false
+	var _fumerolle_cd: float = 5.0
+	var _fumerolle_t: float = 0.0
+	var _fumerolle_r: float = 120.0
+	var _fumerolle_dmg: float = 15.0
+	var _fumerolle_push: float = 300.0
+
+	# ===== Bible des niveaux — Niveau 3 (La Ruine Verte / jungle) =====
+	var _plant_mortar: bool = false
+	var _mortar_cd: float = 4.5
+	var _mortar_t: float = 0.0
+	var _mortar_dmg: float = 26.0
+	var _mortar_r: float = 90.0
+
+	var _whip_vine: bool = false
+	var _whip_cd: float = 5.0
+	var _whip_t: float = 0.0
+	var _whip_dmg: float = 22.0
+	var _whip_r: float = 160.0
+	var _whip_arc: float = 120.0
+	var _whip_aim: float = 0.0
+
+	var _catapult: bool = false
+	var _catapult_dist: float = 300.0
+	var _catapult_cd: float = 3.0
+	var _catapult_cd_t: float = 0.0
+
+	var _lasso: bool = false
+	var _lasso_snare: float = 1.5
+	var _lasso_cd: float = 8.0
+	var _lasso_cd_t: float = 0.0
+	var _lasso_r: float = 85.0
+
+	var _fireflies: bool = false
+	var _heal_dps: float = 3.0
+	var _firefly_r: float = 110.0
+	var _firefly_dur: float = 10.0
+	var _firefly_life: float = 10.0
+	var _firefly_cd_t: float = 0.0
+
+	# ===== Bible des niveaux — Niveau 4 (La Forge / volcanic) =====
+	var _slag_mortar: bool = false
+	var _smortar_cd: float = 5.0
+	var _smortar_t: float = 0.0
+	var _smortar_dmg: float = 28.0
+	var _smortar_r: float = 95.0
+
+	var _magma_vent: bool = false
+	var _vent_cd: float = 4.5
+	var _vent_t: float = 0.0
+	var _vent_tell: float = 1.2
+	var _vent_dmg: float = 20.0
+	var _vent_r: float = 110.0
+
+	var _power_hammer: bool = false
+	var _hammer_cd: float = 7.0
+	var _hammer_t: float = 0.0
+	var _hammer_tell: float = 1.4
+	var _hammer_dmg: float = 35.0
+	var _hammer_r: float = 140.0
+
+	var _crucible: bool = false
+	var _crucible_cd: float = 6.0
+	var _crucible_t: float = 0.0
+	var _crucible_tell: float = 1.2
+	var _crucible_dmg: float = 24.0
+	var _crucible_len: float = 260.0
+	var _crucible_dir: Vector2 = Vector2.DOWN
+
+	var _quench_pool: bool = false
+	var _quench_r: float = 120.0
+	var _quench_cd: float = 15.0
+	var _quench_cd_t: float = 0.0
+
+	var _scrap_magnet: bool = false
+	var _magnet_r: float = 450.0
+
+	var _ember_bellows: bool = false
+	var _bellows_cd: float = 5.5
+	var _bellows_t: float = 0.0
+	var _bellows_tell: float = 1.0
+	var _bellows_r: float = 170.0
+	var _bellows_dmg: float = 18.0
+	var _bellows_dir: Vector2 = Vector2.RIGHT
+
+	# ===== Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) =====
+	var _flak_turret: bool = false
+	var _flak_cd: float = 5.0
+	var _flak_t: float = 0.0
+	var _flak_dmg: float = 18.0
+	var _flak_r: float = 110.0
+
+	var _flood_gate: bool = false
+	var _gate_cd: float = 6.0
+	var _gate_t: float = 0.0
+	var _gate_tell: float = 1.5
+	var _gate_dmg: float = 22.0
+	var _gate_len: float = 400.0
+	var _gate_w: float = 120.0
+	var _gate_push: float = 380.0
+	var _gate_dir: Vector2 = Vector2.DOWN
+
+	var _swamp_drain_valve: bool = false
+	var _swamp_drain_r: float = 130.0
+	var _swamp_drain_dur: float = 10.0
+	var _swamp_drain_cd: float = 25.0
+	var _swamp_drain_t: float = 0.0
+	var _swamp_drain_dwell: float = 0.0
+
+	var _floating_mine: bool = false
+	var _mine_trigger_r: float = 160.0
+	var _mine_dmg: float = 35.0
+	var _mine_boom_r: float = 140.0
+	var _mine_beep_t: float = 0.0
+	var _mine_armed: bool = false
+
+	var _searchlight: bool = false
+	var _searchlight_cd: float = 4.0
+	var _searchlight_t: float = 0.0
+	var _searchlight_r: float = 280.0
+
+	var _radio_jammer: bool = false
+	var _jammer_r: float = 300.0
+
+	# ===== Bible des niveaux — Niveau 6 (Le Cryo-Laboratoire / cryo) =====
+	var _nitrogen_cannon: bool = false
+	var _ncannon_cd: float = 4.5
+	var _ncannon_t: float = 0.0
+	var _ncannon_dmg: float = 24.0
+	var _ncannon_r: float = 100.0
+
+	var _frost_condenser: bool = false
+	var _condenser_cd: float = 6.0
+	var _condenser_t: float = 0.0
+	var _condenser_r: float = 250.0
+
+	var _teleporter: bool = false
+	var _teleport_cd: float = 6.0
+	var _teleport_t: float = 0.0
+	var _teleport_r: float = 80.0
+
+	var _regen_ice_wall: bool = false
+	var _regen_time: float = 10.0
+	var _regen_t: float = 0.0
+
+	# ===== Bible des niveaux — Niveau 7 (Le Noyau Instable / reacteur) =====
+	var _particle_cannon: bool = false
+	var _pcannon_cd: float = 4.0
+	var _pcannon_t: float = 0.0
+	var _pcannon_dmg: float = 22.0
+	var _pcannon_r: float = 350.0
+
+	var _tesla_coil: bool = false
+	var _tesla_cd: float = 3.0
+	var _tesla_t: float = 0.0
+	var _tesla_r: float = 300.0
+
+	var _control_rod: bool = false
+	var _control_rod_r: float = 120.0
+	var _control_rod_t: float = 0.0
+	var _control_rod_active_t: float = 0.0
+
+	var _containment_cell: bool = false
+	var _containment_r: float = 220.0
+	var _containment_cd: float = 25.0
+	var _containment_cd_t: float = 0.0
+	var _containment_active_t: float = 0.0
+
+	# ===== Bible des niveaux — Niveau 8 (La Ruche / ruche) =====
+	var _acid_turret: bool = false
+	var _acid_cd: float = 4.5
+	var _acid_t: float = 0.0
+	var _acid_r: float = 320.0
+
+	var _spawner_egg: bool = false
+	var _egg_spawn_cd: float = 5.0
+	var _egg_spawn_t: float = 0.0
+
+	var _vein_pulse: bool = false
+	var _vein_cd: float = 3.0
+	var _vein_t: float = 0.0
+	var _vein_r: float = 250.0
+	var _vein_force: float = 180.0
+
+	var _acid_bladder: bool = false
+
+	# ===== Bible des niveaux — Niveau 9 (La Citadelle Orbitale / citadelle) =====
+	var _guided_launcher: bool = false
+	var _glauncher_cd: float = 5.0
+	var _glauncher_t: float = 0.0
+	var _glauncher_dmg: float = 25.0
+	var _glauncher_r: float = 400.0
+
+	var _satellite_relay: bool = false
+	var _srelay_cd: float = 6.0
+	var _srelay_t: float = 0.0
+	var _srelay_r: float = 350.0
+
+	var _airlock: bool = false
+	var _airlock_cd: float = 6.0
+	var _airlock_t: float = 0.0
+	var _airlock_open: bool = false
+
+	var _dome_shield: bool = false
+	var _dome_r: float = 200.0
+	var _dome_cd: float = 20.0
+	var _dome_cd_t: float = 0.0
+	var _dome_active_t: float = 0.0
+
+	var _magnetic_hook: bool = false
+	var _hook_r: float = 250.0
+	var _hook_force: float = 120.0
+	var _hook_cd: float = 4.0
+	var _hook_t: float = 0.0
+
 	# --- CAPACITEUR: neutral sweeping beam (see the DECOR entry for the design intent) ---
 	var _beam: bool = false
 	var _beam_dir: Vector2 = Vector2.RIGHT   # ONE fixed cardinal, chosen at build from the seed
@@ -1199,10 +1937,28 @@ class Prop extends StaticBody2D:
 		if _conveyor:
 			_conveyor_r = float(def.get("conveyor_r", 160.0))
 			_conveyor_speed = float(def.get("conveyor_speed", 75.0))
-			_conveyor_dir = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][int(skill_roll * 4.0) % 4]
-			_conveyor_ring = _glow_sprite(Color(1.0, 0.55, 0.15), _conveyor_r * 2.0, 0.18)
+			# 14/10 : le tapis poussait selon un axe CARDINAL tire au hasard alors que les chevrons du
+			# dessin pointent en diagonale (bas-droite, ~31 deg) -> on glissait « de travers » par
+			# rapport au tapis. Direction = celle des chevrons ; flip_h miroite dessin ET poussee.
+			_conveyor_dir = Vector2(0.857, 0.515)
+			if flip:
+				_conveyor_dir.x = -_conveyor_dir.x
+			# 14/10 (patron : « recentre et agrandis le perimetre de l'effet tapis ») : le halo additif
+			# a alpha 0,14-0,22 etait INVISIBLE sur le sol clair -> on ne voyait jamais ou s'arretait
+			# la zone. Disque + BORD net centres sur l'origine du tapis (= centre du dessin), au
+			# rayon exact de l'effet : ce qu'on voit est ce qui agit.
+			_conveyor_ring = Sprite2D.new()
+			_conveyor_ring.texture = Tex.disc_tex()
+			_conveyor_ring.material = Tex.add_mat()
+			_conveyor_ring.scale = Vector2.ONE * (_conveyor_r * 2.0 / 128.0)
+			_conveyor_ring.z_index = -1
 			add_child(_conveyor_ring)
-			_core_child(_conveyor_ring, Color(1.0, 0.7, 0.2))
+			_conveyor_edge = Sprite2D.new()
+			_conveyor_edge.texture = Tex.shock_tex()
+			_conveyor_edge.material = Tex.add_mat()
+			_conveyor_edge.scale = Vector2.ONE * (_conveyor_r * 2.0 / 256.0)
+			_conveyor_edge.z_index = -1
+			add_child(_conveyor_edge)
 			add_to_group("tech_convoyeur")
 		_console = bool(def.get("console", false))
 		if _console:
@@ -1419,6 +2175,266 @@ class Prop extends StaticBody2D:
 			_rot_laser_t = randf_range(3.0, 6.0)
 			_rot_laser_angle = randf() * TAU
 		_pillar = bool(def.get("pillar", false))
+		_welder = bool(def.get("welder", false))
+		if _welder:
+			_sweep_half = deg_to_rad(float(def.get("sweep_half", 45.0)))
+			_welder_dmg = float(def.get("welder_dmg", 28.0))
+		_gantry = bool(def.get("gantry", false))
+		if _gantry:
+			_gantry_cd = float(def.get("gantry_cd", 6.0))
+			_gantry_t = randf_range(1.0, _gantry_cd)
+			_gantry_tell = float(def.get("gantry_tell", 1.2))
+			_gantry_len = float(def.get("gantry_len", 240.0))
+			_gantry_dmg = float(def.get("gantry_dmg", 22.0))
+			_gantry_dir = Vector2.DOWN if flip else Vector2.RIGHT
+
+		# --- Level 2 (desert) inits ---
+		_solar_mirror = bool(def.get("solar_mirror", false))
+		if _solar_mirror:
+			_solar_dmg = float(def.get("solar_dmg", 32.0))
+			_solar_charge = float(def.get("solar_charge", 1.8))
+			_burn_trail = float(def.get("burn_trail", 3.0))
+		_storm_gen = bool(def.get("storm_gen", false))
+		if _storm_gen:
+			_storm_cd = float(def.get("storm_cd", 9.0))
+			_storm_t = randf_range(2.0, _storm_cd)
+			_storm_dmg = float(def.get("storm_dmg", 12.0))
+		_sinkhole = bool(def.get("sinkhole", false))
+		if _sinkhole:
+			_sinkhole_r = float(def.get("sinkhole_r", 150.0))
+			_sinkhole_pull = float(def.get("sinkhole_pull", 55.0))
+			_sinkhole_slow = float(def.get("sinkhole_slow", 0.5))
+			_sinkhole_ring = _glow_sprite(Color(0.85, 0.6, 0.25), _sinkhole_r * 2.0, 0.16)
+			add_child(_sinkhole_ring)
+			_core_child(_sinkhole_ring, Color(0.85, 0.6, 0.25))
+		_solar_collector = bool(def.get("solar_collector", false))
+		if _solar_collector:
+			_collector_cd = float(def.get("collector_cd", 40.0))
+			_collector_zone = DwellZone.new()
+			_collector_zone.radius = float(def.get("dwell_r", 100.0))
+			_collector_zone.fill_time = float(def.get("dwell_time", 1.5))
+			_collector_zone.col = Color(1.0, 0.85, 0.2)
+			_collector_zone.filled.connect(_on_solar_collector_filled)
+			add_child(_collector_zone)
+		_mirage = bool(def.get("mirage", false))
+		if _mirage:
+			_mirage_cd = float(def.get("mirage_cd", 20.0))
+			_mirage_dur = float(def.get("mirage_dur", 6.0))
+			_mirage_r = float(def.get("mirage_r", 340.0))
+			_mirage_zone = DwellZone.new()
+			_mirage_zone.radius = float(def.get("dwell_r", 90.0))
+			_mirage_zone.fill_time = 0.8
+			_mirage_zone.col = Palette.CYAN
+			_mirage_zone.filled.connect(_on_mirage_filled)
+			add_child(_mirage_zone)
+		_sandworm = bool(def.get("sandworm", false))
+		if _sandworm:
+			_sandworm_r = float(def.get("sandworm_r", 220.0))
+			_sandworm_dmg = float(def.get("sandworm_dmg", 25.0))
+			_sandworm_tell = float(def.get("sandworm_tell", 1.0))
+		_fumerolle = bool(def.get("fumerolle", false))
+		if _fumerolle:
+			_fumerolle_cd = float(def.get("fumerolle_cd", 5.0))
+			_fumerolle_r = float(def.get("fumerolle_r", 120.0))
+			_fumerolle_dmg = float(def.get("fumerolle_dmg", 15.0))
+			_fumerolle_t = randf_range(1.0, _fumerolle_cd)
+
+		# --- Level 3 (jungle) inits ---
+		_plant_mortar = bool(def.get("plant_mortar", false))
+		if _plant_mortar:
+			_mortar_cd = float(def.get("mortar_cd", 4.5))
+			_mortar_t = randf_range(1.5, _mortar_cd)
+			_mortar_dmg = float(def.get("mortar_dmg", 26.0))
+			_mortar_r = float(def.get("mortar_r", 90.0))
+		_whip_vine = bool(def.get("whip_vine", false))
+		if _whip_vine:
+			_whip_cd = float(def.get("whip_cd", 5.0))
+			_whip_t = randf_range(1.0, _whip_cd)
+			_whip_dmg = float(def.get("whip_dmg", 22.0))
+			_whip_r = float(def.get("whip_r", 160.0))
+			_whip_aim = randf_range(0.0, TAU)
+		_catapult = bool(def.get("catapult", false))
+		if _catapult:
+			_catapult_dist = float(def.get("catapult_dist", 300.0))
+			_catapult_cd = float(def.get("catapult_cd", 3.0))
+		_lasso = bool(def.get("lasso", false))
+		if _lasso:
+			_lasso_snare = float(def.get("lasso_snare", 1.5))
+			_lasso_cd = float(def.get("lasso_cd", 8.0))
+			_lasso_r = float(def.get("lasso_r", 85.0))
+		_fireflies = bool(def.get("fireflies", false))
+		if _fireflies:
+			_heal_dps = float(def.get("heal_dps", 3.0))
+			_firefly_r = float(def.get("firefly_r", 110.0))
+			_firefly_dur = float(def.get("firefly_dur", 10.0))
+			_firefly_life = _firefly_dur
+
+		# --- Level 4 (volcanic) inits ---
+		_slag_mortar = bool(def.get("slag_mortar", false))
+		if _slag_mortar:
+			_smortar_cd = float(def.get("mortar_cd", 5.0))
+			_smortar_t = randf_range(1.5, _smortar_cd)
+			_smortar_dmg = float(def.get("mortar_dmg", 28.0))
+			_smortar_r = float(def.get("mortar_r", 95.0))
+		_magma_vent = bool(def.get("magma_vent", false))
+		if _magma_vent:
+			_vent_cd = float(def.get("vent_cd", 4.5))
+			_vent_t = randf_range(1.0, _vent_cd)
+			_vent_tell = float(def.get("vent_tell", 1.2))
+			_vent_dmg = float(def.get("vent_dmg", 20.0))
+			_vent_r = float(def.get("vent_r", 110.0))
+		_power_hammer = bool(def.get("power_hammer", false))
+		if _power_hammer:
+			_hammer_cd = float(def.get("hammer_cd", 7.0))
+			_hammer_t = randf_range(2.0, _hammer_cd)
+			_hammer_tell = float(def.get("hammer_tell", 1.4))
+			_hammer_dmg = float(def.get("hammer_dmg", 35.0))
+			_hammer_r = float(def.get("hammer_r", 140.0))
+		_crucible = bool(def.get("crucible", false))
+		if _crucible:
+			_crucible_cd = float(def.get("crucible_cd", 6.0))
+			_crucible_t = randf_range(1.5, _crucible_cd)
+			_crucible_tell = float(def.get("crucible_tell", 1.2))
+			_crucible_dmg = float(def.get("crucible_dmg", 24.0))
+			_crucible_len = float(def.get("crucible_len", 260.0))
+			_crucible_dir = Vector2.DOWN if flip else Vector2.RIGHT
+		_quench_pool = bool(def.get("quench_pool", false))
+		if _quench_pool:
+			_quench_r = float(def.get("quench_r", 120.0))
+		_scrap_magnet = bool(def.get("scrap_magnet", false))
+		if _scrap_magnet:
+			_magnet_r = float(def.get("magnet_r", 450.0))
+		_ember_bellows = bool(def.get("ember_bellows", false))
+		if _ember_bellows:
+			_bellows_cd = float(def.get("bellows_cd", 5.5))
+			_bellows_t = randf_range(1.0, _bellows_cd)
+			_bellows_tell = float(def.get("bellows_tell", 1.0))
+			_bellows_r = float(def.get("bellows_r", 170.0))
+			_bellows_dmg = float(def.get("bellows_dmg", 18.0))
+			_bellows_dir = Vector2.LEFT if flip else Vector2.RIGHT
+
+		# ===== Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) =====
+		_flak_turret = bool(def.get("flak_turret", false))
+		if _flak_turret:
+			_flak_cd = float(def.get("flak_cd", 5.0))
+			_flak_t = randf_range(1.0, _flak_cd)
+			_flak_dmg = float(def.get("flak_dmg", 18.0))
+			_flak_r = float(def.get("flak_r", 110.0))
+		_flood_gate = bool(def.get("flood_gate", false))
+		if _flood_gate:
+			_gate_cd = float(def.get("gate_cd", 6.0))
+			_gate_t = randf_range(1.5, _gate_cd)
+			_gate_tell = float(def.get("gate_tell", 1.5))
+			_gate_dmg = float(def.get("gate_dmg", 22.0))
+			_gate_len = float(def.get("gate_len", 400.0))
+			_gate_w = float(def.get("gate_w", 120.0))
+			_gate_push = float(def.get("gate_push", 380.0))
+			_gate_dir = Vector2.DOWN.rotated(randf_range(-0.4, 0.4))
+		_swamp_drain_valve = bool(def.get("drain_valve", false))
+		if _swamp_drain_valve:
+			_swamp_drain_r = float(def.get("drain_r", 130.0))
+			_swamp_drain_dur = float(def.get("drain_dur", 10.0))
+			_swamp_drain_cd = float(def.get("drain_cd", 25.0))
+		_floating_mine = bool(def.get("floating_mine", false))
+		if _floating_mine:
+			_mine_trigger_r = float(def.get("mine_trigger_r", 160.0))
+			_mine_dmg = float(def.get("mine_dmg", 35.0))
+			_mine_boom_r = float(def.get("mine_boom_r", 140.0))
+		_searchlight = bool(def.get("searchlight", false))
+		if _searchlight:
+			_searchlight_cd = float(def.get("searchlight_cd", 4.0))
+			_searchlight_t = randf_range(1.0, _searchlight_cd)
+			_searchlight_r = float(def.get("searchlight_r", 280.0))
+		_radio_jammer = bool(def.get("radio_jammer", false))
+		if _radio_jammer:
+			_jammer_r = float(def.get("jammer_r", 300.0))
+
+		# ===== Bible des niveaux — Niveau 6 (Le Cryo-Laboratoire / cryo) =====
+		_nitrogen_cannon = bool(def.get("nitrogen_cannon", false))
+		if _nitrogen_cannon:
+			_ncannon_cd = float(def.get("ncannon_cd", 4.5))
+			_ncannon_t = randf_range(1.0, _ncannon_cd)
+			_ncannon_dmg = float(def.get("ncannon_dmg", 24.0))
+			_ncannon_r = float(def.get("ncannon_r", 100.0))
+		_frost_condenser = bool(def.get("frost_condenser", false))
+		if _frost_condenser:
+			_condenser_cd = float(def.get("condenser_cd", 6.0))
+			_condenser_t = randf_range(1.5, _condenser_cd)
+			_condenser_r = float(def.get("condenser_r", 250.0))
+		_teleporter = bool(def.get("teleporter", false))
+		if _teleporter:
+			_teleport_cd = float(def.get("teleport_cd", 6.0))
+			_teleport_r = float(def.get("teleport_r", 80.0))
+			add_to_group("teleporters")
+		_regen_ice_wall = bool(def.get("regen_ice_wall", false))
+		if _regen_ice_wall:
+			_regen_time = float(def.get("regen_time", 10.0))
+
+		# ===== Bible des niveaux — Niveau 7 (Le Noyau Instable / reacteur) =====
+		_particle_cannon = bool(def.get("particle_cannon", false))
+		if _particle_cannon:
+			_pcannon_cd = float(def.get("cannon_cd", 4.0))
+			_pcannon_t = randf_range(1.0, _pcannon_cd)
+			_pcannon_dmg = float(def.get("cannon_dmg", 22.0))
+			_pcannon_r = float(def.get("cannon_r", 350.0))
+		_tesla_coil = bool(def.get("tesla_coil", false))
+		if _tesla_coil:
+			_tesla_cd = float(def.get("tesla_cd", 3.0))
+			_tesla_t = randf_range(1.0, _tesla_cd)
+			_tesla_r = float(def.get("tesla_r", 300.0))
+		_control_rod = bool(def.get("control_rod", false))
+		if _control_rod:
+			_control_rod_r = float(def.get("control_rod_r", 120.0))
+		_containment_cell = bool(def.get("containment_cell", false))
+		if _containment_cell:
+			_containment_r = float(def.get("containment_r", 220.0))
+			_containment_cd = float(def.get("containment_cd", 25.0))
+
+		# ===== Bible des niveaux — Niveau 8 (La Ruche / ruche) =====
+		_acid_turret = bool(def.get("acid_turret", false))
+		if _acid_turret:
+			_acid_cd = float(def.get("acid_cd", 4.5))
+			_acid_t = randf_range(1.0, _acid_cd)
+			_acid_r = float(def.get("acid_r", 320.0))
+		_spawner_egg = bool(def.get("spawner_egg", false))
+		if _spawner_egg:
+			_egg_spawn_cd = float(def.get("spawn_cd", 5.0))
+			_egg_spawn_t = randf_range(1.5, _egg_spawn_cd)
+		_vein_pulse = bool(def.get("vein_pulse", false))
+		if _vein_pulse:
+			_vein_cd = float(def.get("vein_cd", 3.0))
+			_vein_t = randf_range(0.5, _vein_cd)
+			_vein_r = float(def.get("vein_r", 250.0))
+			_vein_force = float(def.get("vein_force", 180.0))
+		_acid_bladder = bool(def.get("acid_bladder", false))
+
+		# ===== Bible des niveaux — Niveau 9 (La Citadelle Orbitale / citadelle) =====
+		_guided_launcher = bool(def.get("guided_launcher", false))
+		if _guided_launcher:
+			_glauncher_cd = float(def.get("launcher_cd", 5.0))
+			_glauncher_t = randf_range(1.0, _glauncher_cd)
+			_glauncher_dmg = float(def.get("launcher_dmg", 25.0))
+			_glauncher_r = float(def.get("launcher_r", 400.0))
+		_satellite_relay = bool(def.get("satellite_relay", false))
+		if _satellite_relay:
+			_srelay_cd = float(def.get("relay_cd", 6.0))
+			_srelay_t = randf_range(1.5, _srelay_cd)
+			_srelay_r = float(def.get("relay_r", 350.0))
+		_airlock = bool(def.get("airlock", false))
+		if _airlock:
+			_airlock_cd = float(def.get("airlock_cd", 6.0))
+			_airlock_t = randf_range(1.0, _airlock_cd)
+		_dome_shield = bool(def.get("dome_shield", false))
+		if _dome_shield:
+			_dome_r = float(def.get("dome_r", 200.0))
+			_dome_cd = float(def.get("dome_cd", 20.0))
+		_magnetic_hook = bool(def.get("magnetic_hook", false))
+		if _magnetic_hook:
+			_hook_r = float(def.get("hook_r", 250.0))
+			_hook_force = float(def.get("hook_force", 120.0))
+			_hook_cd = float(def.get("hook_cd", 4.0))
+			_hook_t = randf_range(1.0, _hook_cd)
+
 		# props that need a per-frame tick
 		set_process(_awaken != "" or _shoot_r > 0.0 or _boom or _beam or _beacon or _pylon or _slow
 			or _aura != "" or _push or _guard or _spot or _cycle or _convey
@@ -1427,7 +2443,15 @@ class Prop extends StaticBody2D:
 			or _toxic_pool or _drain or _wind or _wind_console or _vent_grate or _alt_zone
 			or _unstable_crystal or _energy_pulse
 			or _sticky or _bio_residue or _tentacle or _spore_cloud or _light_plant
-			or _depress or _grav_zone or _rot_laser)
+			or _depress or _grav_zone or _rot_laser or _welder or _gantry
+			or _solar_mirror or _storm_gen or _sinkhole or _solar_collector or _mirage or _sandworm or _fumerolle
+			or _plant_mortar or _whip_vine or _catapult or _lasso or _fireflies
+			or _slag_mortar or _magma_vent or _power_hammer or _crucible or _quench_pool or _scrap_magnet or _ember_bellows
+			or _flak_turret or _flood_gate or _swamp_drain_valve or _floating_mine or _searchlight or _radio_jammer
+			or _nitrogen_cannon or _frost_condenser or _teleporter or _regen_ice_wall
+			or _particle_cannon or _tesla_coil or _control_rod or _containment_cell
+			or _acid_turret or _spawner_egg or _vein_pulse
+			or _guided_launcher or _satellite_relay or _airlock or _dome_shield or _magnetic_hook)
 		var tex: Texture2D = load("res://assets/decor/%s.png" % String(def.get("f", "g20")))
 		var th: float = maxf(1.0, float(tex.get_height()))
 		var d_mult: float = SaveManager.get_decor_scale(kind, PropScatter._decor_cat(kind)) if (SaveManager != null and SaveManager.has_method("get_decor_scale")) else 1.0
@@ -1447,6 +2471,8 @@ class Prop extends StaticBody2D:
 		_sprite = Sprite2D.new()
 		_sprite.texture = tex
 		_sprite.scale = Vector2.ONE * sc
+		if _conveyor:
+			_sprite.flip_h = flip
 		add_child(_sprite)
 
 		# Fixed emplacement gun: derive the FIRING AXIS from the art itself so the bolt always
@@ -1454,14 +2480,14 @@ class Prop extends StaticBody2D:
 		# the axis and the muzzle, which buys a second orientation for free.
 		# Tourelle canon : tout decor avec _shoot_r > 0 OU utilisant l'art g27 OU nomme tourelle/canon
 		# EST un canon fonctionnel a tir de rayon automatique a intervalle regulier.
-		var is_cannon: bool = _shoot_r > 0.0 or String(def.get("f", "")) == "g27" or kind == "tourelle" or kind.begins_with("canon")
+		var is_cannon: bool = _shoot_r > 0.0 or String(def.get("f", "")) == "g27" or kind == "tourelle" or kind.begins_with("canon") or _welder or _solar_mirror
 		if is_cannon:
 			_shoot_r = maxf(_shoot_r, 470.0)
 			set_process(true)
 			_sprite.flip_h = flip
-			var a: float = deg_to_rad(float(def.get("aim", 140.0)))
+			var a: float = deg_to_rad(float(def.get("aim", 135.0 if (_welder or _solar_mirror) else 140.0)))
 			_cannon = Vector2.RIGHT.rotated(a)
-			var m: Array = def.get("muzzle", [-162.5, 117.0])
+			var m: Array = def.get("muzzle", [0.0, 30.0] if _solar_mirror else ([-20.0, 40.0] if _welder else [-162.5, 117.0]))
 			_muzzle = Vector2(float(m[0]), float(m[1])) * sc
 			if flip:
 				_cannon.x = -_cannon.x
@@ -1472,7 +2498,8 @@ class Prop extends StaticBody2D:
 			_cannon_beam_line = _mk_beam(28)
 			_cannon_beam_core = _mk_beam(29)
 			_cannon_beam_flash = Sprite2D.new()
-			_cannon_beam_flash.texture = Tex.glow(Color(1.0, 0.6, 0.15), 128)
+			var flash_col: Color = Color(1.0, 0.9, 0.4) if _solar_mirror else (Color(0.2, 0.85, 1.0) if _welder else Color(1.0, 0.6, 0.15))
+			_cannon_beam_flash.texture = Tex.glow(flash_col, 128)
 			_cannon_beam_flash.material = Tex.add_mat()
 			_cannon_beam_flash.top_level = true
 			_cannon_beam_flash.z_index = 29
@@ -1515,6 +2542,9 @@ class Prop extends StaticBody2D:
 		# NOTE: props do NOT self-register in cover_list any more. With fixed decor across a big
 		# arena that would put 200+ props in the per-frame enemy-steering scan. PropScatter keeps
 		# cover_list to the props near the player instead (see _refresh_cover).
+
+	func get_sprite_texture() -> Texture2D:
+		return _sprite.texture if _sprite != null else null
 
 	## Cheap additive glow used instead of a real Light2D (see call sites): same soft halo look,
 	## none of the per-frame dynamic-light re-render cost that was hurting mobile.
@@ -1693,11 +2723,15 @@ class Prop extends StaticBody2D:
 			if _conveyor_stop_t > 0.0:
 				_conveyor_stop_t -= delta
 				if _conveyor_ring != null:
-					_conveyor_ring.modulate = Color(0.3, 0.7, 0.9, 0.08)
+					_conveyor_ring.modulate = Color(0.3, 0.7, 0.9, 0.05)
+					_conveyor_edge.modulate = Color(0.3, 0.7, 0.9, 0.18)   # coupe : bleu, quasi eteint
 			else:
-				var puls: float = 0.14 + 0.08 * sin(Time.get_ticks_msec() * 0.005)
+				# clignotement FRANC (periode ~1,3 s, synchrone avec l'onde) : le disque et son bord
+				# respirent ensemble, tous deux centres sur le tapis.
+				var blink: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.0048)
 				if _conveyor_ring != null:
-					_conveyor_ring.modulate = Color(1.0, 0.55, 0.15, puls)
+					_conveyor_ring.modulate = Color(1.0, 0.55, 0.15, 0.08 + 0.20 * blink)
+					_conveyor_edge.modulate = Color(1.0, 0.62, 0.22, 0.30 + 0.65 * blink)
 				var cv_step: Vector2 = _conveyor_dir * _conveyor_speed * delta
 				if dist < _conveyor_r:
 					if "field_slow" in _plr:
@@ -1715,14 +2749,20 @@ class Prop extends StaticBody2D:
 				if _conveyor_vfx_t <= 0.0 and game != null and game.has_method("spawn_vfx"):
 					_conveyor_vfx_t = 1.3
 					const FxKit = preload("res://scenes/FxKit.gd")
-					FxKit.conveyor_pulse(game, global_position, Color(1.0, 0.6, 0.18), _conveyor_dir, _conveyor_r / 160.0)
+					FxKit.conveyor_pulse(game, global_position, Color(1.0, 0.6, 0.18), _conveyor_dir, _conveyor_r / 128.0)
 
 		# --- CONSOLE / VANNE : juste la decrementation du cooldown, le declenchement vient du
 		# signal DwellZone.filled (_on_console_filled/_on_valve_filled plus bas).
-		if _console and _console_cd_t > 0.0:
-			_console_cd_t -= delta
-		if _valve and _valve_cd_t > 0.0:
-			_valve_cd_t -= delta
+		if _console:
+			if _console_cd_t > 0.0:
+				_console_cd_t -= delta
+			if _console_zone != null:
+				_console_zone.active = _console_cd_t <= 0.0   # anneau eteint pendant la recharge
+		if _valve:
+			if _valve_cd_t > 0.0:
+				_valve_cd_t -= delta
+			if _valve_zone != null:
+				_valve_zone.active = _valve_cd_t <= 0.0   # anneau eteint pendant la recharge
 
 		# --- BRAS PRESSEUR (Hall d'Assemblage) : GroundZone en ligne a intervalle aleatoire, meme
 		# idiome que le boss _phase_crusher (Enemy.gd) qui appelle deja spawn_ground_zone depuis
@@ -1742,6 +2782,570 @@ class Prop extends StaticBody2D:
 					z.game = game; z.player = _plr
 					game.enemy_layer.add_child(z)
 					z.global_position = global_position
+
+		# --- PORTIQUE DE DECOUPE LASER (L'Usine / tech) : trace une ligne de decoupe au sol toutes les 6 s
+		if _gantry and dist < 1300.0:
+			_gantry_t -= delta
+			if _gantry_t <= 0.0:
+				_gantry_t = _gantry_cd
+				if game != null and game.has_method("spawn_vfx") and "enemy_layer" in game:
+					var half: Vector2 = _gantry_dir * (_gantry_len * 0.5)
+					var z: GroundZone = GroundZone.new()
+					z.radius = 35.0; z.delay = _gantry_tell; z.damage = _gantry_dmg
+					z.color = Color(1.0, 0.35, 0.15)
+					z.shape = "line"; z.line_from = -half; z.line_to = half
+					z.stun_duration = 0.2; z.fx_kind = kind
+					z.game = game; z.player = _plr
+					game.enemy_layer.add_child(z)
+					z.global_position = global_position
+
+		# --- Bible des niveaux — Niveau 2 (Terres Calcinées / desert) ---
+		# Fosse d'aspiration : attire vers le centre et ralentit tout ce qui entre
+		if _sinkhole and dist < 1200.0:
+			if dist < _sinkhole_r and dist > 2.0:
+				var to_c: Vector2 = (global_position - _plr.global_position).normalized()
+				_plr.global_position += to_c * _sinkhole_pull * delta
+				_plr.field_slow = minf(_plr.field_slow, _sinkhole_slow)
+			var r2_sink: float = _sinkhole_r * _sinkhole_r
+			for e in get_tree().get_nodes_in_group("enemies"):
+				if e is Node2D and is_instance_valid(e):
+					var to_e: Vector2 = global_position - (e as Node2D).global_position
+					var d2e: float = to_e.length_squared()
+					if d2e <= r2_sink and d2e > 4.0:
+						(e as Node2D).global_position += to_e.normalized() * (_sinkhole_pull * 0.8) * delta
+
+		# Collecteur solaire : gestion cooldown du socle de recharge
+		if _solar_collector:
+			if _collector_cd_t > 0.0:
+				_collector_cd_t -= delta
+			if _collector_zone != null:
+				_collector_zone.active = _collector_cd_t <= 0.0
+
+		# Projecteur de mirage : leurre holographique qui détourne la horde
+		if _mirage:
+			if _mirage_cd_t > 0.0:
+				_mirage_cd_t -= delta
+			if _mirage_zone != null:
+				_mirage_zone.active = _mirage_cd_t <= 0.0 and _mirage_active_t <= 0.0
+			if _mirage_active_t > 0.0:
+				_mirage_active_t -= delta
+				var r2_mir: float = _mirage_r * _mirage_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D and is_instance_valid(e):
+						var to_m: Vector2 = global_position - (e as Node2D).global_position
+						var d2m: float = to_m.length_squared()
+						if d2m <= r2_mir and d2m > 9.0:
+							(e as Node2D).global_position += to_m.normalized() * 75.0 * delta
+
+		# Ver foreur enfoui : jaillit du sol à l'approche du joueur
+		if _sandworm and dist < _sandworm_r:
+			if _sandworm_t <= 0.0:
+				_sandworm_t = 12.0
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, 110.0, _sandworm_tell, _sandworm_dmg, Color(1.0, 0.5, 0.15), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.9, 0.6, 0.2))
+			else:
+				_sandworm_t -= delta
+		elif _sandworm and _sandworm_t > 0.0:
+			_sandworm_t -= delta
+
+		# Fumerolle surchauffée : geyser périodique qui repousse et brûle
+		if _fumerolle and dist < 1300.0:
+			_fumerolle_t -= delta
+			if _fumerolle_t <= 0.0:
+				_fumerolle_t = _fumerolle_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, _fumerolle_r, 1.0, _fumerolle_dmg, Color(1.0, 0.55, 0.2), kind)
+				if dist < _fumerolle_r * 1.4 and dist > 1.0:
+					var push_dir: Vector2 = (_plr.global_position - global_position).normalized()
+					_plr.global_position += push_dir * 50.0
+
+		# Générateur de tempête : libère un tourbillon de sable périodique
+		if _storm_gen and dist < 1400.0:
+			_storm_t -= delta
+			if _storm_t <= 0.0:
+				_storm_t = _storm_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					var wander_off: Vector2 = Vector2(randf_range(-140.0, 140.0), randf_range(-140.0, 140.0))
+					game.spawn_ground_zone(global_position + wander_off, 120.0, 1.2, _storm_dmg, Color(0.85, 0.65, 0.3), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position + wander_off, 0.0, 2.0, Color(0.9, 0.7, 0.3))
+
+		# --- Bible des niveaux — Niveau 3 (La Ruine Verte / jungle) ---
+		# Plante-mortier : tire des cosses de graines en cloche (GroundZone sur le joueur)
+		if _plant_mortar and dist < 1300.0:
+			_mortar_t -= delta
+			if _mortar_t <= 0.0:
+				_mortar_t = _mortar_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
+					game.spawn_ground_zone(target_pos, _mortar_r, 1.6, _mortar_dmg, Color(0.4, 0.85, 0.2), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.5, Color(0.5, 0.8, 0.2))
+					Audio.sfx("shoot", 0.08)
+
+		# Liane-fouet : fouette un arc de 120° autour de sa base
+		if _whip_vine and dist < 1200.0:
+			_whip_t -= delta
+			if _whip_t <= 0.0:
+				_whip_t = _whip_cd
+				_whip_aim = fmod(_whip_aim + deg_to_rad(75.0), TAU)
+				if game != null and game.has_method("spawn_ground_zone"):
+					var whip_dir: Vector2 = Vector2.RIGHT.rotated(_whip_aim)
+					var whip_pos: Vector2 = global_position + whip_dir * (_whip_r * 0.6)
+					game.spawn_ground_zone(whip_pos, _whip_r * 0.6, 1.0, _whip_dmg, Color(0.3, 0.8, 0.25), kind)
+					if dist < _whip_r:
+						var away: Vector2 = (_plr.global_position - global_position).normalized()
+						_plr.global_position += away * 60.0
+
+		# Fleur-catapulte : marcher dessus propulse le joueur de 300 u
+		if _catapult:
+			if _catapult_cd_t > 0.0:
+				_catapult_cd_t -= delta
+			elif dist < 80.0:
+				_catapult_cd_t = _catapult_cd
+				var l_dir: Vector2 = _plr.velocity.normalized() if (_plr.velocity != null and _plr.velocity.length_squared() > 100.0) else (_plr.global_position - global_position).normalized()
+				if l_dir.length_squared() < 0.1:
+					l_dir = Vector2.RIGHT
+				_plr.global_position += l_dir * _catapult_dist
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 2.2, Color(0.85, 0.3, 0.65))
+				Audio.sfx("dash", 0.15)
+				Events.screen_shake.emit(3.0)
+
+		# Plante-lasso : se referme et immobilise 1.5 s
+		if _lasso:
+			if _lasso_cd_t > 0.0:
+				_lasso_cd_t -= delta
+			elif dist < _lasso_r:
+				_lasso_cd_t = _lasso_cd
+				_plr.field_slow = 0.05
+				_plr.take_damage(8.0, global_position)
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("impact", global_position, 0.0, 1.8, Color(0.4, 0.8, 0.2))
+				Audio.sfx("hit", 0.12)
+
+		# Nuée de lucioles : soigne le joueur (+3 PV/s) pendant 10 s
+		if _fireflies:
+			if _firefly_cd_t > 0.0:
+				_firefly_cd_t -= delta
+				if _firefly_cd_t <= 0.0:
+					_firefly_life = _firefly_dur
+			elif dist < _firefly_r:
+				_firefly_life -= delta
+				if _plr.has_method("heal"):
+					_plr.heal(_heal_dps * delta)
+				if game != null and game.has_method("spawn_vfx") and randf() < 0.1:
+					game.spawn_vfx("heal", _plr.global_position, 0.0, 0.8)
+				if _firefly_life <= 0.0:
+					_firefly_cd_t = 30.0
+					if game != null and game.has_method("impact_fx"):
+						game.impact_fx(global_position, Color(0.8, 0.9, 0.3), kind, Vector2.ZERO, 1.5)
+
+		# --- Bible des niveaux — Niveau 4 (La Forge / volcanic) ---
+		# Mortier à scories : lance un obus de lave en cloche laissant une flaque brûlante
+		if _slag_mortar and dist < 1300.0:
+			_smortar_t -= delta
+			if _smortar_t <= 0.0:
+				_smortar_t = _smortar_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-25.0, 25.0), randf_range(-25.0, 25.0))
+					game.spawn_ground_zone(target_pos, _smortar_r, 1.5, _smortar_dmg, Color(1.0, 0.4, 0.1), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(1.0, 0.4, 0.1))
+					Audio.sfx("shoot", 0.08)
+
+		# Évent de magma : éruption volcanique périodique
+		if _magma_vent and dist < 1200.0:
+			_vent_t -= delta
+			if _vent_t <= 0.0:
+				_vent_t = _vent_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, _vent_r, _vent_tell, _vent_dmg, Color(1.0, 0.35, 0.1), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.6, Color(1.0, 0.5, 0.1))
+
+		# Marteau-pilon géant : frappe écrasante et onde de choc
+		if _power_hammer and dist < 1300.0:
+			_hammer_t -= delta
+			if _hammer_t <= 0.0:
+				_hammer_t = _hammer_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, _hammer_r, _hammer_tell, _hammer_dmg, Color(1.0, 0.55, 0.1), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(1.0, 0.6, 0.2))
+					Events.screen_shake.emit(5.0)
+					if dist < _hammer_r * 1.5 and dist > 1.0:
+						var away: Vector2 = (_plr.global_position - global_position).normalized()
+						_plr.global_position += away * 65.0
+
+		# Creuset basculant : déverse du métal en fusion en ligne
+		if _crucible and dist < 1300.0:
+			_crucible_t -= delta
+			if _crucible_t <= 0.0:
+				_crucible_t = _crucible_cd
+				if game != null and "enemy_layer" in game:
+					var half: Vector2 = _crucible_dir * (_crucible_len * 0.5)
+					var z: GroundZone = GroundZone.new()
+					z.radius = 36.0; z.delay = _crucible_tell; z.damage = _crucible_dmg
+					z.color = Color(1.0, 0.45, 0.1)
+					z.shape = "line"; z.line_from = -half; z.line_to = half
+					z.stun_duration = 0.0; z.fx_kind = kind
+					z.game = game; z.player = _plr
+					game.enemy_layer.add_child(z)
+					z.global_position = global_position + half
+
+		# Bassin de trempe : éteint les brûlures et soigne 15 %
+		if _quench_pool:
+			if _quench_cd_t > 0.0:
+				_quench_cd_t -= delta
+			elif dist < _quench_r:
+				_quench_cd_t = _quench_cd
+				_cool_down_player(0.15)
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.4, 0.85, 1.0))
+				Audio.sfx("powerup", 0.08)
+
+		# Électroaimant de ferrailleur : aspire les pickups proches
+		if _scrap_magnet and dist < 220.0:
+			var r2_mag: float = _magnet_r * _magnet_r
+			for p in get_tree().get_nodes_in_group("pickups"):
+				if p is Node2D and is_instance_valid(p):
+					var to_p: Vector2 = global_position - (p as Node2D).global_position
+					if to_p.length_squared() <= r2_mag and to_p.length_squared() > 16.0:
+						(p as Node2D).global_position += to_p.normalized() * 320.0 * delta
+
+		# Soufflerie à braises : rafale brûlante périodique
+		if _ember_bellows and dist < 1200.0:
+			_bellows_t -= delta
+			if _bellows_t <= 0.0:
+				_bellows_t = _bellows_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					var b_pos: Vector2 = global_position + _bellows_dir * (_bellows_r * 0.6)
+					game.spawn_ground_zone(b_pos, _bellows_r * 0.5, _bellows_tell, _bellows_dmg, Color(1.0, 0.45, 0.15), kind)
+					if dist < _bellows_r:
+						_plr.global_position += _bellows_dir * 55.0
+
+		# --- Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) ---
+		# Batterie antiaérienne : salve de 4 obus à fusée éclatant en anneau d'éclats
+		if _flak_turret and dist < 1300.0:
+			_flak_t -= delta
+			if _flak_t <= 0.0:
+				_flak_t = _flak_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					for i in 4:
+						var ang: float = float(i) * (PI * 0.5) + randf_range(-0.2, 0.2)
+						var burst_target: Vector2 = _plr.global_position + Vector2.RIGHT.rotated(ang) * randf_range(40.0, 90.0)
+						game.spawn_ground_zone(burst_target, _flak_r * 0.7, 1.2, _flak_dmg, Color(1.0, 0.5, 0.15), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(1.0, 0.45, 0.2))
+					Audio.sfx("shoot", 0.08)
+
+		# Vanne de crue : vague torrentielle qui balaie 400 u et pousse
+		if _flood_gate and dist < 1300.0:
+			_gate_t -= delta
+			if _gate_t <= 0.0:
+				_gate_t = _gate_cd
+				if game != null and "enemy_layer" in game:
+					var half_len: Vector2 = _gate_dir * (_gate_len * 0.5)
+					var gz: GroundZone = GroundZone.new()
+					gz.radius = _gate_w * 0.5; gz.delay = _gate_tell; gz.damage = _gate_dmg
+					gz.color = Color(0.25, 0.65, 0.75)
+					gz.shape = "line"; gz.line_from = -half_len; gz.line_to = half_len
+					gz.stun_duration = 0.0; gz.fx_kind = kind
+					gz.game = game; gz.player = _plr
+					game.enemy_layer.add_child(gz)
+					gz.global_position = global_position + half_len
+					if dist < _gate_len and dist > 1.0:
+						_plr.global_position += _gate_dir * 80.0
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.2, Color(0.3, 0.7, 0.8))
+
+		# Vanne de barrage : RESTER 1,5 s dedans -> assèche la zone (annule slow) pendant 10 s
+		if _swamp_drain_valve:
+			if _swamp_drain_t > 0.0:
+				_swamp_drain_t -= delta
+			else:
+				if dist < _swamp_drain_r:
+					_swamp_drain_dwell += delta
+					if _swamp_drain_dwell >= 1.5:
+						_swamp_drain_dwell = 0.0
+						_swamp_drain_t = _swamp_drain_cd
+						if _plr != null and "field_slow" in _plr:
+							_plr.field_slow = 1.0
+						if game != null and game.has_method("spawn_vfx"):
+							game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(0.3, 0.8, 0.9))
+						Audio.sfx("powerup", 0.08)
+				else:
+					_swamp_drain_dwell = maxf(0.0, _swamp_drain_dwell - delta * 2.0)
+
+		# Bouée-mine dérivante : dérive lentement et explose au contact
+		if _floating_mine and dist < 1200.0:
+			global_position += Vector2(cos(Time.get_ticks_msec() * 0.001), sin(Time.get_ticks_msec() * 0.0008)) * 12.0 * delta
+			if not _mine_armed and dist < _mine_trigger_r:
+				_mine_armed = true
+				_mine_beep_t = 1.2
+			if _mine_armed:
+				_mine_beep_t -= delta
+				if _mine_beep_t <= 0.0:
+					_mine_armed = false
+					if game != null and game.has_method("spawn_ground_zone"):
+						game.spawn_ground_zone(global_position, _mine_boom_r, 0.3, _mine_dmg, Color(1.0, 0.3, 0.2), kind)
+					if game != null and game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(1.0, 0.4, 0.2))
+					take_damage(999.0)
+
+		# Phare de toit : projecteur balayant la zone
+		if _searchlight and dist < 1200.0:
+			_searchlight_t -= delta
+			if _searchlight_t <= 0.0:
+				_searchlight_t = _searchlight_cd
+				var sweep_ang: float = randf_range(0.0, TAU)
+				var spot_pos: Vector2 = global_position + Vector2.RIGHT.rotated(sweep_ang) * (_searchlight_r * 0.6)
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", spot_pos, 0.0, 1.8, Color(0.9, 0.7, 0.2))
+				if _plr != null and _plr.global_position.distance_to(spot_pos) < _searchlight_r * 0.5:
+					for e in get_tree().get_nodes_in_group("enemies"):
+						if e is Node2D and (e as Node2D).global_position.distance_to(global_position) < 500.0:
+							if "speed_mult" in e:
+								e.speed_mult = 1.4
+
+		# Brouilleur radio : ralentit de 50 % les projectiles ennemis dans 300 u
+		if _radio_jammer and dist < 1200.0:
+			var r2_j: float = _jammer_r * _jammer_r
+			for b in get_tree().get_nodes_in_group("enemy_bullets"):
+				if b is Node2D and is_instance_valid(b):
+					if global_position.distance_squared_to((b as Node2D).global_position) <= r2_j:
+						if "speed_mult" in b:
+							b.speed_mult = 0.5
+
+		# --- Bible des niveaux — Niveau 6 (Le Cryo-Laboratoire / cryo) ---
+		# Canon à azote : tire des orbes de givre lents explosant en nova glacée
+		if _nitrogen_cannon and dist < 1300.0:
+			_ncannon_t -= delta
+			if _ncannon_t <= 0.0:
+				_ncannon_t = _ncannon_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					var target_pos: Vector2 = _plr.global_position + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
+					game.spawn_ground_zone(target_pos, _ncannon_r, 1.4, _ncannon_dmg, Color(0.6, 0.85, 1.0), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.6, 0.9, 1.0))
+					Audio.sfx("shoot", 0.08)
+
+		# Condenseur à givre : anneaux de givre périodiques qui s'étendent et ralentissent
+		if _frost_condenser and dist < 1200.0:
+			_condenser_t -= delta
+			if _condenser_t <= 0.0:
+				_condenser_t = _condenser_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					for ring in 3:
+						var r_dist: float = (float(ring) + 1.0) * (_condenser_r / 3.0)
+						game.spawn_ground_zone(global_position, r_dist, 0.8 + float(ring) * 0.4, 12.0, Color(0.7, 0.9, 1.0), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.4, Color(0.7, 0.95, 1.0))
+
+		# Téléporteur de laboratoire : téléporte le mecha
+		if _teleporter:
+			if _teleport_t > 0.0:
+				_teleport_t -= delta
+			elif dist < _teleport_r:
+				_teleport_t = _teleport_cd
+				var pads: Array = get_tree().get_nodes_in_group("teleporters")
+				var target_pad: Node2D = null
+				for p in pads:
+					if p != self and is_instance_valid(p):
+						target_pad = p as Node2D
+						break
+				var dest: Vector2 = target_pad.global_position if target_pad != null else global_position + Vector2.RIGHT.rotated(randf_range(0, TAU)) * 350.0
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.4, 0.9, 1.0))
+					game.spawn_vfx("shockwave", dest, 0.0, 2.0, Color(0.4, 0.9, 1.0))
+				_plr.global_position = dest
+				Audio.sfx("powerup", 0.08)
+
+		# Mur de glace régénérant : réapparaît 10 s après destruction
+		if _regen_ice_wall and hp <= 0.0 and _regen_t > 0.0:
+			_regen_t -= delta
+			if _regen_t <= 0.0:
+				hp = _hp_start
+				if _sprite != null:
+					_sprite.visible = true
+				if _cycle_col != null:
+					_cycle_col.set_deferred("disabled", false)
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 1.5, Color(0.6, 0.9, 1.0))
+
+		# --- Bible des niveaux — Niveau 7 (Le Noyau Instable / reacteur) ---
+		# Canon à particules instable : charge et divise son tir en 3
+		if _particle_cannon and dist < 1400.0:
+			_pcannon_t -= delta
+			if _pcannon_t <= 0.0:
+				_pcannon_t = _pcannon_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					for frag in 3:
+						var ang: float = float(frag - 1) * 0.4
+						var target_dir: Vector2 = (_plr.global_position - global_position).normalized().rotated(ang)
+						var target_pos: Vector2 = global_position + target_dir * minf(dist, _pcannon_r)
+						game.spawn_ground_zone(target_pos, 70.0, 1.2, _pcannon_dmg, Color(0.4, 1.0, 0.5), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.4, 1.0, 0.5))
+					Audio.sfx("shoot", 0.08)
+
+		# Bobine de Tesla : arc électrique reliant à distance
+		if _tesla_coil and dist < 1200.0:
+			_tesla_t -= delta
+			if _tesla_t <= 0.0:
+				_tesla_t = _tesla_cd
+				if game != null and "enemy_layer" in game:
+					var gz: GroundZone = GroundZone.new()
+					gz.radius = 45.0; gz.delay = 1.0; gz.damage = 25.0
+					gz.color = Color(0.4, 1.0, 0.5)
+					gz.shape = "line"; gz.line_from = Vector2.ZERO; gz.line_to = Vector2.RIGHT.rotated(randf_range(0, TAU)) * _tesla_r
+					gz.game = game; gz.player = _plr
+					game.enemy_layer.add_child(gz)
+					gz.global_position = global_position
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.6, Color(0.5, 1.0, 0.6))
+
+		# Barre de contrôle : réduit les dégâts de zone d'énergie si le joueur reste à portée
+		if _control_rod:
+			if dist < _control_rod_r:
+				_control_rod_t += delta
+				if _control_rod_t >= 1.5:
+					_control_rod_active_t = 8.0
+					_control_rod_t = 0.0
+					if game != null and game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(1.0, 0.85, 0.2))
+					Audio.sfx("powerup", 0.08)
+			else:
+				_control_rod_t = maxf(0.0, _control_rod_t - delta * 0.5)
+			if _control_rod_active_t > 0.0:
+				_control_rod_active_t -= delta
+
+		# Cellule de confinement : dôme bloquant les projectiles ennemis pendant 6 s
+		if _containment_cell:
+			if _containment_active_t > 0.0:
+				_containment_active_t -= delta
+				var r2_dome: float = _containment_r * _containment_r
+				for b in get_tree().get_nodes_in_group("enemy_bullets"):
+					if b is Node2D and is_instance_valid(b):
+						if global_position.distance_squared_to((b as Node2D).global_position) <= r2_dome:
+							b.call_deferred("queue_free")
+			elif _containment_cd_t > 0.0:
+				_containment_cd_t -= delta
+			elif dist < _containment_r * 0.6:
+				_containment_active_t = 6.0
+				_containment_cd_t = _containment_cd
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 2.2, Color(0.4, 1.0, 0.5))
+				Audio.sfx("powerup", 0.08)
+
+		# --- Bible des niveaux — Niveau 8 (La Ruche / ruche) ---
+		# Organe cracheur d'acide : crache 3 globules laissant des flaques
+		if _acid_turret and dist < 1300.0:
+			_acid_t -= delta
+			if _acid_t <= 0.0:
+				_acid_t = _acid_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					for i in 3:
+						var offset: Vector2 = Vector2.RIGHT.rotated(randf_range(0, TAU)) * randf_range(40.0, _acid_r)
+						game.spawn_ground_zone(global_position + offset, 60.0, 1.0 + float(i) * 0.3, 16.0, Color(0.8, 0.9, 0.3), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.8, 0.9, 0.3))
+					Audio.sfx("shoot", 0.08)
+
+		# Pondoir : génère des petites larves
+		if _spawner_egg and dist < 1200.0:
+			_egg_spawn_t -= delta
+			if _egg_spawn_t <= 0.0:
+				_egg_spawn_t = _egg_spawn_cd
+				if game != null and game.has_method("awaken_enemy"):
+					game.awaken_enemy(global_position + Vector2(randf_range(-30, 30), randf_range(-30, 30)), "rush")
+				if game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 1.5, Color(0.7, 0.3, 0.8))
+
+		# Veine pulsatile : pulse et repousse tout le long de son axe
+		if _vein_pulse and dist < 1200.0:
+			_vein_t -= delta
+			if _vein_t <= 0.0:
+				_vein_t = _vein_cd
+				var r2_v: float = _vein_r * _vein_r
+				if _plr != null and global_position.distance_squared_to(_plr.global_position) <= r2_v:
+					var p_dir: Vector2 = (_plr.global_position - global_position).normalized()
+					_plr.global_position += p_dir * (_vein_force * 0.4)
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D and is_instance_valid(e):
+						if global_position.distance_squared_to((e as Node2D).global_position) <= r2_v:
+							var e_dir: Vector2 = ((e as Node2D).global_position - global_position).normalized()
+							(e as Node2D).global_position += e_dir * (_vein_force * 0.6)
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.6, 0.2, 0.7))
+
+		# --- Bible des niveaux — Niveau 9 (La Citadelle Orbitale / citadelle) ---
+		# Lanceur orbital : missiles guidés à tête chercheuse
+		if _guided_launcher and dist < 1400.0:
+			_glauncher_t -= delta
+			if _glauncher_t <= 0.0:
+				_glauncher_t = _glauncher_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(_plr.global_position, 85.0, 1.6, _glauncher_dmg, Color(1.0, 0.5, 0.1), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(1.0, 0.6, 0.2))
+					Audio.sfx("shoot", 0.08)
+
+		# Relais satellite : pulsations orbitales périodiques
+		if _satellite_relay and dist < 1300.0:
+			_srelay_t -= delta
+			if _srelay_t <= 0.0:
+				_srelay_t = _srelay_cd
+				if game != null and game.has_method("spawn_ground_zone"):
+					game.spawn_ground_zone(global_position, _srelay_r, 1.2, 20.0, Color(0.3, 0.8, 1.0), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(0.4, 0.9, 1.0))
+
+		# Sas pressurisé : bloque / débloque périodiquement
+		if _airlock:
+			_airlock_t -= delta
+			if _airlock_t <= 0.0:
+				_airlock_t = _airlock_cd
+				_airlock_open = not _airlock_open
+				if _cycle_col != null:
+					_cycle_col.set_deferred("disabled", _airlock_open)
+				if _sprite != null:
+					_sprite.modulate.a = 0.4 if _airlock_open else 1.0
+
+		# Dôme-bouclier orbital : dôme déviant les tirs ennemis
+		if _dome_shield:
+			if _dome_active_t > 0.0:
+				_dome_active_t -= delta
+				var r2_d: float = _dome_r * _dome_r
+				for b in get_tree().get_nodes_in_group("enemy_bullets"):
+					if b is Node2D and is_instance_valid(b):
+						if global_position.distance_squared_to((b as Node2D).global_position) <= r2_d:
+							b.call_deferred("queue_free")
+			elif _dome_cd_t > 0.0:
+				_dome_cd_t -= delta
+			elif dist < _dome_r * 0.7:
+				_dome_active_t = 8.0
+				_dome_cd_t = _dome_cd
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 2.2, Color(0.4, 0.9, 1.0))
+				Audio.sfx("powerup", 0.08)
+
+		# Grappin magnétique : attire périodiquement les ennemis
+		if _magnetic_hook and dist < 1200.0:
+			_hook_t -= delta
+			if _hook_t <= 0.0:
+				_hook_t = _hook_cd
+				var r2_h: float = _hook_r * _hook_r
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if e is Node2D and is_instance_valid(e):
+						if global_position.distance_squared_to((e as Node2D).global_position) <= r2_h:
+							var pull_dir: Vector2 = (global_position - (e as Node2D).global_position).normalized()
+							(e as Node2D).global_position += pull_dir * _hook_force
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.3, 0.8, 1.0))
 
 		# --- SURCHAUFFE DU SOL (Fonderie) : re-spawn une GroundZone un peu plus grande toutes les
 		# ~2s jusqu'a un rayon max - simule une croissance SANS vraie persistance (GroundZone ne
@@ -1816,6 +3420,17 @@ class Prop extends StaticBody2D:
 			if _fog_sprite != null:
 				_fog_sprite.modulate.a = 0.42 * _fog_alpha_mult
 			_fog_alpha_mult = minf(1.0, _fog_alpha_mult + delta * 0.3)   # recupere lentement hors radiateur
+			# 14/10 (patron : decors « sans effet ») : le brouillard n'etait qu'un voile visuel et le
+			# radiateur ne dissipait donc... rien d'utile. Effet reel : le froid ralentit tout ce qui
+			# traverse un brouillard EPAIS (>50 %), joueur et horde ; le radiateur l'annule.
+			if _fog_alpha_mult > 0.5:
+				if dist < _fog_r and "field_slow" in _plr:
+					_plr.field_slow = minf(float(_plr.field_slow), 0.72)
+				if dist < 1300.0:
+					var r2f: float = _fog_r * _fog_r
+					for e in get_tree().get_nodes_in_group("enemies"):
+						if e is Node2D and "field_slow" in e and global_position.distance_squared_to((e as Node2D).global_position) <= r2f:
+							e.field_slow = minf(float(e.field_slow), 0.72)
 
 		# --- RADIATEUR (Serres Gelees) : a portee, dissipe localement le brouillard le plus
 		# proche - meme idiome que console_convoyeur qui parcourt un groupe de props voisins.
@@ -1844,8 +3459,11 @@ class Prop extends StaticBody2D:
 		# --- BORNE THERMIQUE / GLACE FRAGILE : juste la decrementation du cooldown pour la borne
 		# (le declenchement vient du signal DwellZone.filled, _on_thermal_filled plus bas) ; pour
 		# la glace fragile, un simple timer qui bascule la collision partagee en permanent.
-		if _thermal and _thermal_cd_t > 0.0:
-			_thermal_cd_t -= delta
+		if _thermal:
+			if _thermal_cd_t > 0.0:
+				_thermal_cd_t -= delta
+			if _thermal_zone != null:
+				_thermal_zone.active = _thermal_cd_t <= 0.0   # anneau eteint pendant la recharge
 		if _fragile_ice and not _fragile_broken:
 			_fragile_ice_t -= delta
 			if _fragile_ice_t <= 0.0:
@@ -1870,8 +3488,11 @@ class Prop extends StaticBody2D:
 
 		# --- VANNE DE DRAINAGE : juste la decrementation du cooldown, le declenchement vient du
 		# signal DwellZone.filled (_on_drain_filled plus bas).
-		if _drain and _drain_cd_t > 0.0:
-			_drain_cd_t -= delta
+		if _drain:
+			if _drain_cd_t > 0.0:
+				_drain_cd_t -= delta
+			if _drain_zone != null:
+				_drain_zone.active = _drain_cd_t <= 0.0   # anneau eteint pendant la recharge
 
 		# --- POCHE DE VENT (Salle des Turbines, simplifiee en zone locale) : pousse le joueur ET
 		# les ennemis en continu, meme idiome que convoyeur_sol (Secteur Tech).
@@ -1886,8 +3507,11 @@ class Prop extends StaticBody2D:
 
 		# --- CONSOLE DE VENT : juste la decrementation du cooldown, le declenchement vient du
 		# signal DwellZone.filled (_on_wind_console_filled plus bas).
-		if _wind_console and _wind_console_cd_t > 0.0:
-			_wind_console_cd_t -= delta
+		if _wind_console:
+			if _wind_console_cd_t > 0.0:
+				_wind_console_cd_t -= delta
+			if _wind_console_zone != null:
+				_wind_console_zone.active = _wind_console_cd_t <= 0.0   # anneau eteint pendant la recharge
 
 		# --- GRILLE DE VENTILATION (Salle des Turbines) : cercle classique a intervalle, meme
 		# idiome que bras_presseur/pic_de_glace - stun (projection approchee) au lieu de ligne.
@@ -1986,8 +3610,11 @@ class Prop extends StaticBody2D:
 
 		# --- PLANTE LUMINEUSE : juste la decrementation du cooldown, le declenchement vient du
 		# signal DwellZone.filled (_on_light_plant_filled plus bas).
-		if _light_plant and _light_plant_cd_t > 0.0:
-			_light_plant_cd_t -= delta
+		if _light_plant:
+			if _light_plant_cd_t > 0.0:
+				_light_plant_cd_t -= delta
+			if _light_plant_zone != null:
+				_light_plant_zone.active = _light_plant_cd_t <= 0.0   # anneau eteint pendant la recharge
 
 		# --- ZONE DE DEPRESSURISATION (Pont Orbital) : aspire le joueur vers le centre a
 		# intervalle, meme idiome que _push (impulsion) mais direction inversee (vers soi).
@@ -2107,6 +3734,15 @@ class Prop extends StaticBody2D:
 		if game != null and game.has_method("impact_fx"):
 			game.impact_fx(global_position, Palette.CYAN, kind, Vector2.ZERO, 2.5)
 
+	## Soin reel des vannes/bornes : un pourcentage des PV max, avec l'effet vert habituel des soins.
+	func _cool_down_player(frac: float) -> void:
+		if _plr == null or not is_instance_valid(_plr):
+			return
+		if _plr.has_method("heal") and "max_hp" in _plr:
+			_plr.heal(float(_plr.max_hp) * frac)
+		if game != null and game.has_method("spawn_vfx"):
+			game.spawn_vfx("heal", _plr.global_position, 0.0, 1.3)
+
 	## VANNE DE REFROIDISSEMENT (Fonderie) : la jauge (DwellZone dediee, voir _ready) vient de se
 	## remplir -> ouvre une zone sure temporaire (GroundZone a 0 degat, repere visuel + petit
 	## repit). Pas de contre-effet ailleurs (hors scope, voir le plan).
@@ -2114,8 +3750,15 @@ class Prop extends StaticBody2D:
 		if _valve_cd_t > 0.0:
 			return
 		_valve_cd_t = _valve_cd
-		if game != null and game.has_method("spawn_ground_zone"):
-			game.spawn_ground_zone(global_position, _valve_r, 0.3, 0.0, Color(0.5, 0.9, 1.0), kind)
+		# 14/10 (patron : « certains decors n'ont aucun effet ») : la « zone sure » n'etait qu'une
+		# GroundZone a 0 degat = un cercle d'avertissement qui ne fait RIEN. Effet reel : soigne 20 %
+		# des PV et eteint les sols en surchauffe voisins (reset + gel 12 s de leur croissance).
+		_cool_down_player(0.20)
+		var r2v: float = _valve_r * _valve_r * 4.0
+		for q in get_tree().get_nodes_in_group("cover"):
+			if q is Prop and (q as Prop)._overheat and global_position.distance_squared_to((q as Node2D).global_position) <= r2v:
+				(q as Prop)._overheat_r = 60.0
+				(q as Prop)._overheat_t = 12.0
 		if game != null and game.has_method("impact_fx"):
 			game.impact_fx(global_position, Color(0.5, 0.9, 1.0), kind, Vector2.ZERO, _valve_r / 95.0)
 
@@ -2125,8 +3768,7 @@ class Prop extends StaticBody2D:
 		if _thermal_cd_t > 0.0:
 			return
 		_thermal_cd_t = _thermal_cd
-		if game != null and game.has_method("spawn_ground_zone"):
-			game.spawn_ground_zone(global_position, _thermal_r, 0.3, 0.0, Color(1.0, 0.7, 0.3), kind)
+		_cool_down_player(0.20)   # 14/10 : la « zone sure » a 0 degat ne faisait rien -> soin reel
 		if game != null and game.has_method("impact_fx"):
 			game.impact_fx(global_position, Color(1.0, 0.7, 0.3), kind, Vector2.ZERO, _thermal_r / 95.0)
 
@@ -2187,6 +3829,28 @@ class Prop extends StaticBody2D:
 					p._spore_suppressed_t = 8.0
 		if game != null and game.has_method("impact_fx"):
 			game.impact_fx(global_position, Color(0.55, 1.0, 0.4), kind, Vector2.ZERO, 2.0)
+
+	## COLLECTEUR SOLAIRE (Terres Calcinées / desert) : +25 % de jauge de surcharge
+	func _on_solar_collector_filled() -> void:
+		if _collector_cd_t > 0.0:
+			return
+		_collector_cd_t = _collector_cd
+		GameState.add_overdrive(0.25)
+		if game != null and game.has_method("spawn_vfx"):
+			game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(1.0, 0.85, 0.2))
+			if _plr != null and is_instance_valid(_plr):
+				game.spawn_vfx("energy", _plr.global_position, 0.0, 1.5, Color(1.0, 0.85, 0.2))
+		Audio.sfx("powerup", 0.1)
+
+	## PROJECTEUR DE MIRAGE (Terres Calcinées / desert) : leurre holographique 6 s
+	func _on_mirage_filled() -> void:
+		if _mirage_cd_t > 0.0 or _mirage_active_t > 0.0:
+			return
+		_mirage_cd_t = _mirage_cd
+		_mirage_active_t = _mirage_dur
+		if game != null and game.has_method("spawn_vfx"):
+			game.spawn_vfx("shockwave", global_position, 0.0, 2.8, Palette.CYAN)
+		Audio.sfx("teleport", 0.08)
 
 	func _zap_nearest() -> void:
 		var best: Node2D = null
@@ -2366,31 +4030,40 @@ class Prop extends StaticBody2D:
 				Events.screen_shake.emit(7.0)
 
 	## Tourelle canon a rayon : tire automatiquement un rayon energetique a intervalle regulier
-	## dans la direction de son canon fixe. Phase de charge (telegraph lumineux croissant)
-	## suivie d'un tir de rayon fulgurant penetrant. Si pirate, le rayon devient cyan et foudroie
+	## dans la direction de son canon fixe (ou balayage angulaire si soudeuse). Phase de charge (telegraph lumineux croissant)
+	## suivie d'un tir de rayon fulgurant penetrant. Si pirate ou soudeuse, le rayon devient cyan et foudroie
 	## les ennemis au lieu du joueur.
 	func _tick_cannon_beam(delta: float) -> void:
 		_cannon_beam_t -= delta
+		var cur_cannon: Vector2 = _cannon
+		var fire_time: float = float(def.get("fire_dur", 3.0)) if _welder else CANNON_FIRE
+		var idle_time: float = float(def.get("idle_dur", 2.0)) if _welder else CANNON_IDLE
+		var tell_time: float = _solar_charge if _solar_mirror else CANNON_TELL
+		if _welder:
+			var dur: float = fire_time if _cannon_beam_state == 2 else CANNON_TELL
+			var progress: float = 1.0 - clampf(_cannon_beam_t / maxf(dur, 0.001), 0.0, 1.0)
+			var cur_angle: float = lerpf(-_sweep_half, _sweep_half, progress)
+			cur_cannon = _cannon.rotated(cur_angle)
 		var a: Vector2 = global_position + _muzzle
-		var b: Vector2 = a + _cannon * CANNON_LEN
+		var b: Vector2 = a + cur_cannon * CANNON_LEN
 		var pts: PackedVector2Array = PackedVector2Array([a, b])
-		var base_col: Color = Color(0.2, 0.85, 1.0) if _hacked else Color(1.0, 0.35, 0.1)
+		var base_col: Color = Color(1.0, 0.9, 0.4) if _solar_mirror else (Color(0.2, 0.85, 1.0) if (_hacked or _welder) else Color(1.0, 0.35, 0.1))
 
 		match _cannon_beam_state:
 			0:
 				if _cannon_beam_t <= 0.0:
 					_cannon_beam_state = 1
-					_cannon_beam_t = CANNON_TELL
+					_cannon_beam_t = tell_time
 					for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
 						if ln != null and is_instance_valid(ln):
 							ln.points = pts
 							ln.visible = true
 					Audio.sfx("w_railgun", 0.05)
 					if game != null and game.has_method("spawn_vfx"):
-						game.spawn_vfx("muzzle", a, _cannon.angle() + PI * 0.5, 0.25, base_col)
+						game.spawn_vfx("muzzle", a, cur_cannon.angle() + PI * 0.5, 0.25, base_col)
 			1:
 				# Telegraph : ligne laser fine de ciblage qui s'intensifie
-				var k: float = 1.0 - clampf(_cannon_beam_t / CANNON_TELL, 0.0, 1.0)
+				var k: float = 1.0 - clampf(_cannon_beam_t / maxf(tell_time, 0.001), 0.0, 1.0)
 				var puls: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.035)
 				for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
 					if ln != null and is_instance_valid(ln):
@@ -2406,16 +4079,16 @@ class Prop extends StaticBody2D:
 					_cannon_beam_glow.default_color = Color(base_col.r, base_col.g, base_col.b, (0.10 + k * 0.22) * (0.6 + 0.4 * puls))
 				if _cannon_beam_t <= 0.0:
 					_cannon_beam_state = 2
-					_cannon_beam_t = CANNON_FIRE
+					_cannon_beam_t = fire_time
 					_cannon_hit_set.clear()
 					if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
 						_cannon_beam_flash.position = a
 						_cannon_beam_flash.visible = true
-					_fire_cannon_beam(a, b, base_col)
+					_fire_cannon_beam(a, b, base_col, cur_cannon)
 					Audio.sfx("w_plasma", 0.06)
 			2:
 				# Decharge de rayon laser : faisceau epais incandescent avec micro-flicker
-				var f: float = clampf(_cannon_beam_t / CANNON_FIRE, 0.0, 1.0)
+				var f: float = clampf(_cannon_beam_t / maxf(fire_time, 0.001), 0.0, 1.0)
 				var flick: float = 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.1)
 				for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
 					if ln != null and is_instance_valid(ln):
@@ -2433,24 +4106,34 @@ class Prop extends StaticBody2D:
 					_cannon_beam_flash.position = a
 					_cannon_beam_flash.scale = Vector2.ONE * (CANNON_HALF_W * 4.5 / 128.0) * (0.8 + 0.4 * flick)
 					_cannon_beam_flash.modulate = Color(base_col.r, base_col.g, base_col.b, f)
-				_check_cannon_beam_hits(a, b)
+				_check_cannon_beam_hits(a, b, cur_cannon)
 				if _cannon_beam_t <= 0.0:
 					_cannon_beam_state = 0
-					_cannon_beam_t = CANNON_IDLE
+					_cannon_beam_t = idle_time
 					for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
 						if ln != null and is_instance_valid(ln):
 							ln.visible = false
 					if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
 						_cannon_beam_flash.visible = false
 
-	func _fire_cannon_beam(a: Vector2, b: Vector2, base_col: Color) -> void:
+	func _fire_cannon_beam(a: Vector2, b: Vector2, base_col: Color, shot_dir: Vector2 = _cannon) -> void:
 		Audio.sfx("explosion", 0.08)
 		if game != null and game.has_method("spawn_vfx"):
-			game.spawn_vfx("muzzle", a, _cannon.angle() + PI * 0.5, 0.55, base_col)
+			game.spawn_vfx("muzzle", a, shot_dir.angle() + PI * 0.5, 0.55, base_col)
 			game.spawn_vfx("energy", a, 0.0, 1.0, base_col)
-		_check_cannon_beam_hits(a, b)
+		if _solar_mirror and game != null and "enemy_layer" in game:
+			var mid: Vector2 = (a + b) * 0.5
+			var z: GroundZone = GroundZone.new()
+			z.radius = 28.0; z.delay = 0.05; z.damage = _solar_dmg * 0.8
+			z.color = Color(1.0, 0.8, 0.25)
+			z.shape = "line"; z.line_from = a - mid; z.line_to = b - mid
+			z.stun_duration = 0.0; z.fx_kind = kind
+			z.game = game; z.player = _plr
+			game.enemy_layer.add_child(z)
+			z.global_position = mid
+		_check_cannon_beam_hits(a, b, shot_dir)
 
-	func _check_cannon_beam_hits(a: Vector2, b: Vector2) -> void:
+	func _check_cannon_beam_hits(a: Vector2, b: Vector2, shot_dir: Vector2 = _cannon) -> void:
 		# Toucher des ennemis : les tourelles (meme hostiles) transpercent et blessent les ennemis dans la ligne !
 		for e in get_tree().get_nodes_in_group("enemies"):
 			if e is Node2D and is_instance_valid(e) and e.has_method("take_damage"):
@@ -2459,11 +4142,11 @@ class Prop extends StaticBody2D:
 				var p: Vector2 = (e as Node2D).global_position
 				if Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p) <= CANNON_HALF_W + 32.0:
 					_cannon_hit_set[e] = true
-					var edmg: float = _shoot_dmg * 6.0 if _hacked else _shoot_dmg * 3.5
+					var edmg: float = _solar_dmg * 2.5 if _solar_mirror else (_welder_dmg * 2.0 if _welder else (_shoot_dmg * 6.0 if _hacked else _shoot_dmg * 3.5))
 					e.take_damage(edmg)
 					if game != null and game.has_method("impact_fx"):
-						var col: Color = Color(0.3, 0.9, 1.0) if _hacked else Color(1.0, 0.45, 0.15)
-						game.impact_fx(p, col, "laser", _cannon, 1.6)
+						var col: Color = Color(1.0, 0.85, 0.3) if _solar_mirror else (Color(0.3, 0.9, 1.0) if (_hacked or _welder) else Color(1.0, 0.45, 0.15))
+						game.impact_fx(p, col, "laser", shot_dir, 1.6)
 
 		# Toucher du joueur : seulement si non pirate
 		if not _hacked and _plr != null and is_instance_valid(_plr) and _plr.has_method("take_damage"):
@@ -2471,10 +4154,12 @@ class Prop extends StaticBody2D:
 				var pp: Vector2 = _plr.global_position
 				if Geometry2D.get_closest_point_to_segment(pp, a, b).distance_to(pp) <= CANNON_HALF_W + 24.0:
 					_cannon_hit_set[_plr] = true
-					_plr.take_damage(_shoot_dmg * 1.5, global_position)
+					var pdmg: float = _solar_dmg if _solar_mirror else (_welder_dmg * 0.7 if _welder else _shoot_dmg * 1.5)
+					_plr.take_damage(pdmg, global_position)
 					Events.screen_shake.emit(6.0)
 					if game != null and game.has_method("impact_fx"):
-						game.impact_fx(pp, Color(1.0, 0.4, 0.1), "laser", _cannon, 1.8)
+						var col: Color = Color(1.0, 0.85, 0.3) if _solar_mirror else (Color(0.3, 0.9, 1.0) if _welder else Color(1.0, 0.4, 0.1))
+						game.impact_fx(pp, col, "laser", shot_dir, 1.8)
 
 	## Fuel barrel detonation: hurts EVERYTHING in BOOM_R, the player included — the 4s fuse is
 	## the fair warning. Leading the horde over a barrel is the reward.
@@ -2568,6 +4253,13 @@ class Prop extends StaticBody2D:
 			_clear_beam()
 			if _boom:
 				_explode()      # shooting a fuel barrel sets it off — no fuse, you chose this
+				return
+			if _regen_ice_wall:
+				_regen_t = _regen_time
+				if _sprite != null:
+					_sprite.visible = false
+				if _cycle_col != null:
+					_cycle_col.set_deferred("disabled", true)
 				return
 			GameState.props_destroyed += 1   # daily-quest tracking (flushed at run end)
 			if game != null and game.has_method("hint_prop_destroyed"):

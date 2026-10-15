@@ -454,7 +454,7 @@ func _process(delta: float) -> void:
 		# Depth z-index sorting: when facing back (away from camera), weapon sits behind torso
 		var back_facing: bool = false
 		if "mecha" in _player and _player.mecha != null and _player.mecha.has_method("facing"):
-			back_facing = (_player.mecha.facing() == "back")
+			back_facing = String(_player.mecha.facing()).begins_with("back")
 		sp.z_index = -1 if back_facing else (6 if is_primary else 5)
 
 		var shadow: Sprite2D = w.get("shadow", null) as Sprite2D

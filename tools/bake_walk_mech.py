@@ -132,6 +132,8 @@ def main():
 
     tmp_png = os.path.join(OUT_DIR, "_tmp_walkmech.png")
     DIRS = [("front", 0), ("back", 180), ("left", 90), ("right", -90)]
+    if "--diag" in sys.argv:   # 14/10 : 4 diagonales (voir build_*_anims.py)
+        DIRS = [("front_right", -45), ("front_left", 45), ("back_right", -135), ("back_left", 135)]
 
     print("=== BAKING WALK (Meshy Carry_Heavy_Cannon_Forward) FOR %s ===" % CHASSIS.upper())
     for dir_name, az in DIRS:

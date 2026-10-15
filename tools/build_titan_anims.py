@@ -475,12 +475,22 @@ def main():
 
     tmp_png = os.path.join(PREVIEW_DIR, "_tmp_titan.png")
     DIRS = [("front", 0), ("back", 180), ("left", 90), ("right", -90)]
+    # 14/10 (patron : « 4 diagonales pour que le mecha semble faire un tour complet ») : --diag bake les
+    # 4 diagonales (memes parametres de prise de vue que les 4 cardinales -> meme echelle/cadrage) ;
+    # --anims idle,walk,run,attack limite les animations. Sans option : comportement d'origine.
+    if "--diag" in sys.argv:
+        DIRS = [("front_right", -45), ("front_left", 45), ("back_right", -135), ("back_left", 135)]
+    _ONLY = sys.argv[sys.argv.index("--anims") + 1].split(",") if "--anims" in sys.argv else None
 
     print("=== BAKING 28 SPRITESHEETS FOR TITAN (meshy_in/titan/rigged.glb) ===")
 
     summary_results = []
 
     for anim_name, poser_fn in POSERS.items():
+
+        if _ONLY is not None and anim_name not in _ONLY:
+
+            continue
         print(f"--> Processing animation '{anim_name}' ({FRAMES} frames)")
 
         preview_frames = []

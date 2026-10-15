@@ -14,6 +14,8 @@ var _shaft_base0: float = 0.0
 var _shaft_base1: float = 0.0
 var _shaft_base2: float = 0.0
 
+var current_biome: String = "tech"
+
 func setup(target: Node2D) -> void:
 	_target = target
 
@@ -22,6 +24,76 @@ func _ready() -> void:
 	_build_dust()
 	_build_embers()
 	_build_light_shafts()
+	apply_biome(current_biome)
+
+func apply_biome(biome_name: String) -> void:
+	current_biome = biome_name
+	if _dust == null or _embers == null or _shaft0 == null:
+		return
+	match biome_name:
+		"tech":
+			_dust.color = Color(0.2, 0.85, 1.0, 0.18)
+			_dust.gravity = Vector2(0, -6)
+			_embers.color = Color(1.0, 0.55, 0.2, 0.35)
+			_embers.amount = 26
+			_set_shaft_color(Color(0.2, 0.85, 1.0))
+		"desert":
+			_dust.color = Color(1.0, 0.82, 0.45, 0.30)
+			_dust.gravity = Vector2(-28, 6)
+			_embers.color = Color(1.0, 0.9, 0.6, 0.20)
+			_embers.amount = 16
+			_set_shaft_color(Color(1.0, 0.75, 0.3))
+		"jungle":
+			_dust.color = Color(0.4, 1.0, 0.5, 0.22)
+			_dust.gravity = Vector2(0, 8)
+			_embers.color = Color(1.0, 0.95, 0.3, 0.40)
+			_embers.amount = 32
+			_set_shaft_color(Color(0.3, 0.9, 0.4))
+		"volcanic":
+			_dust.color = Color(0.9, 0.3, 0.1, 0.28)
+			_dust.gravity = Vector2(0, -32)
+			_embers.color = Color(1.0, 0.45, 0.1, 0.65)
+			_embers.amount = 48
+			_set_shaft_color(Color(1.0, 0.35, 0.1))
+		"swamp":
+			_dust.color = Color(0.4, 0.75, 0.6, 0.26)
+			_dust.gravity = Vector2(6, 14)
+			_embers.color = Color(0.2, 0.9, 0.8, 0.20)
+			_embers.amount = 14
+			_set_shaft_color(Color(0.3, 0.65, 0.6))
+		"cryo", "ice":
+			_dust.color = Color(0.75, 0.95, 1.0, 0.36)
+			_dust.gravity = Vector2(-35, 4)
+			_embers.color = Color(0.85, 0.98, 1.0, 0.32)
+			_embers.amount = 26
+			_set_shaft_color(Color(0.4, 0.85, 1.0))
+		"reacteur":
+			_dust.color = Color(0.3, 1.0, 0.35, 0.30)
+			_dust.gravity = Vector2(0, -10)
+			_embers.color = Color(0.2, 1.0, 0.6, 0.50)
+			_embers.amount = 32
+			_set_shaft_color(Color(0.2, 1.0, 0.4))
+		"ruche":
+			_dust.color = Color(0.9, 0.3, 0.85, 0.26)
+			_dust.gravity = Vector2(0, -4)
+			_embers.color = Color(0.8, 0.2, 1.0, 0.38)
+			_embers.amount = 26
+			_set_shaft_color(Color(0.8, 0.25, 0.9))
+		"citadelle", "spaceship":
+			_dust.color = Color(0.85, 0.85, 1.0, 0.20)
+			_dust.gravity = Vector2(0, 0)
+			_embers.color = Color(1.0, 0.85, 0.4, 0.32)
+			_embers.amount = 20
+			_set_shaft_color(Color(0.5, 0.85, 1.0))
+		_:
+			_dust.color = Color(0.7, 0.8, 1.0, 0.15)
+			_embers.color = Color(1.0, 0.55, 0.2, 0.25)
+			_set_shaft_color(Color(0.4, 0.7, 1.0))
+
+func _set_shaft_color(c: Color) -> void:
+	if _shaft0 != null: _shaft0.modulate = Color(c.r, c.g, c.b, 0.07)
+	if _shaft1 != null: _shaft1.modulate = Color(c.r, c.g, c.b, 0.07)
+	if _shaft2 != null: _shaft2.modulate = Color(c.r, c.g, c.b, 0.07)
 
 func _process(delta: float) -> void:
 	_time += delta

@@ -254,6 +254,8 @@ def main():
 
     tmp = os.path.join(PREVIEW_DIR, "_tmp_vgun.png")
     DIRS = [("front", 0), ("right", -90)] if TEST else [("front", 0), ("back", 180), ("left", 90), ("right", -90)]
+    if "--diag" in sys.argv:   # 14/10 : 4 diagonales AVEC le canon de bras (memes prises de vue que les cardinales)
+        DIRS = [("front_right", -45), ("front_left", 45), ("back_right", -135), ("back_left", 135)]
     anims = ["attack"] if TEST else list(POSERS.keys())
     if "--anims" in sys.argv:                       # re-bake only the listed anims (e.g. walk,run)
         anims = sys.argv[sys.argv.index("--anims") + 1].split(",")

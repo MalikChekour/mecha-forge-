@@ -15,7 +15,7 @@ class StubGame extends Node:
 		add_child(enemy_layer)
 	func spawn_ground_zone(_pos: Vector2, _radius: float, _delay: float, _dmg: float, _color: Color = Color.WHITE, _fx_kind: String = "decor_hit") -> void:
 		zone_calls += 1
-	func spawn_vfx(_kind: String, _pos: Vector2, _rot: float, _scale: float, _color: Color) -> void:
+	func spawn_vfx(_kind: String, _pos: Vector2, _rot: float = 0.0, _scale: float = 1.0, _color: Color = Color.WHITE) -> void:
 		vfx_colors.append(_color)
 	func awaken_enemy(_pos: Vector2, _kind: String) -> void:
 		awaken_calls += 1
@@ -33,6 +33,10 @@ class StubGame extends Node:
 class DummyPlayer extends Node2D:
 	var _patch_inertia: float = 0.0
 	var field_slow: float = 1.0
+	var hp: float = 40.0
+	var max_hp: float = 100.0
+	func heal(a: float) -> void:
+		hp = minf(max_hp, hp + a)
 
 ## Game.gd n'a pas de class_name (juste "extends Node2D") -> pas accessible comme "Game.BIOMES"
 ## depuis un autre script. preload() recupere la ressource GDScript elle-meme, sur laquelle les
@@ -168,7 +172,8 @@ func _ready() -> void:
 	for i in 15:   # 1.5s, fill_time par defaut 1.0s, joueur au centre = dans le rayon
 		thermal._thermal_zone._physics_process(dt)
 		thermal._process(dt)
-	_ok(game_stub.zone_calls > calls_avant_thermal, "borne_thermique : ouvre bien une zone sure")
+	# 14/10 : la « zone sure » (GroundZone a 0 degat) ne faisait RIEN -> la borne soigne desormais.
+	_ok(plr.hp > 40.0, "borne_thermique : soigne reellement le joueur (plus de zone a 0 degat)", "hp=%.0f" % plr.hp)
 
 	# --- 8. GLACE FRAGILE : devient permanente (collision activee) apres son delai ---
 	var fragile: PropScatter.Prop = PropScatter.Prop.new()

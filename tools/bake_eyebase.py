@@ -10,6 +10,7 @@ RES=256; FRAMES=8; SAMPLES=16; EL=40.0
 EYE_OFF=(0.0,-0.15,0.44); EYE_SCALE=(0.058,0.05,0.034); XSEP=0.052  # TWIN eyes
 DIRS=[("front",0),("back",180),("left",90),("right",-90)]
 if len(sys.argv)>1 and sys.argv[-1]=="front": DIRS=[("front",0)]
+if "--diag" in sys.argv: DIRS=[("front_right",-45),("front_left",45),("back_right",-135),("back_left",135)]   # 14/10 : 8 directions
 
 def setup():
     bpy.ops.wm.read_factory_settings(use_empty=True)

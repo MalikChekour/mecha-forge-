@@ -108,21 +108,23 @@ static func _launch(g: Node, p: CPUParticles2D, layer: Node = null) -> void:
 	p.emitting = true
 	_free_after(g, p, p.lifetime + 0.4)
 
-static func conveyor_pulse(g: Node, pos: Vector2, color: Color, dir: Vector2, scale: float) -> void:
+## Onde du tapis ralentisseur. 14/10 (patron : « l'effet clignotement doit etre aussi centre ») : l'onde
+## partait du centre mais DERIVAIT de 60 u le long de la poussee et depassait la zone ; elle reste
+## maintenant CENTREE sur le tapis et s'epanouit jusqu'au rayon exact de l'effet. `radius_scale` =
+## rayon final / 128 (shock_tex fait 256 px de diametre -> diametre final = 2 x rayon).
+static func conveyor_pulse(g: Node, pos: Vector2, color: Color, _dir: Vector2, radius_scale: float) -> void:
 	if not ok(g): return
 	var sw: Sprite2D = Sprite2D.new()
 	sw.texture = Tex.shock_tex()
 	sw.material = Tex.add_mat()
 	sw.global_position = pos
-	sw.rotation = dir.angle()
-	sw.modulate = Color(color.r, color.g, color.b, 0.8)
-	sw.scale = Vector2.ONE * (scale * 0.5)
+	sw.modulate = Color(color.r, color.g, color.b, 0.85)
+	sw.scale = Vector2.ONE * (radius_scale * 0.2)
 	g.get("fx_layer").add_child(sw)
 	var tw: Tween = sw.create_tween().set_parallel(true)
-	tw.tween_property(sw, "scale", Vector2.ONE * (scale * 1.5), 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	tw.tween_property(sw, "position", sw.global_position + dir * 60.0 * scale, 0.4).set_ease(Tween.EASE_OUT)
-	tw.tween_property(sw, "modulate:a", 0.0, 0.4).set_ease(Tween.EASE_IN)
-	_free_after(g, sw, 0.45)
+	tw.tween_property(sw, "scale", Vector2.ONE * radius_scale, 0.55).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(sw, "modulate:a", 0.0, 0.55).set_ease(Tween.EASE_IN)
+	_free_after(g, sw, 0.6)
 
 # ---------------------------------------------------------------------------------------------
 # couches
