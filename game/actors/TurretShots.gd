@@ -64,10 +64,12 @@ static func fire(shot_style: String, prop: Node2D, g: Node, p: Node2D, damage: f
 	var lead: Vector2 = Vector2.ZERO
 	if "velocity" in p:
 		lead = (p.velocity as Vector2) * 0.35
+	var fixed_dir: Vector2 = Vector2.ZERO
 	# canon a tube fixe : le tir part DROIT dans l axe du tube, sans viser le mecha
 	if prop.has_method("barrel_fixed") and prop.barrel_fixed():
 		var bd: Vector2 = prop.head_dir()
 		lead = Vector2.ZERO
+		fixed_dir = bd
 		to_p = s + bd * float(STRAIGHT_RANGE.get(shot_style, 400.0))
 	match shot_style:
 		"weld_sweep":
@@ -87,6 +89,8 @@ static func fire(shot_style: String, prop: Node2D, g: Node, p: Node2D, damage: f
 		"flak":
 			for i in 4:
 				var off: Vector2 = Vector2.RIGHT.rotated(randf() * TAU) * randf_range(25.0, 75.0)
+				if fixed_dir != Vector2.ZERO:
+					off = fixed_dir * randf_range(-70.0, 70.0)   # tube fixe : les obus restent DANS l axe, seule la profondeur varie
 				var sh5: TurretShot = _mk("flak", g, p, damage * 0.45, k, s, to_p + lead + off, prop)
 				sh5.delay = float(i) * 0.12
 				sh5.life = clampf(s.distance_to(sh5.tgt) / 560.0, 0.45, 1.0)
@@ -103,6 +107,8 @@ static func fire(shot_style: String, prop: Node2D, g: Node, p: Node2D, damage: f
 			_swell(prop)
 			for i in 3:
 				var off2: Vector2 = Vector2(randf_range(-34.0, 34.0), randf_range(-34.0, 34.0))
+				if fixed_dir != Vector2.ZERO:
+					off2 = fixed_dir * randf_range(-40.0, 40.0)
 				var sh8: TurretShot = _mk("acid_burst", g, p, damage, k, s, to_p + lead * 0.5 + off2, prop)
 				sh8.delay = 0.55 + float(i) * 0.16
 				sh8.life = clampf(s.distance_to(sh8.tgt) / 400.0, 0.5, 1.1)
@@ -226,6 +232,10 @@ func _hurt(amount: float, from: Vector2) -> void:
 func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 	return Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p)
 
+## canon a tube fixe : la cloche est aplatie pour que l obus reste VISIBLEMENT dans l axe du tube
+func _arc_h(h: float) -> float:
+	return h * (0.28 if bool(_d.get("straight", false)) else 1.0)
+
 func _ground(u: float) -> Vector2:
 	return src.lerp(tgt, u)
 
@@ -347,7 +357,7 @@ func _step_pod(delta: float) -> void:
 	if t < delta * 1.5:
 		_sfx("ts_pod_a", 0.06)
 	var u: float = clampf(t / life, 0.0, 1.0)
-	global_position = _ballistic(u, 220.0) # Cloche haute
+	global_position = _ballistic(u, _arc_h(220.0)) # Cloche haute
 	if int(t * 30.0) != int((t - delta) * 30.0):
 		_trail.append([global_position, 0.0, randf() * TAU])
 	if u >= 1.0:
@@ -388,7 +398,7 @@ func _step_slag(delta: float) -> void:
 	var hop: float = 0.6
 	if phase == 0:
 		var u: float = clampf(t / total1, 0.0, 1.0)
-		global_position = _ballistic(u, 310.0) # Lourd et haut
+		global_position = _ballistic(u, _arc_h(310.0)) # Lourd et haut
 		if randf() < 0.92:
 			_trail.append([global_position + Vector2(randf_range(-5.0, 5.0), randf_range(-5.0, 5.0)), 0.0, randf_range(6.0, 12.0)])
 		if u >= 1.0:
@@ -560,7 +570,7 @@ func _step_acid(delta: float) -> void:
 		_sfx("ts_acid_a", 0.08)
 	var u: float = clampf(t / life, 0.0, 1.0)
 	var prev: Vector2 = global_position
-	global_position = _ballistic(u, 75.0)
+	global_position = _ballistic(u, _arc_h(75.0))
 	dir = (global_position - prev).normalized() if prev != global_position else dir
 	if int(t * 22.0) != int((t - delta) * 22.0):
 		_after("drop", _ground(u), 9.0, 1.4, dmg * 0.08, 0.0)
