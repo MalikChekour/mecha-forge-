@@ -561,7 +561,7 @@ func _physics_process(delta: float) -> void:
 		# lunge), so it reads as "trained on the enemy" the whole time the guns are live.
 		_thruster.emitting = false
 		if _melee_t <= 0.0:
-			var wa: String = "attack" if _firing_t > 0.0 else "idle"
+			var wa: String = "attack" if (_firing_t > 0.0 or _is_aiming()) else "idle"
 			if mecha.current_anim() != wa:
 				mecha.play(wa)
 
@@ -572,7 +572,7 @@ func _physics_process(delta: float) -> void:
 	# set_facing_from keeps this from jittering between two equidistant foes.
 	# while the Overdrive beam is out, the arm IS attacking -> face the aim too (so the beam
 	# leaves the cannon tip pointed at the target, never from the back).
-	mecha.set_facing_from(aim_dir if (_firing_t > 0.0 or transformed) else mv)
+	mecha.set_facing_from(aim_dir if (_firing_t > 0.0 or transformed or _is_aiming()) else mv)
 	# NO body tilt: a mech stays PLANTED on its feet — it faces the target in 4 dir and the head-laser
 	# shows the exact aim; it does not rock/pitch toward the aim (that read as a "dancer", not a mech).
 	if mecha.has_method("set_lean_target"):
@@ -1213,6 +1213,12 @@ func _transform_off() -> void:
 	if game != null and game.has_method("transform_fx"):
 		game.transform_fx(global_position, false)
 	Events.player_transformed.emit(false)
+
+## 16/10 (patron : « on ne dirait pas qu'il vise ») : le mecha est en POSE DE VISEE (bras tendu vers la cible, corps tourne
+## vers elle) des qu'il vise : bouton de souris maintenu, stick de visee, visee auto. Avant, seule la fenetre de tir (_firing_t)
+## declenchait cette pose : armes coupees ou en pause entre deux tirs, il marchait/attendait en garde et regardait ou il allait.
+func _is_aiming() -> bool:
+	return _aim_stick_active or auto_aim or bot_active or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 
 func _update_aim() -> void:
 	# MANUAL OVERRIDE (patron, 25/09 : "orienter la visee manuellement meme si la visee est

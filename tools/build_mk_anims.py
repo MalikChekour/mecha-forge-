@@ -26,6 +26,23 @@ def _import(sc, mech_h):
 def _place(arm, gun, mech_h):
     _parts["p"].update()
 
+# 16/10 (patron : « son bras est contracte et non tendu quand il vise ») : bras de tir TENDU vers la cible
+# (epaule a l'horizontale, coude droit) au lieu du bras plie des poses d'origine ; le bras gauche accompagne.
+R = bg.R
+def aim_arm(pb):
+    if "RightArm" in pb: pb["RightArm"].rotation_euler = (R(-86), R(-2), R(2))
+    if "RightForeArm" in pb: pb["RightForeArm"].rotation_euler = (0, 0, 0)
+    if "Spine" in pb: pb["Spine"].rotation_euler.x = R(-6)
+bg.aim_arm = aim_arm
+_orig_attack = bg.pose_attack
+def pose_attack(arm, f, n):
+    _orig_attack(arm, f, n)
+    pb = arm.pose.bones
+    if "RightArm" in pb: pb["RightArm"].rotation_euler = (R(-86) + R(8) * max(0.0, __import__("math").sin(2 * __import__("math").pi * f / n)), R(-2), R(2))
+    if "RightForeArm" in pb: pb["RightForeArm"].rotation_euler = (0, 0, 0)
+    if "LeftArm" in pb: pb["LeftArm"].rotation_euler = (R(-38), R(18), R(-10))
+bg.pose_attack = pose_attack
+bg.POSERS["attack"] = pose_attack
 bg.import_gun = _import
 bg.place_gun = _place
 bg.main()
