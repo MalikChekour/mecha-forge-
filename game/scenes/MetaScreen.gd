@@ -1033,8 +1033,12 @@ func _build_garage() -> void:
 	v.add_child(prev_center)
 	dmech.play("walk")
 
+	var _mk_titre: bool = false
 	for mech: Dictionary in GameState.MECHS:
 		var id: String = String(mech["id"])
+		if mech.has("mk") and not _mk_titre:
+			_mk_titre = true
+			_title(v, "VERSIONS MK  (essai : memes mecaniques que leur chassis, pieces 3D en plus)", Color(1.0, 0.85, 0.4), 18)
 		var owned: bool = SaveManager.owns_mech(id)
 		var row: HBoxContainer = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)

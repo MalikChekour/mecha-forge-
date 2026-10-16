@@ -276,8 +276,8 @@ def main():
                 tiles.append(Image.open(tmp).convert("RGBA").copy())
             if TEST:
                 bg = Image.new("RGB", tiles[3].size, (30, 33, 42)); bg.paste(tiles[3], (0, 0), tiles[3])
-                bg.save(os.path.abspath("cine/_show/vortex_gun_%s.png" % dname))
-                print("TEST attack", dname, "-> cine/_show/vortex_gun_%s.png" % dname)
+                os.makedirs(os.path.abspath("cine/_show"), exist_ok=True); bg.save(os.path.abspath("cine/_show/%s_gun_%s.png" % (CHASSIS, dname)))
+                print("TEST attack", dname, "-> cine/_show/%s_gun_%s.png" % (CHASSIS, dname))
                 continue
             sheet = Image.new("RGBA", (RES * FRAMES, RES), (0, 0, 0, 0))
             for k, im in enumerate(tiles):
@@ -288,4 +288,5 @@ def main():
     print("DONE")
 
 
-main()
+if __name__ == "__main__":
+    main()

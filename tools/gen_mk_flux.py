@@ -10,15 +10,15 @@ BASE = ("full body front view of a heavy sci-fi battle mecha standing in a neutr
         "background, no text, no logo, game concept art, ultra detailed hard-surface design, 3D render, studio lighting. ")
 SPEC = {
  "vortex": ("VORTEX prototype: sleek matte black armor, glowing cyan neon lines, orange glowing chest core, narrow angular helmet "
-            "with two antennas, a long energy blade held at the side, slim athletic proportions. ", 4242,
-  {"mk2": "MARK II upgrade: extra layered armor plates on shoulders and forearms, sharper helmet crest, brighter cyan circuitry, reinforced knees, longer energy blade with cyan edge glow.",
-   "mk3": "MARK III upgrade: heavier armored silhouette, small back thrusters with cyan flame, shoulder energy-shield emitters, intricate neon circuitry, orange core inside a reinforced chest frame, blade with plasma aura.",
-   "mk4": "MARK IV ultimate flagship version: black armor with polished chrome and gold trim, floating detached shoulder plates with cyan halo rings, wing-like fins on the back, intense orange-white core, a double-edged radiant energy blade."}),
+            "with two antennas, slim athletic proportions. NO sword, NO blade, NO handheld weapon: every weapon is built into the arms and hands. ", 4242,
+  {"mk2": "MARK II upgrade: extra armor plates, brighter cyan circuitry, a large energy cannon integrated into the right forearm, a glowing palm emitter built into the left hand.",
+   "mk3": "MARK III upgrade: heavier armor, back thrusters with cyan flame, shoulder shield emitters, twin energy cannons integrated into both forearms, palm emitters in both hands.",
+   "mk4": "MARK IV ultimate flagship: black armor with chrome and gold trim, floating shoulder plates with cyan halo rings, a big rotating beam cannon integrated into the right arm, a glowing palm cannon in the left hand."}),
  "bluestrike": ("BLUESTRIKE scout: grey gunmetal and bright orange armor, huge round shoulder pods, cyan and magenta glowing head visor, "
-                "light and fast agile build, orange fists and knees. ", 777,
-  {"mk2": "MARK II upgrade: extra orange armor plating, shoulder pods with vent slits, sharper head crest, brighter cyan magenta visor, reinforced fists and knees, panel lines.",
-   "mk3": "MARK III upgrade: assault configuration, shoulder pods turned into twin blaster cannons, small back thrusters with orange flame, armor skirt, glowing energy conduits on arms and legs.",
-   "mk4": "MARK IV ultimate prototype: orange and gunmetal armor with white and gold trim, floating weapon drones behind the shoulders, glowing visor halo, translucent cyan light wings, intense core glow."})}
+                "light and fast agile build. NO sword, NO handheld weapon: every weapon is built into the arms and hands. ", 777,
+  {"mk2": "MARK II upgrade: extra orange armor plating, vented shoulder pods, short-range scatter blasters integrated into both forearms, fists with built-in blast emitters.",
+   "mk3": "MARK III upgrade: assault configuration, twin shotgun-style cannons integrated into the forearms, back thrusters with orange flame, glowing energy conduits, palm emitters.",
+   "mk4": "MARK IV ultimate prototype: orange and gunmetal armor with white and gold trim, a rotary gatling cannon integrated into the right arm, a palm blast cannon in the left hand, translucent cyan light wings, glowing visor halo."})}
 if __name__ == "__main__":
     only = sys.argv[1:]
     for name, (ident, seed, mks) in SPEC.items():
@@ -27,5 +27,5 @@ if __name__ == "__main__":
             dst = os.path.join(OUT, tag + "_flux.png")
             if (only and tag not in only) or os.path.exists(dst):
                 continue
-            ok = flux(BASE + ident + desc, dst, steps=8)
+            ok = flux(BASE + ident + desc + " Weapons built into the arm and the hand, no sword.", dst, steps=8)
             print(tag, "OK" if ok else "ECHEC")

@@ -159,6 +159,10 @@ func _anchor_in(d: Dictionary, fallback: Vector2) -> Vector2:
 			return ((d[v] as Vector2) + (d[h] as Vector2)) * 0.5
 	return fallback
 
+## Famille de lookup des ancres (les versions MK reprennent celles de leur chassis de base).
+func _fam() -> String:
+	return GameState.chassis_family(chassis)
+
 func grip_anchor() -> Vector2:
 	var a: Vector2 = _anchor_in(_GRIP_ANCHOR, Vector2(0.0, -23.0))
 	return a * (display_height / 190.0)   # anchors were measured at display_height 190
@@ -227,28 +231,28 @@ const _BLADE_ANCHORS: Dictionary = {
 }
 
 func has_baked_weapon() -> bool:
-	return _GUN_ANCHORS.has(chassis)
+	return _GUN_ANCHORS.has(_fam())
 
 # True when gun_anchor() already points at the barrel TIP (not the hand), so the muzzle
 # needs no extra forward offset. VORTEX's arm-cannon anchors are measured tips.
 func gun_at_tip() -> bool:
-	return chassis in ["vortex", "titan", "bruiser", "vanquisher", "pylone", "cerclier"]
+	return _fam() in ["vortex", "titan", "bruiser", "vanquisher", "pylone", "cerclier"]
 
 func gun_anchor() -> Vector2:
-	var d: Dictionary = _GUN_ANCHORS.get(chassis, {})
+	var d: Dictionary = _GUN_ANCHORS.get(_fam(), {})
 	var a: Vector2 = _anchor_in(d, Vector2(-15.0, -25.0))
 	return a * (display_height / 190.0)
 
 func has_head_anchor() -> bool:
-	return _HEAD_ANCHORS.has(chassis)
+	return _HEAD_ANCHORS.has(_fam())
 
 func head_anchor() -> Vector2:
-	var d: Dictionary = _HEAD_ANCHORS.get(chassis, {})
+	var d: Dictionary = _HEAD_ANCHORS.get(_fam(), {})
 	var a: Vector2 = _anchor_in(d, Vector2(0.0, -44.0))
 	return a * (display_height / 190.0)
 
 func blade_anchor() -> Vector2:
-	var d: Dictionary = _BLADE_ANCHORS.get(chassis, {})
+	var d: Dictionary = _BLADE_ANCHORS.get(_fam(), {})
 	var a: Vector2 = _anchor_in(d, Vector2(15.0, -20.0))
 	return a * (display_height / 190.0)
 

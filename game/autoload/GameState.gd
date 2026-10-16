@@ -216,6 +216,50 @@ const MECHS: Array = [
 		"sig_muzzle": ["fire_blast", 0.40],
 		"ligne": "RELANCE — le premier retour du Disque repart une fois.",
 		"desc": "Chassis bas et circulaire. A son premier retour, le Disque peut repartir une fois vers une cible proche, a degats reduits."},
+	## ---- VERSIONS MK (16/10, ESSAI) : memes rig, poses et meca que leur chassis de base (Player.chassis_family), pieces 3D en plus
+	## (tools/mk_parts.py, cuites par tools/build_mk_anims.py). cout 0 = jouables tout de suite pour juger. A retirer si non retenues.
+	{"id": "vortexmk2", "name": "VORTEX MK II", "cost": 0, "mk": 2, "base": "vortex",
+		"weapons": ["autocannon"], "hp": 24.0, "dmg": 1.28, "speed": 1.07, "crit": 0.09,
+		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
+		"signature": "autocannon", "accent": Color(0.38, 0.92, 1.00),
+		"sig_muzzle": ["aaa_beam", 0.46],
+		"ligne": "ÉNERGIE DIRIGÉE — blindage renforcé.",
+		"desc": "Mk II : pauldrons, canon d'avant-bras, émetteur de paume. Même style que le VORTEX, plus robuste."},
+	{"id": "vortexmk3", "name": "VORTEX MK III", "cost": 0, "mk": 3, "base": "vortex",
+		"weapons": ["autocannon"], "hp": 28.0, "dmg": 1.36, "speed": 1.08, "crit": 0.1,
+		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
+		"signature": "autocannon", "accent": Color(0.38, 0.92, 1.00),
+		"sig_muzzle": ["aaa_beam", 0.46],
+		"ligne": "ÉNERGIE DIRIGÉE — double canon.",
+		"desc": "Mk III : canons jumeaux d'avant-bras, propulseurs dorsaux, plastron."},
+	{"id": "vortexmk4", "name": "VORTEX MK IV", "cost": 0, "mk": 4, "base": "vortex",
+		"weapons": ["autocannon"], "hp": 34.0, "dmg": 1.46, "speed": 1.1, "crit": 0.12,
+		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
+		"signature": "autocannon", "accent": Color(0.38, 0.92, 1.00),
+		"sig_muzzle": ["aaa_beam", 0.46],
+		"ligne": "ÉNERGIE DIRIGÉE — version d'élite.",
+		"desc": "Mk IV : gatling au bras, plaques flottantes et halos."},
+	{"id": "bluestrikemk2", "name": "BLUESTRIKE MK II", "cost": 0, "mk": 2, "base": "bluestrike",
+		"weapons": ["disperseur"], "hp": 9.0, "dmg": 1.12, "speed": 1.26, "crit": 0.16,
+		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
+		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
+		"sig_muzzle": ["fire_blast", 0.40],
+		"ligne": "SOUFFLE RAPPROCHÉ — blindage renforcé.",
+		"desc": "Mk II : blasters aux mains, évents d'épaule, genouillères."},
+	{"id": "bluestrikemk3", "name": "BLUESTRIKE MK III", "cost": 0, "mk": 3, "base": "bluestrike",
+		"weapons": ["disperseur"], "hp": 12.0, "dmg": 1.2, "speed": 1.28, "crit": 0.17,
+		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
+		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
+		"sig_muzzle": ["fire_blast", 0.40],
+		"ligne": "SOUFFLE RAPPROCHÉ — assaut.",
+		"desc": "Mk III : canons jumeaux d'avant-bras, propulseurs dorsaux."},
+	{"id": "bluestrikemk4", "name": "BLUESTRIKE MK IV", "cost": 0, "mk": 4, "base": "bluestrike",
+		"weapons": ["disperseur"], "hp": 16.0, "dmg": 1.3, "speed": 1.3, "crit": 0.19,
+		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
+		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
+		"sig_muzzle": ["fire_blast", 0.40],
+		"ligne": "SOUFFLE RAPPROCHÉ — version d'élite.",
+		"desc": "Mk IV : gatling au bras, ailes d'énergie, halo."},
 ]
 
 ## RESKIN (27/09) : id de MECHS -> chassis dont on reutilise les planches deja bakees (voir la
@@ -254,6 +298,13 @@ static func mech_arsenal(id: String) -> Array:
 static func mech_signature(id: String) -> String:
 	var d: Dictionary = mech_def(id)
 	return String(d.get("signature", String((d.get("weapons", ["autocannon"]) as Array)[0])))
+
+## Famille mecanique d'un chassis : les versions MK (vortexmk2...) jouent comme leur chassis de base.
+static func chassis_family(id: String) -> String:
+	for b in ["vortex", "bluestrike"]:
+		if id.begins_with(b + "mk"):
+			return b
+	return id
 
 static func mech_def(id: String) -> Dictionary:
 	for m in MECHS:

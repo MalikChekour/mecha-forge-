@@ -102,7 +102,7 @@ func align_dmg_mult() -> float:
 	return 1.0 + ALIGN_PER_STACK * float(_align_stacks)
 
 func vortex_align_stack() -> void:
-	if base_chassis != "vortex":
+	if chassis_family != "vortex":
 		return
 	_align_stacks = mini(_align_stacks + 1, 5)
 	_align_t = ALIGN_STACK_DUR
@@ -130,6 +130,7 @@ var _weapons: WeaponSystem
 var transformed: bool = false
 var _tf_t: float = 0.0
 var base_chassis: String = ""
+var chassis_family: String = ""   # base_chassis ramene a sa famille (vortexmk2 -> vortex) : mecaniques propres au chassis
 const TF_DUR: float = 8.0   # Overdrive "harvester" spike: short, intense, then vulnerable again
 var _space_was: bool = false
 
@@ -217,9 +218,10 @@ func refresh_equipped_chassis() -> void:
 		mecha = dmech
 		add_child(mecha)
 		base_chassis = hero_id
+		chassis_family = GameState.chassis_family(hero_id)
 		if mecha.has_method("set_tint"):
 			mecha.set_tint(BASE_TINT)
-		_apply_lock_visuals(hero_id)   # le reticule de verrouillage suit le changement de chassis
+		_apply_lock_visuals(chassis_family)   # le reticule de verrouillage suit le changement de chassis
 	var sig: String = GameState.mech_signature(hero_id)
 	var gamme: Array = GameState.mech_arsenal(hero_id)
 	var start_w: String = SaveManager.start_weapon()
@@ -251,6 +253,7 @@ func _ready() -> void:
 	mecha = dmech
 	add_child(mecha)
 	base_chassis = hero_id
+	chassis_family = GameState.chassis_family(hero_id)
 	if mecha.has_method("set_tint"):
 		mecha.set_tint(BASE_TINT)   # heros legerement plus clair que la pietaille (voir BASE_TINT)
 
@@ -383,7 +386,7 @@ func _ready() -> void:
 	_laser_dot = LockReticle.new()
 	_laser_dot.z_index = 12   # au-dessus de tout (mecha=6, laser=8, eye=9) — jamais masque
 	add_child(_laser_dot)
-	_apply_lock_visuals(base_chassis)
+	_apply_lock_visuals(chassis_family if chassis_family != "" else base_chassis)
 
 	# the emitting EYE: a small glow at the head where the sight starts (cyan, pas rouge)
 	_laser_eye = Sprite2D.new()
@@ -1525,7 +1528,7 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
 ## chiffres retenus. Direction = opposee a la source du coup ; a defaut (source inconnue),
 ## opposee a la vitesse courante ; a defaut de tout, vers le bas (jamais un dash "nulle part").
 func _trigger_dash_escape(source_pos: Vector2) -> void:
-	if base_chassis != "bluestrike" or _dash_cd > 0.0:
+	if chassis_family != "bluestrike" or _dash_cd > 0.0:
 		return
 	_dash_cd = DASH_COOLDOWN
 	_dash_t = DASH_DUR

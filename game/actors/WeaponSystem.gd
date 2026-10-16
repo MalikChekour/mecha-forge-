@@ -574,7 +574,7 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		# plan de differenciation des chassis (26/09) : identite du tireur, lue par
 		# Projectile pour VORTEX (chaine d'alignement) et par Enemy.take_damage pour
 		# BRUISER (piles de brisure) — vide et sans effet pour les 3 autres chassis.
-		"chassis": String(_player.base_chassis) if "base_chassis" in _player else "",
+		"chassis": String(_player.chassis_family) if "chassis_family" in _player else "",
 	}
 	if AOE.has(id):
 		# blast radius grows with level: an AoE weapon LITERALLY covers more ground each level.
@@ -684,7 +684,7 @@ func _do_beam(id: String, dmg: float, game: Node, muzzle: Vector2, fx_scale: flo
 			continue
 		var is_crit: bool = randf() < cc
 		var hit: float = dmg * (cm if is_crit else 1.0)
-		(e as Enemy).take_damage(hit, String(_player.base_chassis) if "base_chassis" in _player else "", id)
+		(e as Enemy).take_damage(hit, String(_player.chassis_family) if "chassis_family" in _player else "", id)
 		Events.damage_dealt.emit((e as Node2D).global_position, int(hit), is_crit)
 	# --- RENDU : un COMPOSITE, jamais un trait ------------------------------------
 	# Le rayon est une PLANCHE ANIMEE etiree sur toute sa longueur (elle vit et scintille
@@ -749,7 +749,7 @@ func _do_melee(id: String, dmg: float, game: Node) -> void:
 			continue
 		var is_crit: bool = randf() < crit_chance
 		var out: float = dmg * (crit_mult if is_crit else 1.0)
-		(e as Enemy).take_damage(out, String(_player.base_chassis) if "base_chassis" in _player else "", id)
+		(e as Enemy).take_damage(out, String(_player.chassis_family) if "chassis_family" in _player else "", id)
 		Events.damage_dealt.emit(ep, int(out), is_crit)
 		if is_crit:
 			Audio.sfx("crit", 0.1)
