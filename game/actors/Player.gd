@@ -592,11 +592,20 @@ func _physics_process(delta: float) -> void:
 		_laser_dot.visible = false
 		if _laser_eye != null:
 			_laser_eye.visible = false
-		_process_beam(delta)
+		if WeaponSystem.ARMES_ACTIVES:
+			_process_beam(delta)
+		else:
+			_hide_beam()
 	else:
 		_hide_beam()
 		_weapons.set_active(true)
-		if _weapons != null:
+		if not WeaponSystem.ARMES_ACTIVES:
+			_laser.visible = false
+			_laser_dot.visible = false
+			if _laser_eye != null:
+				_laser_eye.visible = false
+			_last_lock_target = null
+		elif _weapons != null:
 			# SYNC: the red targeting laser is drawn from the GUN MUZZLE — the exact spot and
 			# direction the bullets leave — so the shot rides along the visible beam. It used to
 			# emit from the HEAD, so bullets travelled parallel-but-offset from the sight (looked

@@ -12,6 +12,10 @@ const WEAPON_ORDER: Array[String] = ["autocannon", "missilepod", "railgun", "pla
 	"vulcan", "hydra", "annihilator", "singularity", "tempest",
 	"deflagrateur", "carambole", "guillotine", "rayon_spectre",
 	"rail_nova", "frelon"]
+## 15/10 (patron : « supprime toutes les armes des mecha, on va refaire tout le systeme de tir ») :
+## INTERRUPTEUR GENERAL. false = aucun mecha ne tire (ni projectile, ni faisceau, ni corps-a-corps, ni
+## flash de bouche, ni arme dessinee, ni laser de visee, ni son). Remettre true pour retrouver l ancien systeme.
+const ARMES_ACTIVES: bool = false
 const MAX_LEVEL: int = 5   # a weapon at MAX + its required passive can EVOLVE
 const EVOLVED: Array[String] = ["vulcan", "hydra", "annihilator", "singularity", "tempest",
 	"deflagrateur", "carambole", "guillotine", "rayon_spectre"]
@@ -135,7 +139,7 @@ const MULTISHOT: Dictionary = {   # projectiles fired per shot, spread around ai
 var muzzle_global: Vector2 = Vector2.ZERO
 
 var _player: Node = null
-var _active: bool = true
+var _active: bool = ARMES_ACTIVES
 var _weapons: Dictionary = {}
 
 ## --- SIGNATURE DU CHASSIS ---------------------------------------------------------------
@@ -303,8 +307,8 @@ func is_borrowing() -> bool:
 	return _borrow_original_id != ""
 
 func set_active(a: bool) -> void:
-	_active = a
-	visible = a   # hide the held weapon entirely while inactive (e.g. Overdrive beam mode)
+	_active = a and ARMES_ACTIVES
+	visible = _active   # hide the held weapon entirely while inactive (e.g. Overdrive beam mode)
 
 static func _asset_path(id: String) -> String:
 	# evolved weapons reuse their base sprite (tinted gold in _create_sprite)
@@ -517,7 +521,7 @@ const SFX_FOR: Dictionary = {
 }
 
 func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
-	if _player == null:
+	if not ARMES_ACTIVES or _player == null:
 		return
 	var game: Node = null
 	if "game" in _player:
