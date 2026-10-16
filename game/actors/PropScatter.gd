@@ -574,16 +574,18 @@ const ZONE_HINTS: bool = false
 const HEAD_PIVOT: bool = false
 const TUBE_CANNONS: Array = ["g27", "tech_tourelle_soudeuse", "jungle_tourelle_mortier_plante", "volcanic_tourelle_mortier_scories",
 	"swamp_tourelle_dca_toit", "cryo_tourelle_canon_azote", "reacteur_tourelle_canon_particules", "ruche_tourelle_organe_acide"]
+# 16/10 : pivot = un point SUR l AXE DU TUBE (cote culasse), muzzle = centre de la bouche ; mesures sur l image avec une
+# grille (l ancien pivot etait le centre du corps : axe faux de 10 a 25 degres, et FAUX SENS pour le mortier a scories).
 const HEADS: Dictionary = {
-	"g27": {"cut": [[0, 0.90], [0.25, 0.90], [0.28, 0.64], [0.5, 0.60], [1, 0.58]], "pivot": [0.55, 0.45], "muzzle": [0.10, 0.75]},
-	"tech_tourelle_soudeuse": {"cut": [[0, 0.70], [0.25, 0.66], [0.5, 0.66], [0.75, 0.66], [1, 0.70]], "pivot": [0.45, 0.52], "muzzle": [0.10, 0.30]},
+	"g27": {"cut": [[0, 0.90], [0.25, 0.90], [0.28, 0.64], [0.5, 0.60], [1, 0.58]], "pivot": [0.3, 0.55], "muzzle": [0.069, 0.798]},
+	"tech_tourelle_soudeuse": {"cut": [[0, 0.70], [0.25, 0.66], [0.5, 0.66], [0.75, 0.66], [1, 0.70]], "pivot": [0.34, 0.178], "muzzle": [0.139, 0.258]},
 	"desert_tourelle_miroir_solaire": {"cut": [[0, 0.60], [0.3, 0.63], [0.5, 0.64], [0.7, 0.63], [1, 0.60]], "pivot": [0.5, 0.33], "muzzle": [0.5, 0.05], "tip": [0.5, 0.30]},
-	"jungle_tourelle_mortier_plante": {"cut": [[0, 0.66], [0.2, 0.66], [0.22, 0.57], [0.5, 0.58], [0.8, 0.55], [1, 0.62]], "pivot": [0.5, 0.42], "muzzle": [0.08, 0.57]},
-	"volcanic_tourelle_mortier_scories": {"cut": [[0, 0.5], [0.25, 0.45], [0.5, 0.42], [0.75, 0.42], [1, 0.5]], "pivot": [0.5, 0.36], "muzzle": [0.30, 0.27]},
-	"swamp_tourelle_dca_toit": {"cut": [[0, 0.52], [0.25, 0.50], [0.5, 0.52], [0.75, 0.5], [1, 0.55]], "pivot": [0.5, 0.42], "muzzle": [0.04, 0.08]},
-	"ruche_tourelle_organe_acide": {"cut": [], "pivot": [0.55, 0.45], "muzzle": [0.17, 0.45]},
-	"cryo_tourelle_canon_azote": {"cut": [[0, 0.80], [0.2, 0.78], [0.3, 0.72], [0.5, 0.70], [0.75, 0.66], [1, 0.66]], "pivot": [0.55, 0.5], "muzzle": [0.03, 0.58]},
-	"reacteur_tourelle_canon_particules": {"cut": [[0, 0.78], [0.2, 0.76], [0.3, 0.72], [0.5, 0.72], [0.8, 0.70], [1, 0.72]], "pivot": [0.55, 0.48], "muzzle": [0.08, 0.64]},
+	"jungle_tourelle_mortier_plante": {"cut": [[0, 0.66], [0.2, 0.66], [0.22, 0.57], [0.5, 0.58], [0.8, 0.55], [1, 0.62]], "pivot": [0.37, 0.444], "muzzle": [0.115, 0.578]},
+	"volcanic_tourelle_mortier_scories": {"cut": [[0, 0.5], [0.25, 0.45], [0.5, 0.42], [0.75, 0.42], [1, 0.5]], "pivot": [0.78, 0.08], "muzzle": [0.294, 0.341]},
+	"swamp_tourelle_dca_toit": {"cut": [[0, 0.52], [0.25, 0.50], [0.5, 0.52], [0.75, 0.5], [1, 0.55]], "pivot": [0.55, 0.291], "muzzle": [0.05, 0.077]},
+	"ruche_tourelle_organe_acide": {"cut": [], "pivot": [0.79, 0.222], "muzzle": [0.212, 0.489]},
+	"cryo_tourelle_canon_azote": {"cut": [[0, 0.80], [0.2, 0.78], [0.3, 0.72], [0.5, 0.70], [0.75, 0.66], [1, 0.66]], "pivot": [0.45, 0.39], "muzzle": [0.062, 0.545]},
+	"reacteur_tourelle_canon_particules": {"cut": [[0, 0.78], [0.2, 0.76], [0.3, 0.72], [0.5, 0.72], [0.8, 0.70], [1, 0.72]], "pivot": [0.367, 0.398], "muzzle": [0.05, 0.566]},
 }
 
 const BIOME_BORDER: Dictionary = {
