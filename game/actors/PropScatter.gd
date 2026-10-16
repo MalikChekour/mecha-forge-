@@ -566,6 +566,9 @@ const RIDGE_CHANCE: float = 0.5   # per chunk, when the biome has a rock-family 
 # `cut` n est plus utilise (ancienne decoupe tete/socle abandonnee).
 ## Interrupteur de retour arriere : false = les canons ne pivotent plus (image fixe, comme avant 11.46).
 const HEAD_ROTATE: bool = true
+## 16/10 (patron : « il faut que ces cercles soient invisibles ») : false = aucun anneau/liseré de perimetre ajoute par
+## l audit (les halos d origine restent). true = liseres nets + anneaux vent/gravite/lucioles/bassin/aimant/brouilleur.
+const ZONE_HINTS: bool = false
 ## 16/10 (patron : « stop le pivotement, laisse-les fixes ») : false = l image ne tourne plus. Les canons a TUBE
 ## (liste ci-dessous) tirent alors DROIT, dans l axe de leur tube, a cadence reguliere, sans viser le mecha.
 const HEAD_PIVOT: bool = false
@@ -2745,6 +2748,8 @@ class Prop extends StaticBody2D:
 		# 16/10 (audit du perimetre) : un disque lumineux a bord doux ne dit pas OU s arrete la zone. On ajoute un
 		# LISERE net exactement au rayon reel (le pic de Tex.ring est a 78 % du rayon de sa texture -> x1,28),
 		# enfant du halo : il herite de sa pulsation et de son alpha (ring alpha 2,2 x alpha du halo ~ 0,35).
+		if not ZONE_HINTS:
+			return
 		var edge: Sprite2D = Sprite2D.new()
 		edge.texture = Tex.ring(color.lerp(Color.WHITE, 0.25), 128)
 		edge.scale = Vector2.ONE * 1.28
@@ -2771,6 +2776,8 @@ class Prop extends StaticBody2D:
 
 	var _zone_vis: Array = []
 	func _add_zone_vis(r: float, col: Color, a: float, mode: String = "ring") -> void:
+		if mode == "ring" and not ZONE_HINTS:
+			return
 		var sp: Sprite2D
 		if mode == "ring":
 			sp = _glow_sprite(col, r * 2.0, a)
