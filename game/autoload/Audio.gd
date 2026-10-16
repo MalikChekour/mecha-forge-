@@ -8,10 +8,16 @@ const SFX_DIR: String = "res://assets/audio/sfx/"
 const MUSIC_DIR: String = "res://assets/audio/music/"
 const _SFX_NAMES: Array[String] = ["shoot", "hit", "crit", "explosion", "xp", "scrap",
 	"levelup", "hurt", "boss", "overdrive", "click", "victory",
-	"w_autocannon", "w_missile", "w_railgun", "w_plasma", "w_sabre"]
+	"w_autocannon", "w_missile", "w_railgun", "w_plasma", "w_sabre",
+	# 15/10 : un timbre PROPRE a chaque niveau pour les tirs de tourelle (depart _a, impact _b),
+	# generes par tools/gen_turret_sfx.py - voir TurretShots.gd
+	"ts_weld_a", "ts_weld_b", "ts_solar_a", "ts_solar_b", "ts_pod_a", "ts_pod_b",
+	"ts_slag_a", "ts_slag_b", "ts_flak_a", "ts_flak_b", "ts_frost_a", "ts_frost_b",
+	"ts_plasma_a", "ts_plasma_b", "ts_acid_a", "ts_acid_b", "ts_missile_a", "ts_missile_b"]
 # Rapid-fire weapons need their own throttle or the pool floods and every shot cancels the last.
 const _THROTTLE: Dictionary = {"shoot": 0.11, "hit": 0.08, "xp": 0.05, "scrap": 0.06,
-	"w_autocannon": 0.07, "w_missile": 0.14, "w_railgun": 0.12, "w_plasma": 0.12, "w_sabre": 0.13}
+	"w_autocannon": 0.07, "w_missile": 0.14, "w_railgun": 0.12, "w_plasma": 0.12, "w_sabre": 0.13,
+	"ts_flak_a": 0.1, "ts_flak_b": 0.08, "ts_missile_a": 0.09, "ts_acid_a": 0.12, "ts_acid_b": 0.1}
 
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
