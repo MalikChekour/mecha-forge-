@@ -297,7 +297,7 @@ func _step_weld(delta: float) -> void:
 	if _tick <= 0.0 and plr != null and _seg_dist(plr.global_position, src, tip) < 24.0:
 		_tick = 0.35
 		_hurt(dmg * 0.5, src)
-		_burst("pod", plr.global_position, 0.5, Color(0.4, 0.9, 1.0))
+		_burst("ice", plr.global_position, 0.4, Color(0.4, 0.9, 1.0))
 	if t >= tell + 2.4:
 		queue_free()
 
@@ -528,7 +528,7 @@ func _step_plasma(delta: float) -> void:
 				var b: TurretShot = _mk("bolt", game, plr, dmg * 0.55, kind, global_position, tgt, prop_ref)
 				b.vel = dir.rotated(float(i - 1) * 0.4) * 580.0
 				b.life = 0.68
-			_burst("flower", global_position, 0.7, Color(0.5, 1.0, 0.6))
+			_burst("plasma", global_position, 0.8, Color(0.5, 1.0, 0.6))
 			_sig("reacteur_fx_tir_fragmente", global_position, 0.85, Color(0.45, 1.0, 0.55))
 			queue_free()
 
@@ -538,7 +538,7 @@ func _step_bolt(delta: float) -> void:
 	if plr != null and global_position.distance_to(plr.global_position) <= 20.0 and not _hit_done:
 		_hit_done = true
 		_hurt(dmg, global_position)
-		_burst("flower", global_position, 0.5, Color(0.5, 1.0, 0.6))
+		_burst("plasma", global_position, 0.5, Color(0.5, 1.0, 0.6))
 		queue_free()
 	elif t >= life:
 		queue_free()
@@ -595,7 +595,7 @@ func _step_missile(delta: float) -> void:
 	global_position += vel * delta
 	_trail.append([global_position, 0.0, randf_range(3.0, 7.0)])
 	if _intercepted(global_position, 18.0):
-		_burst("flower", global_position, 0.6, Color(1.0, 0.85, 0.5))
+		_burst("missile", global_position, 0.6, Color(1.0, 0.85, 0.5))
 		_sfx("ts_missile_b", 0.1)
 		queue_free()
 		return
@@ -605,24 +605,64 @@ func _step_missile(delta: float) -> void:
 		_shake(3.8)
 		if plr != null and plr.global_position.distance_to(c) <= 76.0:
 			_hurt(dmg, c)
-		_burst("flower", c, 1.25, Color(1.0, 0.72, 0.9))
+		_burst("missile", c, 1.0, Color(1.0, 0.72, 0.9))
 		_sig("citadelle_fx_missile_plasma", c, 0.85, Color(1.0, 0.45, 0.85))
 		queue_free()
 
+# ================================================================== BIBLIOTHEQUE DE TEXTURES
+# 15/10 (patron : « la qualite etait trop basique ») : plus aucun cercle/trait dessine a la main pour les
+# effets. Tout passe par des textures RENDUES (tools/gen_turret_vfx.py : lumiere HDR, bloom, bruit fractal)
+# dessinees en additif dans le noeud `_glow` ; seuls les ombres au sol et les fumees sont en melange normal.
+static func _T(n: String) -> Texture2D:
+	return Tex.get_tex("res://assets/vfx/ts/%s.png" % n)
+
+## Sprite centre en `pos`, de taille `size`, tourne de `rot`.
+static func _spr(g: CanvasItem, n: String, pos: Vector2, size: Vector2, rot: float = 0.0, col: Color = Color.WHITE) -> void:
+	var tex: Texture2D = _T(n)
+	if tex == null:
+		return
+	g.draw_set_transform(pos, rot, Vector2.ONE)
+	g.draw_texture_rect(tex, Rect2(-size * 0.5, size), false, col)
+	g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+## Image entiere etiree de `a` (queue) vers `b` (tete), epaisseur `w` (streak, spark).
+static func _line(g: CanvasItem, n: String, a: Vector2, b: Vector2, w: float, col: Color = Color.WHITE) -> void:
+	var tex: Texture2D = _T(n)
+	var l: float = a.distance_to(b)
+	if tex == null or l < 1.0:
+		return
+	g.draw_set_transform(a, (b - a).angle(), Vector2.ONE)
+	g.draw_texture_rect(tex, Rect2(0.0, -w * 0.5, l, w), false, col)
+	g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+## Bande de faisceau : 4 variantes empilees dans la texture, `v` choisit laquelle (scintillement).
+static func _strip(g: CanvasItem, n: String, a: Vector2, b: Vector2, w: float, v: int, col: Color = Color.WHITE) -> void:
+	var tex: Texture2D = _T(n)
+	var l: float = a.distance_to(b)
+	if tex == null or l < 1.0:
+		return
+	g.draw_set_transform(a, (b - a).angle(), Vector2.ONE)
+	g.draw_texture_rect_region(tex, Rect2(0.0, -w * 0.5, l, w), Rect2(0.0, float(posmod(v, 4)) * 64.0, 256.0, 64.0), col)
+	g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+## Image `frame` (0-15) d'une planche d'impact 4x4.
+static func _frame(g: CanvasItem, n: String, frame: int, pos: Vector2, size: Vector2, col: Color = Color.WHITE) -> void:
+	var tex: Texture2D = _T(n)
+	if tex == null:
+		return
+	var fr: int = clampi(frame, 0, 15)
+	g.draw_texture_rect_region(tex, Rect2(pos - size * 0.5, size), Rect2(float(fr % 4) * 192.0, float(int(fr / 4)) * 192.0, 192.0, 192.0), col)
+
 # ================================================================== DESSIN PRINCIPAL
+# Melange NORMAL : ombres au sol, fumees, reperes de telegraphie. Tout le reste est additif (voir _draw_glow).
 func _draw() -> void:
 	if delay > 0.0:
 		return
 	match style:
 		"weld_sweep": _draw_weld()
-		"solar_needle": _draw_solar()
 		"lob_pod": _draw_pod()
-		"thorn": _draw_thorn()
 		"lob_slag": _draw_slag()
 		"flak": _draw_flak()
-		"orb_frost": _draw_orb()
-		"plasma": _draw_plasma()
-		"bolt": _draw_bolt()
 		"acid_burst": _draw_acid()
 		"missile": _draw_missile()
 		"lock": _draw_lock()
@@ -633,11 +673,14 @@ func _draw_glow(g: Node2D) -> void:
 	match style:
 		"weld_sweep": _glow_weld(g)
 		"solar_needle": _glow_solar(g)
+		"lob_pod": _glow_pod(g)
+		"thorn": _glow_thorn(g)
 		"lob_slag": _glow_slag(g)
 		"flak": _glow_flak(g)
 		"orb_frost": _glow_orb(g)
 		"plasma": _glow_plasma(g)
 		"bolt": _glow_bolt(g)
+		"acid_burst": _glow_acid(g)
 		"missile": _glow_missile(g)
 		"lock": _glow_lock(g)
 
@@ -648,341 +691,264 @@ func _ellipse(c: Vector2, rx: float, ry: float, col: Color, rot: float = 0.0, n:
 		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry).rotated(rot))
 	draw_colored_polygon(pts, col)
 
-func _dotted(a: Vector2, b: Vector2, col: Color, gap: float = 14.0, r: float = 2.0) -> void:
-	var n: int = int(a.distance_to(b) / gap)
-	for i in n:
-		draw_circle(a.lerp(b, float(i) / maxf(1.0, float(n))), r, col)
+## Ombre portee douce (disque noir aux bords fondus) : remplace les ellipses plates.
+func _shadow(c: Vector2, rx: float, ry: float, a: float) -> void:
+	var tex: Texture2D = Tex.shadow(96)
+	draw_texture_rect(tex, Rect2(c - Vector2(rx, ry), Vector2(rx, ry) * 2.0), false, Color(1, 1, 1, a))
+
+## Bouffees de fumee (melange normal) le long de la trainee.
+func _smoke_trail(col: Color, size0: float, grow: float, alpha: float) -> void:
+	var tex: Texture2D = _T("ts_smoke")
+	if tex == null:
+		return
+	for tr in _trail:
+		var ag: float = float(tr[1])
+		var k: float = clampf(1.0 - ag / 0.7, 0.0, 1.0)
+		var sz: float = size0 + grow * ag
+		var rot: float = float(tr[2]) if tr.size() > 2 else 0.0
+		draw_set_transform(to_local(tr[0] as Vector2), rot, Vector2.ONE)
+		draw_texture_rect(tex, Rect2(-sz * 0.5, -sz * 0.5, sz, sz), false, Color(col.r, col.g, col.b, alpha * k))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+## Lueurs le long de la trainee (additif).
+func _glow_trail(g: CanvasItem, n: String, col: Color, size0: float, alpha: float) -> void:
+	for tr in _trail:
+		var ag: float = float(tr[1])
+		var k: float = clampf(1.0 - ag / 0.7, 0.0, 1.0)
+		_spr(g, n, to_local(tr[0] as Vector2), Vector2.ONE * size0 * (0.35 + 0.65 * k), 0.0, Color(col.r, col.g, col.b, alpha * k * k))
 
 # ---------------------------------------------------------------- DESSIN 1 SOUDEUSE
 func _draw_weld() -> void:
+	if t >= 0.7:
+		return
 	var o: Vector2 = to_local(src)
 	var max_ang: float = deg_to_rad(46.0)
+	var k: float = clampf(t / 0.7, 0.0, 1.0)
+	var a0: Vector2 = o + dir.rotated(-max_ang) * 320.0
+	var a1: Vector2 = o + dir.rotated(max_ang) * 320.0
+	# secteur de balayage +-46° (gabarit lisible, fondu)
+	var sector: PackedVector2Array = PackedVector2Array([o])
+	for i in 17:
+		sector.append(o + dir.rotated(lerpf(-max_ang, max_ang, float(i) / 16.0)) * 320.0)
+	draw_colored_polygon(sector, Color(0.25, 0.75, 1.0, 0.07 * k))
+	draw_line(o, a0, Color(0.4, 0.9, 1.0, 0.45 * k), 1.6, true)
+	draw_line(o, a1, Color(0.4, 0.9, 1.0, 0.45 * k), 1.6, true)
+	draw_arc(o, 320.0, dir.angle() - max_ang, dir.angle() + max_ang, 32, Color(0.4, 0.9, 1.0, 0.4 * k), 2.0, true)
+
+func _glow_weld(g: Node2D) -> void:
+	var o: Vector2 = to_local(src)
 	if t < 0.7:
 		var k: float = clampf(t / 0.7, 0.0, 1.0)
-		var a0: Vector2 = o + dir.rotated(-max_ang) * 320.0
-		var a1: Vector2 = o + dir.rotated(max_ang) * 320.0
-		# Grille industrielle de balayage +-46°
-		_dotted(o, a0, Color(0.35, 0.85, 1.0, 0.45 * k), 12.0, 2.2)
-		_dotted(o, a1, Color(0.35, 0.85, 1.0, 0.45 * k), 12.0, 2.2)
-		draw_arc(o, 320.0, dir.angle() - max_ang, dir.angle() + max_ang, 32, Color(0.35, 0.85, 1.0, 0.3 * k), 2.0)
-		# Arc median et encoches
-		for step in [-0.5, 0.0, 0.5]:
-			var tick_d: Vector2 = dir.rotated(max_ang * step)
-			draw_line(o + tick_d * 300.0, o + tick_d * 335.0, Color(0.4, 0.9, 1.0, 0.4 * k), 1.5)
-		# Masque de soudeur metallique
-		var vy: float = lerpf(-32.0, -14.0, k)
-		draw_colored_polygon(PackedVector2Array([o + Vector2(-18, vy - 11), o + Vector2(18, vy - 11), o + Vector2(13, vy + 7), o + Vector2(-13, vy + 7)]), Color(0.08, 0.11, 0.15, 0.95))
-		draw_rect(Rect2(o + Vector2(-10, vy - 4), Vector2(20, 6)), Color(0.4, 0.95, 1.0, 0.95))
-		# Etincelle pilote au nez du canon
-		var pilot_f: float = fmod(t * 22.0, 1.0)
-		draw_circle(o, 3.5 + pilot_f * 2.0, Color(0.8, 0.98, 1.0, 0.85))
+		var pulse: float = 0.6 + 0.4 * sin(t * 40.0)
+		_spr(g, "ts_flare", o, Vector2.ONE * (60.0 + 90.0 * k), t * 2.0, Color(0.6, 0.95, 1.0, (0.35 + 0.5 * k) * pulse))
 		return
 	if not _d.has("tip"):
 		return
 	var tip: Vector2 = to_local(_d["tip"])
-	var pts: PackedVector2Array = PackedVector2Array()
-	var n: int = 18
 	var perp: Vector2 = (tip - o).normalized().orthogonal()
-	# Faisceau principal avec fractal jitter
+	var n: int = 14
+	var pts: PackedVector2Array = PackedVector2Array()
 	for i in n + 1:
 		var f: float = float(i) / float(n)
-		var jit: float = 0.0 if (i == 0 or i == n) else (sin(t * 40.0 + float(i) * 2.5) * 5.5 + randf_range(-3.5, 3.5))
+		var jit: float = 0.0 if (i == 0 or i == n) else (sin(t * 38.0 + float(i) * 2.5) * 6.0 + randf_range(-4.0, 4.0))
 		pts.append(o.lerp(tip, f) + perp * jit)
-	# Gaine cyan et coeur blanc incandescant
-	draw_polyline(pts, Color(0.4, 0.92, 1.0, 0.75), 6.5, true)
-	draw_polyline(pts, Color(1.0, 1.0, 1.0, 0.98), 2.8, true)
-	# 5 branches electriques ramifiees
+	var v: int = int(t * 28.0)
+	for i in n:
+		_strip(g, "ts_beam_weld", pts[i], pts[i + 1], 52.0, v + i)
+	# ramifications qui jaillissent du tronc
 	for i in 5:
-		var bi: int = clampi(int(float(n) * (0.2 + float(i) * 0.14)), 2, n - 2)
-		var br_root: Vector2 = pts[bi]
-		var br_dir: Vector2 = perp * (1.0 if i % 2 == 0 else -1.0) * randf_range(18.0, 32.0) + (tip - o).normalized() * randf_range(10.0, 24.0)
-		var br_mid: Vector2 = br_root + br_dir * 0.55 + perp * randf_range(-8.0, 8.0)
-		var br_tip: Vector2 = br_root + br_dir
-		draw_polyline(PackedVector2Array([br_root, br_mid, br_tip]), Color(0.55, 0.92, 1.0, 0.85), 1.8, true)
-		draw_circle(br_tip, 1.6, Color(0.9, 1.0, 1.0, 0.9))
-	# Cratere de fusion au point d'impact
-	draw_circle(tip, 11.0 + randf() * 3.0, Color(1.0, 0.95, 0.7, 0.85))
-	draw_circle(tip, 19.0 + randf() * 4.0, Color(1.0, 0.5, 0.1, 0.4))
-	# Etincelles physiques avec traînée effilee
+		var bi: int = clampi(int(float(n) * (0.2 + float(i) * 0.15)), 2, n - 2)
+		var root: Vector2 = pts[bi]
+		var bd: Vector2 = perp * (1.0 if i % 2 == 0 else -1.0) * randf_range(26.0, 48.0) + (tip - o).normalized() * randf_range(12.0, 34.0)
+		_strip(g, "ts_beam_weld", root, root + bd * 0.55 + perp * randf_range(-9.0, 9.0), 24.0, v + i * 3, Color(1, 1, 1, 0.85))
+		_strip(g, "ts_beam_weld", root + bd * 0.55, root + bd, 16.0, v + i * 5, Color(1, 1, 1, 0.7))
+	# ecrasement de lumiere : bouche + point d'impact
+	_spr(g, "ts_flare", o, Vector2.ONE * (96.0 + randf() * 14.0), t * 3.0, Color(0.7, 0.97, 1.0, 0.9))
+	_spr(g, "ts_flare", tip, Vector2.ONE * (150.0 + randf() * 24.0), t * -2.0, Color(1.0, 0.92, 0.75, 0.95))
+	_spr(g, "ts_ring", tip, Vector2.ONE * (60.0 + 26.0 * fmod(t * 3.0, 1.0)), 0.0, Color(1.0, 0.7, 0.3, 0.45))
+	# etincelles : traits effiles orientes selon leur vitesse
 	for sp in _sparks:
-		var p_cur: Vector2 = to_local(sp[0] as Vector2)
-		var sp_v: Vector2 = sp[1] as Vector2
-		var l: float = float(sp[2])
-		var max_l: float = float(sp[3])
-		var f_sp: float = clampf(l / max_l, 0.0, 1.0)
-		var p_prev: Vector2 = p_cur - sp_v * minf(0.026, 0.045 * f_sp)
-		draw_line(p_prev, p_cur, Color(1.0, 0.48, 0.1, f_sp * 0.75), 2.2 * f_sp + 0.8)
-		draw_circle(p_cur, 1.8 * f_sp + 0.5, Color(1.0, 0.96, 0.85, f_sp))
-
-func _glow_weld(g: Node2D) -> void:
-	if t < 0.7 or not _d.has("tip"):
-		return
-	var o: Vector2 = to_local(src)
-	var tip: Vector2 = to_local(_d["tip"])
-	g.draw_line(o, tip, Color(0.25, 0.65, 1.0, 0.35), 36.0)
-	g.draw_line(o, tip, Color(0.5, 0.92, 1.0, 0.6), 16.0)
-	g.draw_circle(tip, 22.0 + randf() * 6.0, Color(0.7, 0.95, 1.0, 0.65))
-	g.draw_circle(o, 14.0 + randf() * 4.0, Color(0.7, 0.95, 1.0, 0.65))
+		var pc: Vector2 = to_local(sp[0] as Vector2)
+		var sv: Vector2 = sp[1] as Vector2
+		var fs: float = clampf(float(sp[2]) / float(sp[3]), 0.0, 1.0)
+		_line(g, "ts_spark", pc - sv.normalized() * (10.0 + 26.0 * fs), pc, 4.0 + 9.0 * fs, Color(1.0, 0.78, 0.4, fs))
 
 # ---------------------------------------------------------------- DESSIN 2 TERRES CALCINEES
-func _draw_solar() -> void:
-	var o: Vector2 = to_local(src)
-	if t < 1.5:
-		var u: float = clampf(t / 1.5, 0.0, 1.0)
-		var lk: Vector2 = to_local(_d["lock"] if _d.has("lock") else tgt)
-		var rr: float = lerpf(320.0, 24.0, u * u)
-		# 12 rayons solaires or qui convergent
-		for i in 12:
-			var a: float = TAU * float(i) / 12.0 + u * 1.1
-			var r_len: float = rr + lerpf(180.0, 40.0, u)
-			var from: Vector2 = lk + Vector2.RIGHT.rotated(a) * r_len
-			draw_line(from, lk, Color(1.0, 0.88, 0.35, 0.15 + 0.65 * u), 1.5 + 2.5 * u)
-		# Anneaux solaires concentriques se resserrant
-		draw_arc(lk, rr, 0.0, TAU, 48, Color(1.0, 0.92, 0.5, 0.25 + 0.45 * u), 2.2)
-		draw_arc(lk, rr * 0.6, 0.0, TAU, 36, Color(1.0, 0.8, 0.3, 0.2 + 0.5 * u), 1.6)
-		# Motes d'energie convergentes
-		for i in 8:
-			var mote_p: float = fmod(u * 3.0 + float(i) * 0.28, 1.0)
-			var mote_pos: Vector2 = lk + Vector2.RIGHT.rotated(float(i) * 1.25) * (rr * (1.0 - mote_p))
-			draw_circle(mote_pos, 2.2 * (1.0 - mote_p), Color(1.0, 1.0, 0.8, 0.85))
-		return
-	if _d.has("tip"):
-		var tip: Vector2 = to_local(_d["tip"])
-		var f: float = clampf(1.0 - (t - 1.5) / 0.45, 0.0, 1.0)
-		# Aiguille instantanee : coeur ultra fin et net
-		draw_line(o, tip, Color(1.0, 0.92, 0.55, f), 8.0 * f + 1.5)
-		draw_line(o, tip, Color(1.0, 1.0, 1.0, f), 3.0 * f + 1.0)
-
 func _glow_solar(g: Node2D) -> void:
 	var o: Vector2 = to_local(src)
 	if t < 1.5:
 		var u: float = clampf(t / 1.5, 0.0, 1.0)
 		var lk: Vector2 = to_local(_d["lock"] if _d.has("lock") else tgt)
-		# Eclat focal sur la cible et lentille sur le miroir
-		g.draw_circle(lk, 14.0 + 38.0 * u, Color(1.0, 0.88, 0.35, 0.2 + 0.6 * u))
-		g.draw_circle(o, 12.0 + 32.0 * u, Color(1.0, 0.92, 0.5, 0.2 + 0.5 * u))
-		for i in 4:
-			var a: float = float(i) * PI * 0.5 + 0.4
-			g.draw_line(o - Vector2.RIGHT.rotated(a) * (36.0 * u), o + Vector2.RIGHT.rotated(a) * (36.0 * u), Color(1.0, 0.96, 0.65, 0.7 * u), 2.5)
+		var rr: float = lerpf(320.0, 24.0, u * u)
+		# 12 rayons d'or qui convergent sur la cible
+		for i in 12:
+			var a: float = TAU * float(i) / 12.0 + u * 1.1
+			var r_len: float = rr + lerpf(160.0, 36.0, u)
+			var from: Vector2 = lk + Vector2.RIGHT.rotated(a) * r_len
+			_strip(g, "ts_beam_solar", from, lk, 6.0 + 22.0 * u, i, Color(1, 1, 1, 0.1 + 0.55 * u))
+		# iris : anneaux qui se resserrent
+		_spr(g, "ts_ring", lk, Vector2.ONE * rr * 2.0, u * 1.5, Color(1.0, 0.85, 0.4, 0.25 + 0.55 * u))
+		_spr(g, "ts_ring", lk, Vector2.ONE * rr * 1.2, -u * 2.2, Color(1.0, 0.7, 0.25, 0.2 + 0.5 * u))
+		_spr(g, "ts_flare", lk, Vector2.ONE * (50.0 + 190.0 * u), u * 2.0, Color(1.0, 0.9, 0.55, 0.3 + 0.7 * u))
+		# lentille du miroir qui se charge
+		_spr(g, "ts_flare", o, Vector2.ONE * (60.0 + 150.0 * u), -u * 3.0, Color(1.0, 0.95, 0.65, 0.35 + 0.6 * u))
 		return
 	if _d.has("tip"):
 		var tip: Vector2 = to_local(_d["tip"])
 		var f: float = clampf(1.0 - (t - 1.5) / 0.45, 0.0, 1.0)
-		g.draw_line(o, tip, Color(1.0, 0.78, 0.2, 0.65 * f), 42.0 * f)
-		g.draw_line(o, tip, Color(1.0, 0.95, 0.7, 0.85 * f), 16.0 * f)
+		_strip(g, "ts_beam_solar", o, tip, 80.0 * f + 10.0, int(t * 40.0), Color(1, 1, 1, f))
+		_strip(g, "ts_beam_solar", o, tip, 26.0 * f + 4.0, int(t * 40.0) + 2, Color(1, 1, 1, f))
+		_spr(g, "ts_flare", tip, Vector2.ONE * (300.0 * f + 40.0), 0.0, Color(1.0, 0.92, 0.6, f))
+		_spr(g, "ts_flare", o, Vector2.ONE * (150.0 * f + 20.0), 0.0, Color(1.0, 0.95, 0.75, f))
+		_spr(g, "ts_ring", tip, Vector2.ONE * (360.0 * (1.0 - f) + 40.0), 0.0, Color(1.0, 0.8, 0.35, 0.8 * f))
 
 # ---------------------------------------------------------------- DESSIN 3 RUINE VERTE
 func _draw_pod() -> void:
 	var u: float = clampf(t / life, 0.0, 1.0)
 	var gp: Vector2 = to_local(_ground(u))
 	var tp: Vector2 = to_local(tgt)
-	# Ombre ovale nette et contrastée qui grandit a l'approche
-	_ellipse(tp, 16.0 + 34.0 * u, 8.0 + 17.0 * u, Color(0.01, 0.06, 0.01, 0.2 + 0.45 * u))
-	_ellipse(gp, 14.0 * (1.0 - u * 0.3), 6.0 * (1.0 - u * 0.3), Color(0.0, 0.0, 0.0, 0.22))
-	# Trainee de spores
-	for tr in _trail:
-		var ag: float = float(tr[1])
-		var k_tr: float = 1.0 - ag / 0.7
-		draw_circle(to_local(tr[0]), 3.5 * k_tr, Color(0.55, 0.92, 0.25, 0.55 * k_tr))
-	# Cosse en cloche qui tourne avec ailerons organiques
-	var rot: float = t * 11.0
-	_ellipse(Vector2.ZERO, 15.0, 10.0, Color(0.24, 0.55, 0.16), rot)
-	_ellipse(Vector2(-3, -2), 8.0, 4.5, Color(0.7, 1.0, 0.35, 0.85), rot)
-	# 3 ailes de samara / sycomore
-	for i in 3:
-		var la: float = rot + float(i) * TAU / 3.0
-		var wing: PackedVector2Array = PackedVector2Array([
-			Vector2.RIGHT.rotated(la) * 9.0,
-			Vector2.RIGHT.rotated(la + 0.32) * 24.0,
-			Vector2.RIGHT.rotated(la - 0.18) * 18.0
-		])
-		draw_colored_polygon(wing, Color(0.32, 0.72, 0.22, 0.92))
+	# ombre d'alerte qui s'assombrit et se resserre sur la cible, ombre de la cosse sur son trajet
+	_shadow(tp, 22.0 + 40.0 * u, 11.0 + 20.0 * u, 0.25 + 0.5 * u)
+	_shadow(gp, 16.0 * (1.0 - u * 0.3), 8.0 * (1.0 - u * 0.3), 0.4)
 
-func _draw_thorn() -> void:
-	draw_colored_polygon(PackedVector2Array([Vector2(16, 0), Vector2(-7, 4.0), Vector2(-5, 0), Vector2(-7, -4.0)]), Color(0.8, 1.0, 0.45))
-	draw_line(Vector2(-6, 0), Vector2(-20, 0), Color(0.45, 0.9, 0.3, 0.65), 2.5)
+func _glow_pod(g: Node2D) -> void:
+	_glow_trail(g, "ts_flare", Color(0.6, 1.0, 0.3), 46.0, 0.6)
+	_spr(g, "ts_pod_head", Vector2.ZERO, Vector2.ONE * 92.0, t * 11.0, Color.WHITE)
+
+func _glow_thorn(g: Node2D) -> void:
+	_line(g, "ts_streak", Vector2(-44, 0), Vector2(10, 0), 14.0, Color(0.7, 1.0, 0.4, 0.9))
+	_spr(g, "ts_flare", Vector2(6, 0), Vector2.ONE * 34.0, 0.0, Color(0.85, 1.0, 0.55, 0.9))
 
 # ---------------------------------------------------------------- DESSIN 4 FORGE
 func _draw_slag() -> void:
 	var tp: Vector2 = to_local(tgt)
 	if phase == 0:
 		var u: float = clampf(t / life, 0.0, 1.0)
-		_ellipse(tp, 20.0 + 26.0 * u, 9.0 + 12.0 * u, Color(0.06, 0.03, 0.02, 0.35 + 0.35 * u))
-		# Vapeur et fumee chaude au sol
-		for i in 4:
-			var rise: float = fmod(t * 42.0 + float(i) * 20.0, 70.0)
-			draw_circle(tp + Vector2(sin(t * 3.5 + float(i)) * 10.0, -rise), 6.0 + rise * 0.12, Color(0.22, 0.18, 0.16, 0.38 * (1.0 - rise / 70.0)))
-	# Trainee de fumee noire et cendre
-	for tr in _trail:
-		var ag: float = float(tr[1])
-		var sz_tr: float = float(tr[2]) if tr.size() > 2 else 7.0
-		var k_tr: float = 1.0 - ag / 0.7
-		draw_circle(to_local(tr[0]), sz_tr + 6.0 * ag, Color(0.14, 0.11, 0.09, 0.55 * k_tr))
-	# Obus de lave lourd : coeur de magma incandescent + plaques d'obsidienne
-	draw_circle(Vector2.ZERO, 17.0, Color(0.12, 0.08, 0.06))
-	draw_circle(Vector2.ZERO, 12.0, Color(1.0, 0.55, 0.12))
-	draw_circle(Vector2(-3, -3), 6.0, Color(1.0, 0.95, 0.65))
-	for i in 4:
-		var a: float = t * 3.6 + float(i) * 1.57
-		draw_line(Vector2.RIGHT.rotated(a) * 4.0, Vector2.RIGHT.rotated(a + 0.35) * 16.0, Color(1.0, 0.8, 0.25), 2.5)
+		_shadow(tp, 30.0 + 40.0 * u, 14.0 + 20.0 * u, 0.3 + 0.45 * u)
+	else:
+		_shadow(to_local(global_position + Vector2(0.0, 40.0)), 22.0, 10.0, 0.35)
+	_smoke_trail(Color(0.16, 0.13, 0.12), 26.0, 60.0, 0.55)
 
 func _glow_slag(g: Node2D) -> void:
-	g.draw_circle(Vector2.ZERO, 30.0, Color(1.0, 0.42, 0.08, 0.32))
-	g.draw_circle(Vector2.ZERO, 15.0, Color(1.0, 0.75, 0.2, 0.5))
+	_glow_trail(g, "ts_flare", Color(1.0, 0.5, 0.1), 40.0, 0.7)
+	var pulse: float = 1.0 + 0.06 * sin(t * 30.0)
+	_spr(g, "ts_slag_head", Vector2.ZERO, Vector2.ONE * 104.0 * pulse, t * 3.0, Color.WHITE)
 
 # ---------------------------------------------------------------- DESSIN 5 CITE DECHUE
 func _draw_flak() -> void:
 	if phase == 0:
 		var tp: Vector2 = to_local(tgt)
 		var k: float = clampf(t / life, 0.0, 1.0)
-		draw_arc(tp, 122.0, 0.0, TAU, 40, Color(0.95, 0.88, 0.72, 0.25 + 0.5 * k), 2.6)
-		draw_circle(tp, 5.0, Color(0.1, 0.1, 0.14, 0.4 * k))
-		# Obus traceur avec combustion de phosphore
-		draw_line(Vector2.ZERO, -dir * 60.0, Color(1.0, 0.55, 0.18, 0.75), 5.5)
-		draw_line(Vector2.ZERO, -dir * 35.0, Color(1.0, 0.95, 0.6, 0.98), 3.0)
-		draw_circle(Vector2.ZERO, 4.0, Color(1.0, 1.0, 0.9))
-	else:
-		var r: float = float(_d.get("r", 0.0))
-		var f: float = clampf(1.0 - t / 0.6, 0.0, 1.0)
-		# Anneau de 16 eclats de tungstene
-		for i in FRAG_N:
-			var a: float = TAU * float(i) / float(FRAG_N) + 0.2
-			var p: Vector2 = Vector2.RIGHT.rotated(a) * r
-			var flechette: Vector2 = Vector2.RIGHT.rotated(a) * 18.0
-			draw_line(p, p - flechette, Color(1.0, 0.92, 0.5, f), 3.8)
-			draw_circle(p, 2.5, Color(1.0, 1.0, 0.9, f))
-		draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color(1.0, 0.92, 0.75, 0.7 * f), 4.0)
+		_shadow(tp, 18.0 + 10.0 * k, 9.0 + 5.0 * k, 0.25 + 0.3 * k)
+	_smoke_trail(Color(0.5, 0.48, 0.46), 14.0, 36.0, 0.35)
 
 func _glow_flak(g: Node2D) -> void:
 	if phase == 0:
-		g.draw_line(Vector2.ZERO, -dir * 50.0, Color(1.0, 0.78, 0.25, 0.5), 11.0)
+		var tp: Vector2 = to_local(tgt)
+		var k: float = clampf(t / life, 0.0, 1.0)
+		# anneau d'ombre qui annonce le rayon d'eclatement
+		_spr(g, "ts_ring", tp, Vector2.ONE * 244.0, 0.0, Color(1.0, 0.8, 0.45, 0.18 + 0.4 * k))
+		_spr(g, "ts_flak_head", Vector2.ZERO, Vector2(170, 170), dir.angle(), Color.WHITE)
 	else:
-		var f: float = clampf(1.0 - t / 0.35, 0.0, 1.0)
-		g.draw_circle(Vector2.ZERO, 32.0 * f + 8.0, Color(1.0, 0.72, 0.25, 0.6 * f))
+		var r: float = float(_d.get("r", 0.0))
+		var f: float = clampf(1.0 - t / 0.6, 0.0, 1.0)
+		_spr(g, "ts_ring", Vector2.ZERO, Vector2.ONE * (r * 2.0 + 24.0), 0.0, Color(1.0, 0.85, 0.55, 0.85 * f))
+		# 16 eclats de tungstene : traits incandescents radiaux
+		for i in FRAG_N:
+			var a: float = TAU * float(i) / float(FRAG_N) + 0.2
+			var d: Vector2 = Vector2.RIGHT.rotated(a)
+			_line(g, "ts_spark", d * (r - 30.0), d * r, 9.0, Color(1.0, 0.85, 0.5, f))
+			_spr(g, "ts_flare", d * r, Vector2.ONE * 22.0, 0.0, Color(1.0, 0.95, 0.8, f))
+		_spr(g, "ts_flare", Vector2.ZERO, Vector2.ONE * (60.0 + 60.0 * f), 0.0, Color(1.0, 0.8, 0.45, 0.7 * f))
 
 # ---------------------------------------------------------------- DESSIN 6 CRYO
-func _draw_orb() -> void:
+func _glow_orb(g: Node2D) -> void:
 	var o: Vector2 = to_local(src)
 	if phase == 0:
 		var k: float = clampf(t / 0.9, 0.0, 1.0)
 		var e: Vector2 = o + dir * minf(src.distance_to(tgt), 430.0) * k
-		# Ligne de givre dentritique
-		for i in 16:
-			var f_l: float = float(i) / 16.0
-			if f_l > k: break
+		# ligne de givre dentritique qui cristallise vers le joueur
+		_line(g, "ts_streak", o, e, 30.0, Color(0.7, 0.95, 1.0, 0.55))
+		for i in 12:
+			var f_l: float = float(i) / 12.0
+			if f_l > k:
+				break
 			var p: Vector2 = o.lerp(e, f_l)
-			var pr: Vector2 = dir.orthogonal() * (5.0 + 6.0 * sin(float(i) * 1.8))
-			draw_line(p - pr, p + pr, Color(0.78, 0.94, 1.0, 0.65), 1.8)
+			var pr: Vector2 = dir.orthogonal() * (14.0 + 10.0 * sin(float(i) * 1.8))
+			_line(g, "ts_spark", p - pr, p + pr, 8.0, Color(0.85, 0.97, 1.0, 0.7))
+		_spr(g, "ts_flare", o, Vector2.ONE * (50.0 + 70.0 * k), t * 2.0, Color(0.7, 0.95, 1.0, 0.4 + 0.5 * k))
 		return
-	# Trainee de givre et cristaux
-	for tr in _trail:
-		var ag: float = float(tr[1])
-		var k_tr: float = 1.0 - ag / 0.7
-		draw_circle(to_local(tr[0]), 6.0 + 10.0 * ag, Color(0.85, 0.96, 1.0, 0.26 * k_tr))
-	# Orbe de glace a cristaux rotatifs
-	var rot: float = t * 2.2
-	var pts: PackedVector2Array = PackedVector2Array()
-	for i in 8:
-		pts.append(Vector2.RIGHT.rotated(rot + float(i) * TAU / 8.0) * (18.0 if i % 2 == 0 else 12.0))
-	draw_colored_polygon(pts, Color(0.65, 0.88, 1.0, 0.95))
-	draw_circle(Vector2.ZERO, 7.5, Color(0.95, 1.0, 1.0))
-
-func _glow_orb(g: Node2D) -> void:
-	if phase == 1:
-		g.draw_circle(Vector2.ZERO, 34.0, Color(0.5, 0.85, 1.0, 0.32))
+	_glow_trail(g, "ts_flare", Color(0.7, 0.95, 1.0), 52.0, 0.45)
+	_spr(g, "ts_ring", Vector2.ZERO, Vector2.ONE * 96.0, t * 1.4, Color(0.7, 0.92, 1.0, 0.4))
+	_spr(g, "ts_frost_head", Vector2.ZERO, Vector2.ONE * 112.0, t * 2.2, Color.WHITE)
 
 # ---------------------------------------------------------------- DESSIN 7 NOYAU INSTABLE
-func _draw_plasma() -> void:
-	var o: Vector2 = to_local(src)
-	if phase == 0:
-		var st: int = int(_d.get("stage", 1))
-		for k in st:
-			var rr: float = 18.0 + float(k) * 12.0 + randf() * 2.5
-			draw_arc(o, rr, 0.0, TAU, 32, Color(0.35, 1.0, 0.6, 0.9), 2.2)
-		# Arcs electriques corona
-		for i in 4:
-			var a: float = randf() * TAU
-			draw_line(o, o + Vector2.RIGHT.rotated(a) * (20.0 + float(st) * 10.0), Color(0.85, 1.0, 0.9, 0.85), 1.6)
-		return
-	for tr in _trail:
-		var ag: float = float(tr[1])
-		draw_circle(to_local(tr[0]), 7.0 * (1.0 - ag / 0.7), Color(0.4, 1.0, 0.6, 0.38))
-	if _d.get("tele", false):
-		var base: Vector2 = Vector2.ZERO
-		for i in 3:
-			var dd: Vector2 = dir.rotated(float(i - 1) * 0.4)
-			_dotted(base, base + dd * 360.0, Color(0.5, 1.0, 0.6, 0.55), 12.0, 2.0)
-	draw_circle(Vector2.ZERO, 13.0 + randf() * 3.0, Color(0.9, 1.0, 0.92))
-	for i in 3:
-		draw_arc(Vector2.ZERO, 15.0 + float(i) * 5.0, t * 7.0 + float(i), t * 7.0 + float(i) + 1.8, 12, Color(0.4, 1.0, 0.6, 0.85), 2.0)
-
 func _glow_plasma(g: Node2D) -> void:
 	var o: Vector2 = to_local(src)
 	if phase == 0:
 		var st: int = int(_d.get("stage", 1))
-		g.draw_circle(o, 14.0 + 14.0 * float(st), Color(0.3, 1.0, 0.55, 0.18 + 0.12 * float(st)))
-	else:
-		g.draw_circle(Vector2.ZERO, 36.0, Color(0.3, 1.0, 0.55, 0.35))
-
-func _draw_bolt() -> void:
-	var n: int = 9
-	var pts: PackedVector2Array = PackedVector2Array()
-	var back: Vector2 = -vel.normalized() * 52.0
-	var perp: Vector2 = vel.normalized().orthogonal()
-	for i in n + 1:
-		var f: float = float(i) / float(n)
-		pts.append(back * f + perp * (0.0 if i == 0 else randf_range(-7.0, 7.0)))
-	draw_polyline(pts, Color(0.95, 1.0, 0.95), 3.0, true)
+		var sz: float = 40.0 + 34.0 * float(st)
+		_spr(g, "ts_plasma_head", o, Vector2.ONE * (sz + randf() * 6.0), t * 4.0, Color(1, 1, 1, 0.55 + 0.15 * float(st)))
+		for k in st:
+			_spr(g, "ts_ring", o, Vector2.ONE * (60.0 + float(k) * 40.0 + randf() * 5.0), t * (3.0 + float(k)) * (1.0 if k % 2 == 0 else -1.0), Color(0.5, 1.0, 0.7, 0.6))
+		# arcs electriques qui crepitent depuis la bouche
+		for i in 2 + st * 2:
+			var a: float = randf() * TAU
+			_strip(g, "ts_beam_plasma", o, o + Vector2.RIGHT.rotated(a) * (36.0 + 22.0 * float(st)), 14.0, i + int(t * 30.0), Color(1, 1, 1, 0.9))
+		return
+	_glow_trail(g, "ts_flare", Color(0.45, 1.0, 0.65), 56.0, 0.55)
+	if _d.get("tele", false):
+		for i in 3:
+			var dd: Vector2 = dir.rotated(float(i - 1) * 0.4)
+			_strip(g, "ts_beam_plasma", Vector2.ZERO, dd * 360.0, 10.0, i, Color(1, 1, 1, 0.35))
+	_spr(g, "ts_plasma_head", Vector2.ZERO, Vector2.ONE * (118.0 + randf() * 8.0), t * 5.0, Color.WHITE)
 
 func _glow_bolt(g: Node2D) -> void:
-	g.draw_line(Vector2.ZERO, -vel.normalized() * 52.0, Color(0.35, 1.0, 0.55, 0.45), 14.0)
+	var a: float = vel.angle() - rotation
+	_spr(g, "ts_bolt_head", Vector2.ZERO, Vector2(150, 150), a, Color.WHITE)
+	_glow_trail(g, "ts_flare", Color(0.45, 1.0, 0.65), 30.0, 0.4)
 
 # ---------------------------------------------------------------- DESSIN 8 RUCHE
 func _draw_acid() -> void:
 	var u: float = clampf(t / life, 0.0, 1.0)
-	var tp: Vector2 = to_local(_ground(u))
-	_ellipse(tp, 12.0, 5.5, Color(0.0, 0.0, 0.0, 0.18))
-	# Globule qui s'etire de facon organique
-	var sp: float = 1.0 + 1.2 * sin(u * PI)
-	var rot: float = dir.angle()
-	_ellipse(Vector2.ZERO, 13.0 * sp, 8.5 / sp, Color(0.82, 0.95, 0.22, 0.95), rot)
-	_ellipse(Vector2(-2, -2), 5.0 * sp, 2.8, Color(1.0, 1.0, 0.75, 0.9), rot)
+	_shadow(to_local(_ground(u)), 14.0, 7.0, 0.3)
+
+func _glow_acid(g: Node2D) -> void:
+	var u: float = clampf(t / life, 0.0, 1.0)
+	var sp: float = 1.0 + 1.1 * sin(u * PI)
+	g.draw_set_transform(Vector2.ZERO, dir.angle(), Vector2(sp, 1.0 / sqrt(sp)))
+	var tex: Texture2D = _T("ts_acid_head")
+	if tex != null:
+		g.draw_texture_rect(tex, Rect2(-46.0, -46.0, 92.0, 92.0), false, Color.WHITE)
+	g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 # ---------------------------------------------------------------- DESSIN 9 CITADELLE
 func _draw_lock() -> void:
 	var u: float = clampf(t / life, 0.0, 1.0)
 	var rr: float = lerpf(135.0, 36.0, u)
 	var col_lock: Color = Color(1.0, 0.82, 0.28, 0.4 + 0.6 * u) if u < 0.85 else Color(1.0, 0.25, 0.25, 0.95)
-	# Reticule de verrouillage militaire avec calibres
+	# reticule de verrouillage militaire : 4 arcs + calibres + croix
 	for i in 4:
 		var a: float = float(i) * PI * 0.5 + u * 1.4
-		draw_arc(Vector2.ZERO, rr, a, a + 0.85, 12, col_lock, 3.0)
-		draw_line(Vector2.RIGHT.rotated(a + 0.42) * (rr - 9.0), Vector2.RIGHT.rotated(a + 0.42) * (rr + 9.0), col_lock, 2.2)
-	draw_circle(Vector2.ZERO, 3.5, Color(1.0, 0.2, 0.2, 0.95 * u))
+		draw_arc(Vector2.ZERO, rr, a, a + 0.85, 12, col_lock, 3.0, true)
+		draw_line(Vector2.RIGHT.rotated(a + 0.42) * (rr - 9.0), Vector2.RIGHT.rotated(a + 0.42) * (rr + 9.0), col_lock, 2.2, true)
+	draw_line(Vector2(-10, 0), Vector2(10, 0), col_lock, 1.6)
+	draw_line(Vector2(0, -10), Vector2(0, 10), col_lock, 1.6)
 
 func _glow_lock(g: Node2D) -> void:
 	var u: float = clampf(t / life, 0.0, 1.0)
 	var rr: float = lerpf(135.0, 36.0, u)
-	var col_glow: Color = Color(1.0, 0.8, 0.25, 0.35 * u) if u < 0.85 else Color(1.0, 0.3, 0.3, 0.6)
-	g.draw_arc(Vector2.ZERO, rr, 0.0, TAU, 32, col_glow, 6.0)
+	var hot: bool = u >= 0.85
+	var col_glow: Color = Color(1.0, 0.3, 0.3, 0.7) if hot else Color(1.0, 0.8, 0.3, 0.25 + 0.4 * u)
+	_spr(g, "ts_ring", Vector2.ZERO, Vector2.ONE * rr * 2.2, u * 1.4, col_glow)
+	_spr(g, "ts_flare", Vector2.ZERO, Vector2.ONE * (30.0 + 40.0 * u), 0.0, Color(1.0, 0.3, 0.25, 0.95 * u))
 
 func _draw_missile() -> void:
-	var n: int = _trail.size()
-	for i in n:
-		var ag: float = float(_trail[i][1])
-		var k_tr: float = 1.0 - ag / 0.7
-		var sz_tr: float = float(_trail[i][2]) if _trail[i].size() > 2 else 4.0
-		draw_circle(to_local(_trail[i][0]), sz_tr + 5.0 * k_tr, Color(1.0, 1.0, 1.0, 0.48 * k_tr))
-	var d: Vector2 = dir
-	var pr: Vector2 = d.orthogonal()
-	draw_colored_polygon(PackedVector2Array([d * 14.0, d * 5.0 + pr * 4.5, -d * 10.0 + pr * 4.5, -d * 10.0 - pr * 4.5, d * 5.0 - pr * 4.5]), Color(0.95, 0.96, 1.0))
-	draw_colored_polygon(PackedVector2Array([d * 14.0, d * 7.0 + pr * 3.5, d * 7.0 - pr * 3.5]), Color(1.0, 0.78, 0.25))
-	draw_colored_polygon(PackedVector2Array([-d * 10.0 + pr * 4.5, -d * 14.0 + pr * 9.0, -d * 5.0 + pr * 4.5]), Color(1.0, 0.78, 0.25))
-	draw_colored_polygon(PackedVector2Array([-d * 10.0 - pr * 4.5, -d * 14.0 - pr * 9.0, -d * 5.0 - pr * 4.5]), Color(1.0, 0.78, 0.25))
+	_smoke_trail(Color(0.92, 0.93, 0.96), 14.0, 40.0, 0.5)
 
 func _glow_missile(g: Node2D) -> void:
-	g.draw_line(-dir * 9.0, -dir * (26.0 + randf() * 7.0), Color(0.5, 0.92, 1.0, 0.85), 7.0)
-	g.draw_circle(-dir * 11.0, 8.5, Color(0.65, 0.95, 1.0, 0.55))
+	_glow_trail(g, "ts_flare", Color(0.6, 0.9, 1.0), 34.0, 0.5)
+	_spr(g, "ts_missile_head", Vector2.ZERO, Vector2(150, 150), dir.angle(), Color(1, 1, 1, 1))
 
 # ================================================================== CLASSES AUXILIAIRES
 class ShotGlow extends Node2D:
@@ -991,6 +957,7 @@ class ShotGlow extends Node2D:
 		if owner_shot != null and is_instance_valid(owner_shot):
 			owner_shot._draw_glow(self)
 
+## Residu au sol : decor en melange normal (croute, flaque) + emissif additif par-dessus.
 class TurretAfter extends Node2D:
 	var kind: String = ""
 	var a: Vector2 = Vector2.ZERO
@@ -1003,9 +970,14 @@ class TurretAfter extends Node2D:
 	var t: float = 0.0
 	var _tick: float = 0.0
 	var _seed: float = 0.0
+	var _emit: AfterGlow = null
 
 	func _ready() -> void:
 		_seed = randf() * 50.0
+		_emit = AfterGlow.new()
+		_emit.owner_after = self
+		_emit.material = Tex.add_mat()
+		add_child(_emit)
 
 	func _process(delta: float) -> void:
 		t += delta
@@ -1026,99 +998,141 @@ class TurretAfter extends Node2D:
 					_tick = 0.25
 					plr.take_damage(dps * 0.25, a)
 		queue_redraw()
+		if _emit != null:
+			_emit.queue_redraw()
+
+	func _fade() -> float:
+		return clampf((dur - t) / 0.8, 0.0, 1.0) * clampf(t / 0.12, 0.0, 1.0)
+
+	func _decal(n: String, scale_k: float, alpha: float) -> void:
+		var tex: Texture2D = TurretShot._T(n)
+		if tex == null:
+			return
+		var sz: float = r * 2.0 * scale_k
+		draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)
+		draw_texture_rect(tex, Rect2(-sz * 0.5, -sz * 0.5, sz, sz), false, Color(1, 1, 1, alpha))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	func _draw() -> void:
-		var f: float = clampf((dur - t) / 0.7, 0.0, 1.0)
-		var o: Vector2 = Vector2.ZERO
+		var f: float = _fade()
 		match kind:
-			"magma": # Flaque de magma bouillonnante (5 s)
-				draw_circle(o, r, Color(0.12, 0.06, 0.04, 0.8 * f))
-				draw_circle(o, r * 0.82, Color(0.92, 0.32, 0.06, 0.65 * f))
-				draw_circle(o, r * 0.48, Color(1.0, 0.78, 0.22, 0.65 * f))
-				# Bulles de lave visqueuses qui gonflent et eclatent
-				for i in 6:
-					var ph: float = fmod(t * 1.3 + float(i) * 0.33 + _seed, 1.0)
-					var b_pos: Vector2 = Vector2.RIGHT.rotated(float(i) * 1.15 + _seed) * (r * 0.52)
-					draw_circle(b_pos, 4.0 + 6.0 * ph, Color(1.0, 0.9, 0.35, (1.0 - ph) * 0.85 * f))
-					draw_arc(b_pos, 4.0 + 7.0 * ph, 0.0, TAU, 16, Color(1.0, 0.5, 0.1, (1.0 - ph) * 0.6 * f), 1.5)
-			"acid": # Flaque d'acide caustique qui fume
-				draw_circle(o, r, Color(0.48, 0.68, 0.12, 0.6 * f))
-				draw_circle(o, r * 0.68, Color(0.82, 0.98, 0.25, 0.48 * f))
-				for i in 7:
-					var ph2: float = fmod(t * 1.2 + float(i) * 0.27 + _seed, 1.0)
-					var steam_pos: Vector2 = Vector2.RIGHT.rotated(float(i) * 1.05 + _seed) * r * 0.65 + Vector2(0.0, -ph2 * 28.0)
-					draw_circle(steam_pos, 2.5 + 4.5 * ph2, Color(0.92, 1.0, 0.5, (1.0 - ph2) * 0.75 * f))
+			"magma":
+				_decal("ts_slag_decal", 1.25, 0.95 * f)
+			"acid":
+				_decal("ts_acid_decal", 1.2, 0.9 * f)
+				_steam(Color(0.78, 0.95, 0.4), f * 0.5, 7, 34.0)
 			"drop":
-				draw_circle(o, r, Color(0.82, 0.96, 0.25, 0.65 * f))
-			"frost": # Trainee de givre et rime
-				draw_circle(o, r, Color(0.78, 0.92, 1.0, 0.35 * f))
-				for i in 6:
-					var ang: float = float(i) * TAU / 6.0 + _seed
-					draw_line(Vector2.RIGHT.rotated(ang) * r * 0.15, Vector2.RIGHT.rotated(ang) * r * 0.95, Color(0.92, 0.98, 1.0, 0.8 * f), 1.8)
-			"spores": # Nuage de spores organiques
-				for i in 8:
-					var ph3: float = fmod(t * 0.5 + float(i) * 0.28, 1.0)
-					draw_circle(Vector2.RIGHT.rotated(float(i) * 0.85 + t * 0.35) * r * (0.2 + 0.75 * ph3), 10.0 + 9.0 * ph3, Color(0.58, 0.92, 0.32, 0.2 * f))
-				draw_circle(o, r, Color(0.52, 0.88, 0.32, 0.12 * f))
-			"glass": # Sillon de verre vitrifie qui brule 3 s
-				var la: Vector2 = Vector2.ZERO
+				_decal("ts_acid_decal", 1.7, 0.85 * f)
+			"frost":
+				_decal("ts_frost_decal", 1.25, 0.9 * f)
+			"spores":
+				_decal("ts_spores_decal", 1.3, 1.0 * f)
+				_steam(Color(0.55, 0.9, 0.3), f * 0.4, 8, 20.0)
+			"glass":
+				var tex: Texture2D = TurretShot._T("ts_glass_decal")
 				var lb: Vector2 = b - a
-				draw_line(la, lb, Color(0.18, 0.72, 0.68, 0.4 * f), r * 1.6)
-				draw_line(la, lb, Color(0.6, 0.98, 0.88, 0.65 * f), 7.0)
-				draw_line(la, lb, Color(1.0, 0.9, 0.45, 0.6 * f), 2.5)
-				for i in 9:
-					var ph4: float = fmod(t * 2.2 + float(i) * 0.35, 1.0)
-					draw_circle(la.lerp(lb, float(i) / 9.0 + ph4 * 0.08), 2.2, Color(1.0, 1.0, 0.85, (1.0 - ph4) * f))
+				if tex != null and lb.length() > 1.0:
+					draw_set_transform(Vector2.ZERO, lb.angle(), Vector2.ONE)
+					draw_texture_rect(tex, Rect2(0.0, -r * 1.7, lb.length(), r * 3.4), false, Color(1, 1, 1, 0.95 * f))
+					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
+	## fumees / vapeurs qui montent de la flaque (melange normal, douces)
+	func _steam(col: Color, alpha: float, n: int, rise: float) -> void:
+		var tex: Texture2D = TurretShot._T("ts_smoke")
+		if tex == null:
+			return
+		for i in n:
+			var ph: float = fmod(t * 0.55 + float(i) / float(n) + _seed * 0.1, 1.0)
+			var pos: Vector2 = Vector2.RIGHT.rotated(float(i) * 2.4 + _seed) * r * 0.55 * (0.4 + fmod(float(i) * 0.37, 0.6)) + Vector2(0.0, -ph * rise)
+			var sz: float = 26.0 + 40.0 * ph
+			draw_texture_rect(tex, Rect2(pos - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false, Color(col.r, col.g, col.b, alpha * sin(ph * PI)))
+
+	func draw_emit(g: CanvasItem) -> void:
+		var f: float = _fade()
+		var pulse: float = 0.8 + 0.2 * sin(t * 5.0 + _seed)
+		match kind:
+			"magma":
+				var sz: float = r * 2.5
+				g.draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)
+				g.draw_texture_rect(TurretShot._T("ts_slag_glow"), Rect2(-sz * 0.5, -sz * 0.5, sz, sz), false, Color(1, 1, 1, f * pulse))
+				g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				# bulles de lave qui gonflent puis eclatent en etincelles
+				for i in 6:
+					var ph: float = fmod(t * 1.1 + float(i) * 0.33 + _seed, 1.0)
+					var pos: Vector2 = Vector2.RIGHT.rotated(float(i) * 1.15 + _seed) * (r * 0.5)
+					TurretShot._spr(g, "ts_flare", pos + Vector2(0, -ph * 12.0), Vector2.ONE * (10.0 + 30.0 * ph), 0.0, Color(1.0, 0.6, 0.2, (1.0 - ph) * 0.8 * f))
+			"acid":
+				var sz2: float = r * 2.4
+				g.draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)
+				g.draw_texture_rect(TurretShot._T("ts_acid_glow"), Rect2(-sz2 * 0.5, -sz2 * 0.5, sz2, sz2), false, Color(1, 1, 1, f * pulse))
+				g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				for i in 5:
+					var ph2: float = fmod(t * 1.3 + float(i) * 0.31 + _seed, 1.0)
+					var p2: Vector2 = Vector2.RIGHT.rotated(float(i) * 1.5 + _seed) * (r * 0.45)
+					TurretShot._spr(g, "ts_flare", p2 + Vector2(0, -ph2 * 22.0), Vector2.ONE * (8.0 + 18.0 * ph2), 0.0, Color(0.8, 1.0, 0.4, (1.0 - ph2) * 0.7 * f))
+			"drop":
+				var sz3: float = r * 3.4
+				g.draw_texture_rect(TurretShot._T("ts_acid_glow"), Rect2(-sz3 * 0.5, -sz3 * 0.5, sz3, sz3), false, Color(1, 1, 1, 0.8 * f))
+			"frost":
+				var sz4: float = r * 2.5
+				g.draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)
+				g.draw_texture_rect(TurretShot._T("ts_frost_glow"), Rect2(-sz4 * 0.5, -sz4 * 0.5, sz4, sz4), false, Color(1, 1, 1, f * (0.6 + 0.4 * pulse)))
+				g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			"spores":
+				var sz5: float = r * 2.6
+				g.draw_texture_rect(TurretShot._T("ts_spores_glow"), Rect2(-sz5 * 0.5, -sz5 * 0.5, sz5, sz5), false, Color(1, 1, 1, f * pulse))
+				for i in 8:
+					var ph3: float = fmod(t * 0.4 + float(i) * 0.19, 1.0)
+					var p3: Vector2 = Vector2.RIGHT.rotated(float(i) * 0.9 + t * 0.3) * r * (0.2 + 0.7 * ph3)
+					TurretShot._spr(g, "ts_flare", p3, Vector2.ONE * 12.0, 0.0, Color(0.7, 1.0, 0.45, sin(ph3 * PI) * 0.55 * f))
+			"glass":
+				var lb: Vector2 = b - a
+				if lb.length() > 1.0:
+					g.draw_set_transform(Vector2.ZERO, lb.angle(), Vector2.ONE)
+					var heat: float = clampf(t / 1.4, 0.0, 1.0)   # le verre est dore et fondu au debut, il refroidit en turquoise
+					var gc: Color = Color(1.0, 0.72, 0.32).lerp(Color.WHITE, heat)
+					g.draw_texture_rect(TurretShot._T("ts_glass_glow"), Rect2(0.0, -r * 1.7, lb.length(), r * 3.4), false, Color(gc.r, gc.g, gc.b, f * (0.75 + 0.25 * sin(t * 9.0))))
+					g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+					for i in 7:
+						var ph4: float = fmod(t * 1.6 + float(i) * 0.37, 1.0)
+						var p4: Vector2 = Vector2.ZERO.lerp(lb, fmod(float(i) * 0.139 + ph4 * 0.05, 1.0))
+						TurretShot._spr(g, "ts_flare", p4 + Vector2(0, -ph4 * 14.0), Vector2.ONE * 18.0, 0.0, Color(1.0, 0.9, 0.55, (1.0 - ph4) * 0.7 * f))
+
+	class AfterGlow extends Node2D:
+		var owner_after: TurretAfter = null
+		func _draw() -> void:
+			if owner_after != null and is_instance_valid(owner_after):
+				owner_after.draw_emit(self)
+
+## Impact : planche animee de 16 images (additif).
 class TurretBurst extends Node2D:
 	var kind: String = ""
 	var scl: float = 1.0
 	var col: Color = Color.WHITE
 	var t: float = 0.0
 	var _seed: float = 0.0
+	const DUR: float = 0.8
+	const SHEET: Dictionary = {"slag": ["ts_slag_impact", 250.0], "ice": ["ts_ice_impact", 270.0], "acid": ["ts_acid_impact", 210.0],
+		"pod": ["ts_pod_impact", 200.0], "smoke": ["ts_smoke_impact", 230.0], "plasma": ["ts_plasma_impact", 240.0],
+		"missile": ["ts_missile_impact", 260.0]}
 
 	func _ready() -> void:
 		_seed = randf() * TAU
+		material = Tex.add_mat()
 
 	func _process(delta: float) -> void:
 		t += delta
-		if t >= 0.7:
+		if t >= DUR:
 			queue_free()
 			return
 		queue_redraw()
 
 	func _draw() -> void:
-		var u: float = clampf(t / 0.7, 0.0, 1.0)
-		var f: float = 1.0 - u
-		match kind:
-			"slag":
-				for i in 10:
-					var a: float = _seed + float(i) * TAU / 10.0
-					var p: Vector2 = Vector2.RIGHT.rotated(a) * (55.0 * scl * u) + Vector2(0.0, -75.0 * u * (1.0 - u) * 4.0 * 0.5 + 32.0 * u * u)
-					draw_circle(p, 5.0 * f + 1.0, Color(1.0, 0.52, 0.12, f))
-			"ice":
-				draw_arc(Vector2.ZERO, 96.0 * scl * (1.0 - f * f), 0.0, TAU, 48, Color(0.82, 0.96, 1.0, 0.85 * f), 3.5)
-				for i in 12:
-					var a2: float = _seed + float(i) * TAU / 12.0
-					var l: float = 75.0 * scl * (1.0 - f * f)
-					draw_line(Vector2.RIGHT.rotated(a2) * l * 0.3, Vector2.RIGHT.rotated(a2) * l, Color(0.92, 0.98, 1.0, f), 3.2)
-			"acid":
-				for i in 8:
-					var a3: float = _seed + float(i) * TAU / 8.0
-					var p3: Vector2 = Vector2.RIGHT.rotated(a3) * (50.0 * scl * u)
-					draw_circle(p3, 5.5 * f + 1.0, Color(0.85, 0.98, 0.25, f))
-			"pod":
-				for i in 9:
-					var a4: float = _seed + float(i) * TAU / 9.0
-					draw_circle(Vector2.RIGHT.rotated(a4) * (44.0 * scl * u), 3.5 * f + 1.0, Color(col.r, col.g, col.b, f))
-			"smoke":
-				for i in 5:
-					var a5: float = _seed + float(i) * 1.5
-					draw_circle(Vector2.RIGHT.rotated(a5) * (16.0 * u), 18.0 * scl * (0.5 + u), Color(0.58, 0.58, 0.6, 0.55 * f))
-			"flower":
-				var rr: float = 78.0 * scl * (1.0 - f * f)
-				for i in 8:
-					var a6: float = _seed + float(i) * TAU / 8.0
-					var tip_b: Vector2 = Vector2.RIGHT.rotated(a6) * rr
-					draw_colored_polygon(PackedVector2Array([Vector2.RIGHT.rotated(a6 + 0.28) * rr * 0.3, tip_b, Vector2.RIGHT.rotated(a6 - 0.28) * rr * 0.3]), Color(col.r, col.g, col.b, 0.75 * f))
-				draw_arc(Vector2.ZERO, rr, 0.0, TAU, 40, Color(1.0, 0.88, 0.35, f), 3.2)
+		var u: float = clampf(t / DUR, 0.0, 0.999)
+		if not SHEET.has(kind):
+			return
+		var info: Array = SHEET[kind]
+		var sz: float = float(info[1]) * scl
+		draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)
+		TurretShot._frame(self, String(info[0]), int(u * 16.0), Vector2.ZERO, Vector2(sz, sz), Color(1, 1, 1, 1.0))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
