@@ -2474,6 +2474,24 @@ class Prop extends StaticBody2D:
 			_hook_cd = float(def.get("hook_cd", 4.0))
 			_hook_t = randf_range(1.0, _hook_cd)
 
+		# 16/10 audit du perimetre : reperes visibles pour les zones qui n en avaient pas
+		if _wind:
+			_add_zone_vis(_wind_r, Color(0.7, 0.9, 1.0), 0.16)
+		if _grav_zone:
+			_add_zone_vis(_grav_r, Color(0.6, 0.85, 1.0), 0.14)
+		if _fireflies:
+			_add_zone_vis(_firefly_r, Color(0.7, 1.0, 0.35), 0.16)
+		if _quench_pool:
+			_add_zone_vis(_quench_r, Color(0.45, 0.8, 1.0), 0.14)
+		if _scrap_magnet:
+			_add_zone_vis(_magnet_r, Color(0.55, 0.85, 1.0), 0.07)
+		if _radio_jammer:
+			_add_zone_vis(_jammer_r, Color(0.95, 0.35, 0.85), 0.08)
+		if _dome_shield:
+			_add_zone_vis(_dome_r, Color(0.45, 0.9, 1.0), 0.55, "dome")
+		if _containment_cell:
+			_add_zone_vis(_containment_r, Color(0.45, 1.0, 0.55), 0.55, "contain")
+
 		# props that need a per-frame tick
 		set_process(_awaken != "" or _shoot_r > 0.0 or _boom or _beam or _beacon or _pylon or _slow
 			or _aura != "" or _push or _guard or _spot or _cycle or _convey
@@ -2724,6 +2742,72 @@ class Prop extends StaticBody2D:
 	## (voir le calcul : echelle_globale = echelle_parent * echelle_locale).
 	func _core_child(halo: Sprite2D, color: Color) -> void:
 		halo.add_child(_glow_sprite(color.lerp(Color.WHITE, 0.5), 51.2, 1.8))
+		# 16/10 (audit du perimetre) : un disque lumineux a bord doux ne dit pas OU s arrete la zone. On ajoute un
+		# LISERE net exactement au rayon reel (le pic de Tex.ring est a 78 % du rayon de sa texture -> x1,28),
+		# enfant du halo : il herite de sa pulsation et de son alpha (ring alpha 2,2 x alpha du halo ~ 0,35).
+		var edge: Sprite2D = Sprite2D.new()
+		edge.texture = Tex.ring(color.lerp(Color.WHITE, 0.25), 128)
+		edge.scale = Vector2.ONE * 1.28
+		var em: CanvasItemMaterial = CanvasItemMaterial.new()
+		em.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		edge.material = em
+		edge.modulate = Color(1.0, 1.0, 1.0, 2.2)
+		halo.add_child(edge)
+
+	## 16/10 (audit du perimetre) : repere visible d une zone PERSISTANTE ou temporaire dont le rayon reel
+	## n etait signale nulle part (vent, gravite, lucioles, bassin, electroaimant, brouilleur, dome, cellule).
+	## mode "ring" : anneau doux qui respire ; "dome"/"contain" : bulle visible SEULEMENT pendant l activite.
+	## 16/10 (optimisation) : ~30 decors scrutaient CHACUN la liste des ennemis a chaque image (une copie de tableau
+	## par decor et par image). Une seule copie par image, partagee par tous les decors.
+	static var _enemy_cache: Array = []
+	static var _enemy_cache_frame: int = -1
+	static var _enemy_cache_on: bool = true   # les tests qui appellent _process() a la main plusieurs fois par image le coupent
+	func _enemies() -> Array:
+		var f: int = Engine.get_process_frames()
+		if f != _enemy_cache_frame or not _enemy_cache_on:
+			_enemy_cache_frame = f
+			_enemy_cache = get_tree().get_nodes_in_group("enemies")
+		return _enemy_cache
+
+	var _zone_vis: Array = []
+	func _add_zone_vis(r: float, col: Color, a: float, mode: String = "ring") -> void:
+		var sp: Sprite2D
+		if mode == "ring":
+			sp = _glow_sprite(col, r * 2.0, a)
+			add_child(sp)
+			_core_child(sp, col)
+		else:
+			sp = Sprite2D.new()
+			sp.texture = load("res://assets/vfx/shield_bubble.png")
+			var m: CanvasItemMaterial = CanvasItemMaterial.new()
+			m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			sp.material = m
+			sp.scale = Vector2.ONE * (r * 2.0 / 1024.0)
+			sp.modulate = Color(col.r, col.g, col.b, 0.0)
+			sp.z_index = 3
+			sp.visible = false
+			add_child(sp)
+		_zone_vis.append({"s": sp, "a": a, "mode": mode})
+
+	func _update_zone_vis(dist: float) -> void:
+		var tt: float = Time.get_ticks_msec() * 0.001
+		for z in _zone_vis:
+			var sp: Sprite2D = z["s"]
+			if sp == null or not is_instance_valid(sp):
+				continue
+			var a: float = float(z["a"])
+			match String(z["mode"]):
+				"ring":
+					sp.visible = dist < 1400.0
+					sp.modulate.a = a * (0.8 + 0.2 * sin(tt * 2.2))
+				"dome":
+					var v: float = _dome_active_t
+					sp.visible = v > 0.0
+					sp.modulate.a = a * clampf(v / 1.0, 0.0, 1.0) * (0.85 + 0.15 * sin(tt * 5.0))
+				"contain":
+					var v2: float = _containment_active_t
+					sp.visible = v2 > 0.0
+					sp.modulate.a = a * clampf(v2 / 1.0, 0.0, 1.0) * (0.85 + 0.15 * sin(tt * 5.0))
 
 	## Only runs on props that need it (see set_process in _ready): CARCASSES watch for the player
 	## walking close (the wreck IS the sleeping robot and stands up), TURRETS shoot at the player.
@@ -2737,6 +2821,8 @@ class Prop extends StaticBody2D:
 		var dist: float = global_position.distance_to(_plr.global_position)
 		if _head != null:
 			_update_head(delta, dist)
+		if not _zone_vis.is_empty():
+			_update_zone_vis(dist)
 
 		# --- CANON A RAYON AUTOMATIQUE A INTERVALLE REGULIER ---
 		if _cannon_beam and (dist < 2200.0 or _cannon_beam_state != 0):
@@ -2777,7 +2863,7 @@ class Prop extends StaticBody2D:
 				_plr.field_slow = minf(_plr.field_slow, _slow_mult)
 			if dist < 1300.0:   # only bother with enemies when the player is near this field
 				var r2s: float = _slow_r * _slow_r
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and "field_slow" in e:
 						if global_position.distance_squared_to((e as Node2D).global_position) <= r2s:
 							e.field_slow = minf(e.field_slow, _slow_mult)
@@ -2795,7 +2881,7 @@ class Prop extends StaticBody2D:
 				if dist < _push_r:
 					_plr.global_position += _push_dir * (_push_force * 0.12)
 				var r2p: float = _push_r * _push_r
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2p:
 						(e as Node2D).global_position += _push_dir * (_push_force * 0.12)
 				if game.has_method("spawn_vfx"):
@@ -2811,7 +2897,7 @@ class Prop extends StaticBody2D:
 				if _guard_t <= 0.0:
 					_guard_t = _guard_cd
 					var r2g: float = _guard_r * _guard_r
-					for e in get_tree().get_nodes_in_group("enemies"):
+					for e in _enemies():
 						if e is Node2D:
 							var away: Vector2 = (e as Node2D).global_position - global_position
 							var d2: float = away.length_squared()
@@ -2834,7 +2920,7 @@ class Prop extends StaticBody2D:
 			if _spot_marked == null:
 				var best: Enemy = null
 				var bd: float = _spot_r * _spot_r
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Enemy and (e as Enemy).alive:
 						var d: float = global_position.distance_squared_to((e as Node2D).global_position)
 						if d < bd:
@@ -2873,7 +2959,7 @@ class Prop extends StaticBody2D:
 				_convey_t = _convey_cd
 				var r2c: float = _convey_r * _convey_r
 				var moved: bool = false
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2c:
 						(e as Node2D).global_position += _convey_dir * _convey_dist
 						moved = true
@@ -2904,7 +2990,7 @@ class Prop extends StaticBody2D:
 					_plr.global_position += cv_step
 				if dist < 1400.0:
 					var r2cv: float = _conveyor_r * _conveyor_r
-					for e in get_tree().get_nodes_in_group("enemies"):
+					for e in _enemies():
 						if e is Node2D and is_instance_valid(e):
 							if global_position.distance_squared_to((e as Node2D).global_position) <= r2cv:
 								if "field_slow" in e:
@@ -2972,7 +3058,7 @@ class Prop extends StaticBody2D:
 				_plr.global_position += to_c * _sinkhole_pull * delta
 				_plr.field_slow = minf(_plr.field_slow, _sinkhole_slow)
 			var r2_sink: float = _sinkhole_r * _sinkhole_r
-			for e in get_tree().get_nodes_in_group("enemies"):
+			for e in _enemies():
 				if e is Node2D and is_instance_valid(e):
 					var to_e: Vector2 = global_position - (e as Node2D).global_position
 					var d2e: float = to_e.length_squared()
@@ -2995,7 +3081,7 @@ class Prop extends StaticBody2D:
 			if _mirage_active_t > 0.0:
 				_mirage_active_t -= delta
 				var r2_mir: float = _mirage_r * _mirage_r
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and is_instance_valid(e):
 						var to_m: Vector2 = global_position - (e as Node2D).global_position
 						var d2m: float = to_m.length_squared()
@@ -3261,7 +3347,7 @@ class Prop extends StaticBody2D:
 				if game != null and game.has_method("spawn_vfx"):
 					game.spawn_vfx("shockwave", spot_pos, 0.0, 1.8, Color(0.9, 0.7, 0.2))
 				if _plr != null and _plr.global_position.distance_to(spot_pos) < _searchlight_r * 0.5:
-					for e in get_tree().get_nodes_in_group("enemies"):
+					for e in _enemies():
 						if e is Node2D and (e as Node2D).global_position.distance_to(global_position) < 500.0:
 							if "speed_mult" in e:
 								e.speed_mult = 1.4
@@ -3414,7 +3500,7 @@ class Prop extends StaticBody2D:
 				if _plr != null and global_position.distance_squared_to(_plr.global_position) <= r2_v:
 					var p_dir: Vector2 = (_plr.global_position - global_position).normalized()
 					_plr.global_position += p_dir * (_vein_force * 0.4)
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and is_instance_valid(e):
 						if global_position.distance_squared_to((e as Node2D).global_position) <= r2_v:
 							var e_dir: Vector2 = ((e as Node2D).global_position - global_position).normalized()
@@ -3476,7 +3562,7 @@ class Prop extends StaticBody2D:
 			if _hook_t <= 0.0:
 				_hook_t = _hook_cd
 				var r2_h: float = _hook_r * _hook_r
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and is_instance_valid(e):
 						if global_position.distance_squared_to((e as Node2D).global_position) <= r2_h:
 							var pull_dir: Vector2 = (global_position - (e as Node2D).global_position).normalized()
@@ -3565,7 +3651,7 @@ class Prop extends StaticBody2D:
 					_plr.field_slow = minf(float(_plr.field_slow), 0.72)
 				if dist < 1300.0:
 					var r2f: float = _fog_r * _fog_r
-					for e in get_tree().get_nodes_in_group("enemies"):
+					for e in _enemies():
 						if e is Node2D and "field_slow" in e and global_position.distance_squared_to((e as Node2D).global_position) <= r2f:
 							e.field_slow = minf(float(e.field_slow), 0.72)
 
@@ -3638,7 +3724,7 @@ class Prop extends StaticBody2D:
 			if dist < _wind_r:
 				_plr.global_position += wind_step
 			var r2w: float = _wind_r * _wind_r
-			for e in get_tree().get_nodes_in_group("enemies"):
+			for e in _enemies():
 				if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2w:
 					(e as Node2D).global_position += wind_step
 
@@ -3711,7 +3797,7 @@ class Prop extends StaticBody2D:
 				_plr.field_slow = minf(_plr.field_slow, _bio_residue_slow)
 			if dist < 1300.0:
 				var r2b: float = _bio_residue_r * _bio_residue_r
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D:
 						var to_center: Vector2 = global_position - (e as Node2D).global_position
 						var d2b: float = to_center.length_squared()
@@ -3846,7 +3932,7 @@ class Prop extends StaticBody2D:
 	## (jamais velocity, voir la note dans le bloc IMPULSION plus haut).
 	func _on_dwell_filled() -> void:
 		var r2: float = 260.0 * 260.0
-		for e in get_tree().get_nodes_in_group("enemies"):
+		for e in _enemies():
 			if e is Node2D:
 				var away: Vector2 = (e as Node2D).global_position - global_position
 				var d2: float = away.length_squared()
@@ -3992,7 +4078,7 @@ class Prop extends StaticBody2D:
 	func _zap_nearest() -> void:
 		var best: Node2D = null
 		var bd: float = _pylon_r * _pylon_r
-		for e in get_tree().get_nodes_in_group("enemies"):
+		for e in _enemies():
 			if e is Node2D and is_instance_valid(e) and "alive" in e and e.alive:
 				var d: float = global_position.distance_squared_to((e as Node2D).global_position)
 				if d < bd:
@@ -4013,7 +4099,7 @@ class Prop extends StaticBody2D:
 			game.impact_fx(pos, Color(1.0, 0.95, 0.4), kind, Vector2.ZERO, 2.0)
 		Events.screen_shake.emit(6.0)
 		var r2: float = 320.0 * 320.0
-		for e in get_tree().get_nodes_in_group("enemies"):
+		for e in _enemies():
 			if e is Node2D and is_instance_valid(e) and "alive" in e and e.alive:
 				var to: Vector2 = (e as Node2D).global_position - pos
 				if to.length_squared() <= r2 and e.has_method("take_damage"):
@@ -4040,7 +4126,7 @@ class Prop extends StaticBody2D:
 				if plr_in and tick and _plr.has_method("take_damage"):
 					_plr.take_damage(_aura_p1)
 				if tick:
-					for e in get_tree().get_nodes_in_group("enemies"):
+					for e in _enemies():
 						if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2 and e.has_method("take_damage"):
 							e.take_damage(_aura_p1 * 1.4)
 			"spore":
@@ -4049,25 +4135,25 @@ class Prop extends StaticBody2D:
 						_plr.field_slow = minf(_plr.field_slow, _aura_p2)
 					if tick and _plr.has_method("take_damage"):
 						_plr.take_damage(_aura_p1)
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r2:
 						if "field_slow" in e:
 							e.field_slow = minf(e.field_slow, _aura_p2)
 						if tick and e.has_method("take_damage"):
 							e.take_damage(_aura_p1)
 			"frost":   # enemies only — a tactical slow you herd the horde into
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and "field_slow" in e and global_position.distance_squared_to((e as Node2D).global_position) <= r2:
 						e.field_slow = minf(e.field_slow, _aura_p1)
 			"snare":   # traps player AND foes
 				if plr_in and "field_slow" in _plr:
 					_plr.field_slow = minf(_plr.field_slow, _aura_p1)
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D and "field_slow" in e and global_position.distance_squared_to((e as Node2D).global_position) <= r2:
 						e.field_slow = minf(e.field_slow, _aura_p1)
 			"heal":    # repair node: tops up nearby foes -> a priority target
 				if tick:
-					for e in get_tree().get_nodes_in_group("enemies"):
+					for e in _enemies():
 						if e is Node2D and "hp" in e and "hp_max" in e and global_position.distance_squared_to((e as Node2D).global_position) <= r2:
 							e.hp = minf(float(e.hp_max), float(e.hp) + _aura_p1)
 
@@ -4076,7 +4162,7 @@ class Prop extends StaticBody2D:
 		if game == null:
 			return
 		var r: float = 240.0
-		for e in get_tree().get_nodes_in_group("enemies"):
+		for e in _enemies():
 			if e is Node2D and global_position.distance_squared_to((e as Node2D).global_position) <= r * r and e.has_method("take_damage"):
 				e.take_damage(60.0)
 		if game.has_method("aura_discharge_fx"):
@@ -4155,7 +4241,7 @@ class Prop extends StaticBody2D:
 		Audio.sfx("explosion", 0.12)
 		if game != null and game.has_method("spawn_vfx"):
 			game.spawn_vfx("energy", a, 0.0, 1.1, BEAM_COL)
-		for e in get_tree().get_nodes_in_group("enemies"):
+		for e in _enemies():
 			if e is Node2D and is_instance_valid(e) and e.has_method("take_damage"):
 				var p: Vector2 = (e as Node2D).global_position
 				if Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p) <= BEAM_HALF_W + 34.0:
@@ -4285,7 +4371,7 @@ class Prop extends StaticBody2D:
 
 	func _check_cannon_beam_hits(a: Vector2, b: Vector2, shot_dir: Vector2 = _cannon) -> void:
 		# Toucher des ennemis : les tourelles (meme hostiles) transpercent et blessent les ennemis dans la ligne !
-		for e in get_tree().get_nodes_in_group("enemies"):
+		for e in _enemies():
 			if e is Node2D and is_instance_valid(e) and e.has_method("take_damage"):
 				if _cannon_hit_set.has(e):
 					continue
@@ -4325,7 +4411,7 @@ class Prop extends StaticBody2D:
 				game.death_fx(pos, 2, true)      # the big lightning burst is EARNED here (rare event)
 			if game.has_method("impact_fx"):
 				game.impact_fx(pos, Color(1.0, 0.6, 0.25), kind, Vector2.ZERO, 2.4)
-			for e in get_tree().get_nodes_in_group("enemies"):
+			for e in _enemies():
 				if e is Node2D and is_instance_valid(e) and "alive" in e and e.alive:
 					if pos.distance_to((e as Node2D).global_position) <= BOOM_R and e.has_method("take_damage"):
 						e.take_damage(BOOM_DMG)
@@ -4440,7 +4526,7 @@ class Prop extends StaticBody2D:
 				# PILIER D'ENERGIE (Chambre de la Forge) : vague d'energie qui repousse les
 				# ennemis proches - meme nudge que _on_dwell_filled ("terminal"), rayon plus large.
 				var r2pil: float = 300.0 * 300.0
-				for e in get_tree().get_nodes_in_group("enemies"):
+				for e in _enemies():
 					if e is Node2D:
 						var awayp: Vector2 = (e as Node2D).global_position - global_position
 						var d2p: float = awayp.length_squared()

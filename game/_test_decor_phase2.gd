@@ -53,6 +53,7 @@ func _mk_prop(game_stub: StubGame, kind: String, pos: Vector2) -> PropScatter.Pr
 	return p
 
 func _ready() -> void:
+	PropScatter.Prop._enemy_cache_on = false
 	print("=== TEST DECOR INTERACTIF (NOYAU INSTABLE / BIOMECANIQUE / FORGE FINALE) ===")
 	GameState.reset()
 
