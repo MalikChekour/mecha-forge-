@@ -566,6 +566,11 @@ const RIDGE_CHANCE: float = 0.5   # per chunk, when the biome has a rock-family 
 # `cut` n est plus utilise (ancienne decoupe tete/socle abandonnee).
 ## Interrupteur de retour arriere : false = les canons ne pivotent plus (image fixe, comme avant 11.46).
 const HEAD_ROTATE: bool = true
+## 16/10 (patron : « stop le pivotement, laisse-les fixes ») : false = l image ne tourne plus. Les canons a TUBE
+## (liste ci-dessous) tirent alors DROIT, dans l axe de leur tube, a cadence reguliere, sans viser le mecha.
+const HEAD_PIVOT: bool = false
+const TUBE_CANNONS: Array = ["g27", "tech_tourelle_soudeuse", "jungle_tourelle_mortier_plante", "volcanic_tourelle_mortier_scories",
+	"swamp_tourelle_dca_toit", "cryo_tourelle_canon_azote", "reacteur_tourelle_canon_particules", "ruche_tourelle_organe_acide"]
 const HEADS: Dictionary = {
 	"g27": {"cut": [[0, 0.90], [0.25, 0.90], [0.28, 0.64], [0.5, 0.60], [1, 0.58]], "pivot": [0.55, 0.45], "muzzle": [0.10, 0.75]},
 	"tech_tourelle_soudeuse": {"cut": [[0, 0.70], [0.25, 0.66], [0.5, 0.66], [0.75, 0.66], [1, 0.70]], "pivot": [0.45, 0.52], "muzzle": [0.10, 0.30]},
@@ -2617,6 +2622,10 @@ class Prop extends StaticBody2D:
 	func has_head() -> bool:
 		return _head != null
 
+	## Canon a tube FIXE : tire droit dans l axe de son tube (image qui ne pivote pas).
+	func barrel_fixed() -> bool:
+		return _head != null and not HEAD_PIVOT and TUBE_CANNONS.has(String(def.get("f", "")))
+
 	## Bout du canon (ou point de depart du tir) en coordonnees MONDE, image tournee comprise.
 	func muzzle_world() -> Vector2:
 		if _head == null:
@@ -2640,10 +2649,14 @@ class Prop extends StaticBody2D:
 
 	## Force le canon a viser `d` pendant `hold` secondes (balayage de la soudeuse, orbe, verrou solaire...).
 	func head_override(d: Vector2, hold: float = 0.2) -> void:
+		if not HEAD_PIVOT:
+			return
 		_head_override = d.normalized()
 		_head_hold_t = hold
 
 	func _update_head(delta: float, dist: float) -> void:
+		if not HEAD_PIVOT:
+			return
 		var d: Vector2
 		if _head_hold_t > 0.0:
 			_head_hold_t -= delta
@@ -2657,7 +2670,7 @@ class Prop extends StaticBody2D:
 	## Cale le canon SUR la cible a l instant du tir (sans attendre l interpolation) : le projectile part
 	## exactement dans l axe du canon.
 	func head_snap(point: Vector2) -> void:
-		if _head == null:
+		if _head == null or not HEAD_PIVOT:
 			return
 		_apply_head_dir((point - pivot_world()).normalized(), 1.0)
 

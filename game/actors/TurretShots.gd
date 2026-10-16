@@ -37,6 +37,9 @@ var _seed: float = 0.0
 var _d: Dictionary = {}
 
 const FRAG_N: int = 16
+## portee du tir droit (canons a tube fixes) selon le style
+const STRAIGHT_RANGE: Dictionary = {"weld_sweep": 450.0, "lob_pod": 430.0, "lob_slag": 400.0, "flak": 470.0,
+	"orb_frost": 450.0, "plasma": 440.0, "acid_burst": 340.0}
 
 const GRAMMAR: Dictionary = {
 	"weld_sweep":    ["balayage_continu", "masque_et_pointilles"],
@@ -61,6 +64,11 @@ static func fire(shot_style: String, prop: Node2D, g: Node, p: Node2D, damage: f
 	var lead: Vector2 = Vector2.ZERO
 	if "velocity" in p:
 		lead = (p.velocity as Vector2) * 0.35
+	# canon a tube fixe : le tir part DROIT dans l axe du tube, sans viser le mecha
+	if prop.has_method("barrel_fixed") and prop.barrel_fixed():
+		var bd: Vector2 = prop.head_dir()
+		lead = Vector2.ZERO
+		to_p = s + bd * float(STRAIGHT_RANGE.get(shot_style, 400.0))
 	match shot_style:
 		"weld_sweep":
 			var sh: TurretShot = _mk("weld_sweep", g, p, damage, k, s, to_p, prop)
@@ -129,6 +137,7 @@ static func _mk(st: String, g: Node, p: Node2D, damage: float, k: String, s: Vec
 	sh.z_index = 30
 	sh.global_position = s
 	sh._seed = randf() * 100.0
+	sh._d["straight"] = prop != null and prop.has_method("barrel_fixed") and prop.barrel_fixed()
 	g.fx_layer.add_child(sh)
 	sh._glow = ShotGlow.new()
 	sh._glow.owner_shot = sh
@@ -459,8 +468,8 @@ func _step_orb(delta: float) -> void:
 			vel = dir * 75.0
 			_d["trav"] = 0.0
 		return
-	# Suivi lent et inexorable
-	if plr != null:
+	# Suivi lent et inexorable (sauf canon a tube fixe : l orbe file droit)
+	if plr != null and not bool(_d.get("straight", false)):
 		var want: Vector2 = (plr.global_position - global_position).normalized() * 115.0
 		vel = vel.move_toward(want, 160.0 * delta)
 	var step: Vector2 = vel * delta
@@ -510,8 +519,9 @@ func _step_plasma(delta: float) -> void:
 				prop_ref._sprite.position = Vector2.ZERO
 			phase = 1
 			t = 0.0
-			dir = ((plr.global_position if plr != null else tgt) - src).normalized()
-			var dist: float = src.distance_to(plr.global_position) if plr != null else 300.0
+			if not bool(_d.get("straight", false)):
+				dir = ((plr.global_position if plr != null else tgt) - src).normalized()
+			var dist: float = src.distance_to(plr.global_position) if (plr != null and not bool(_d.get("straight", false))) else 300.0
 			_d["ls"] = clampf(dist * 0.55, 150.0, 330.0)
 			_d["ttot"] = float(_d["ls"]) / 320.0
 		return
