@@ -1214,11 +1214,12 @@ func _transform_off() -> void:
 		game.transform_fx(global_position, false)
 	Events.player_transformed.emit(false)
 
-## 16/10 (patron : « on ne dirait pas qu'il vise ») : le mecha est en POSE DE VISEE (bras tendu vers la cible, corps tourne
-## vers elle) des qu'il vise : bouton de souris maintenu, stick de visee, visee auto. Avant, seule la fenetre de tir (_firing_t)
-## declenchait cette pose : armes coupees ou en pause entre deux tirs, il marchait/attendait en garde et regardait ou il allait.
+## 16/10 : pose de VISEE (bras tendu, corps tourne vers la cible) uniquement quand le joueur vise A LA MAIN (souris maintenue,
+## stick de visee). 🚨 17/10 (patron : « les mecha n'ont plus la fluidite de mouvement ») : la 1re version incluait aussi la visee auto
+## (auto_aim est actif par defaut) -> le corps se tournait vers l'ennemi pendant la marche (pieds qui glissent, changements de
+## direction a chaque cible). La visee auto ne change donc plus le comportement : le mecha regarde ou il marche, comme avant.
 func _is_aiming() -> bool:
-	return _aim_stick_active or auto_aim or bot_active or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	return _aim_stick_active or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 
 func _update_aim() -> void:
 	# MANUAL OVERRIDE (patron, 25/09 : "orienter la visee manuellement meme si la visee est

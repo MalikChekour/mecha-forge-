@@ -190,11 +190,11 @@ const _GUN_ANCHORS: Dictionary = {
 	# measured barrel-TIP pixel per facing (tools/_muzzle_measure.py, gun rendered alone in
 	# the exact bake framing), so the muzzle flash + laser leave the very end of the barrel.
 	"vortex": {
-		"front": Vector2(-11.7, 6.7), "back": Vector2(8.9, -81.6),
-		"left": Vector2(-67.5, -43.9), "right": Vector2(66.8, -31.9),
-		# diagonales (14/10) : bout de canon MESURE (tools/_muzzle_measure_diag.py, meme methode)
-		"front_right": Vector2(38.5, -2.8), "front_left": Vector2(-54.4, -12.1),
-		"back_right": Vector2(53.0, -64.1), "back_left": Vector2(-40.1, -72.7)},
+		# 17/10 : REMESURES apres le bras tendu (tools/_muzzle_measure.py + _diag.py) - le canon prolonge maintenant le bras
+		"front": Vector2(-16.1, 2.2), "back": Vector2(13.6, -87.6),
+		"left": Vector2(-69.8, -52.1), "right": Vector2(68.3, -33.1),
+		"front_right": Vector2(36.6, -4.7), "front_left": Vector2(-59.2, -18.2),
+		"back_right": Vector2(57.3, -67.4), "back_left": Vector2(-38.2, -80.6)},
 	"titan": {
 		"front": Vector2(-16.0, -14.0), "back": Vector2(16.0, -12.0),
 		"left": Vector2(14.0, -22.0), "right": Vector2(-14.0, -12.0)},

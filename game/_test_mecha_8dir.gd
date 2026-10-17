@@ -68,7 +68,7 @@ func _ready() -> void:
 		# deux cardinales voisines
 		m._dir = "front_right"
 		var mv: Vector2 = m.gun_anchor() / (m.display_height / 190.0)
-		_ok(mv.distance_to(Vector2(38.5, -2.8)) < 0.01, "vortex front_right : bout de canon mesure", str(mv))
+		_ok(mv.distance_to(Vector2(36.6, -4.7)) < 0.01, "vortex front_right : bout de canon mesure", str(mv))
 		var mb: DirectionalMecha = _mk("bruiser")
 		mb._dir = "front"
 		var a_f: Vector2 = mb.gun_anchor()

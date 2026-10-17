@@ -167,11 +167,10 @@ def _legs(arm, p, amp_pitch, amp_knee):
 
 
 def aim_arm(pb):
-    # RIGHT arm thrust FORWARD so the arm-cannon points straight ahead (at the target), matching the
-    # attack pose the muzzle anchors were measured from. Used by walk/run so the cannon never reads as
-    # "pointing to the side" (the old raised-guard pose) while run-and-gunning.
-    if "RightArm" in pb: pb["RightArm"].rotation_euler = (R(-70), R(-6), R(4))
-    if "RightForeArm" in pb: pb["RightForeArm"].rotation_euler = (R(-16), 0, 0)
+    # 17/10 (patron : « le bras n'est pas tendu quand il vise ») : bras de tir TENDU (epaule a l'horizontale, coude droit) -> le canon
+    # prolonge le bras et pointe dans son axe, au lieu du bras plie d'origine (-70 / -16).
+    if "RightArm" in pb: pb["RightArm"].rotation_euler = (R(-86), R(-2), R(2))
+    if "RightForeArm" in pb: pb["RightForeArm"].rotation_euler = (0, 0, 0)
     if "Spine" in pb: pb["Spine"].rotation_euler.x = R(-6)
 
 
@@ -197,9 +196,9 @@ def pose_attack(arm, f, n):
     for b in pb: b.rotation_mode = "XYZ"
     if "Spine" in pb: pb["Spine"].rotation_euler.x = R(-6)
     # right arm THRUST FORWARD (the cannon aims), left arm braces
-    if "RightArm" in pb: pb["RightArm"].rotation_euler = (R(-70), R(-6), R(4))
-    if "RightForeArm" in pb: pb["RightForeArm"].rotation_euler = (R(-16), 0, 0)
-    if "LeftArm" in pb: pb["LeftArm"].rotation_euler = (R(-30), R(14), R(-10))
+    if "RightArm" in pb: pb["RightArm"].rotation_euler = (R(-86), R(-2), R(2))
+    if "RightForeArm" in pb: pb["RightForeArm"].rotation_euler = (0, 0, 0)
+    if "LeftArm" in pb: pb["LeftArm"].rotation_euler = (R(-38), R(18), R(-10))
     if "LeftForeArm" in pb: pb["LeftForeArm"].rotation_euler = (R(-52), 0, 0)
     rec = R(10) * max(0.0, math.sin(2 * math.pi * f / n))
     if "RightArm" in pb: pb["RightArm"].rotation_euler.x += rec
