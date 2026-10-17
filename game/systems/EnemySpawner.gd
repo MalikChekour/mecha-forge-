@@ -41,9 +41,9 @@ const DEFS: Dictionary = {
 	# toujours vert, qui construit ces Enemy directement sans passer par DEFS.
 	# 17/10 (patron : « integre les ennemis de base pour tester ») : les 3 ennemis UNIVERSELS reviennent (Rodeur, Guepe, Belier), copies telles
 	# quelles de EnemySpawner.gd.fullroster. Les specialistes par biome et les boss restent desactives.
-	"brute":     {"name": "Rodeur", "chassis": "u_rodeur", "proc": true, "hp": 14.0, "speed": 224.0, "dmg": 6.0, "radius": 30.0, "size": 124.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "unlock": 0.0},
-	"drone":     {"name": "Guepe", "chassis": "u_guepe", "proc": true, "hp": 10.0, "speed": 300.0, "dmg": 3.0, "radius": 18.0, "size": 78.0, "motion": "hover", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 4.0, "attack_cd": 1.9, "prefer_dist": 280.0, "unlock": 40.0},
-	"quadshell": {"name": "Belier", "chassis": "u_belier", "proc": true, "hp": 18.0, "speed": 214.0, "dmg": 9.0, "radius": 26.0, "size": 122.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "dasher", "unlock": 55.0},
+	"brute":     {"name": "Rodeur", "chassis": "u_rodeur", "proc": true, "hp": 14.0, "speed": 185.0, "dmg": 6.0, "radius": 30.0, "size": 124.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "unlock": 0.0},
+	"drone":     {"name": "Guepe", "chassis": "u_guepe", "proc": true, "hp": 10.0, "speed": 235.0, "dmg": 3.0, "radius": 18.0, "size": 78.0, "motion": "hover", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 4.0, "attack_cd": 1.9, "prefer_dist": 280.0, "unlock": 40.0},
+	"quadshell": {"name": "Belier", "chassis": "u_belier", "proc": true, "hp": 18.0, "speed": 178.0, "dmg": 9.0, "radius": 26.0, "size": 122.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "dasher", "unlock": 55.0},
 	# "cryoboss":      {"name": "Le Cryarque",   "chassis": "cryoboss",      "hp": 2800.0, "speed": 236.0, "dmg": 30.0, "radius": 78.0, "size": 360.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 26.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 380.0},
 	# "reacteurboss":  {"name": "Le Fulgurant",  "chassis": "reacteurboss",  "hp": 2940.0, "speed": 240.0, "dmg": 31.0, "radius": 78.0, "size": 370.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 27.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 400.0},
 	# "rucheboss":     {"name": "La Matriarche", "chassis": "rucheboss",     "hp": 3080.0, "speed": 244.0, "dmg": 32.0, "radius": 80.0, "size": 385.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 28.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 420.0},
@@ -402,8 +402,13 @@ func _scale_enemy(e: Enemy) -> void:
 	# 512 px/s (agility + speed picks) simply outran every non-boss foe at 224 px/s for the whole
 	# run — kiting was free and permanent, and ENEMY_CAP forbids raising pressure by numbers.
 	# The cap keeps them beatable: even maxed they stay slower than an upgraded player.
-	var spd_scale: float = minf(1.0 + difficulty_bonus * 0.10 + GameState.run_time * 0.00018, 1.40)
-	e.speed *= speed_mult * float(d.get("speed", 1.0)) * spd_scale * Protocols.enemy_speed
+	var spd_scale: float = minf(1.0 + difficulty_bonus * 0.10 + GameState.run_time * 0.00018, 1.25)   # 17/10 : plafond 1,40 -> 1,25
+	e.speed *= speed_mult * float(d.get("speed", 1.0)) * spd_scale * clampf(Protocols.enemy_speed, 0.8, 1.2)
+	# 17/10 (patron : « les ennemis sont trop rapides ») : un ennemi ne rattrape plus un mecha qui FUIT. Plafond = 80 % de la vitesse du
+	# joueur : la poursuite reste menacante (on ne peut pas s'arreter), mais on peut toujours repositionner en courant. Les ruees
+	# (dasher) et le coefficient individuel (+/-15 %) s'ajoutent par-dessus : brefs, pas permanents.
+	if player != null and "base_speed" in player:
+		e.speed = minf(e.speed, float(player.base_speed) * 0.80)
 	var hp_scale: float = (1.0 + GameState.run_time * 0.0011) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * Protocols.enemy_hp
 	e.hp *= hp_scale
 	e.hp_max = e.hp
