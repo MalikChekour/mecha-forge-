@@ -17,7 +17,7 @@ dest_files=["res://.godot/imported/land_earth_2.png-4d0c3e3ef7f7a2d2b47558401163
 
 compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.92
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

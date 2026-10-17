@@ -17,7 +17,7 @@ dest_files=["res://.godot/imported/mecha_joueur_die_right.png-a1c6e41b6cd7d42167
 
 compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.85
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

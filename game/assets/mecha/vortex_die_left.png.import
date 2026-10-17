@@ -17,7 +17,7 @@ dest_files=["res://.godot/imported/vortex_die_left.png-968331bf0fb69822131042185
 
 compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.85
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

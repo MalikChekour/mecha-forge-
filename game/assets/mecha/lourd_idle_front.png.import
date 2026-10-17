@@ -17,7 +17,7 @@ dest_files=["res://.godot/imported/lourd_idle_front.png-fe67060f8b1f9526d340d9dc
 
 compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.85
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

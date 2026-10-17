@@ -17,7 +17,7 @@ dest_files=["res://.godot/imported/pilot_idle_back.png-86529f0b20aa4d7a69d3e9855
 
 compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.85
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

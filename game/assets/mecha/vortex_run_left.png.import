@@ -17,7 +17,7 @@ dest_files=["res://.godot/imported/vortex_run_left.png-e57e11042630db0a8b784b8db
 
 compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.85
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
