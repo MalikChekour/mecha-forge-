@@ -206,7 +206,7 @@ const DECOR: Dictionary = {
 	"jungle_fleur_catapulte":     {"f": "jungle_inter_fleur_catapulte", "hp": 90.0, "sz": 135.0, "nature": true, "block": 0.0,
 	                               "catapult": true, "catapult_dist": 300.0, "catapult_cd": 3.0},
 	"jungle_plante_lasso":        {"f": "jungle_inter_plante_lasso", "hp": 100.0, "sz": 140.0, "destruct": true, "glow": "orange",
-	                               "lasso": true, "lasso_snare": 1.5, "lasso_cd": 8.0, "lasso_r": 85.0},
+	                               "lasso": true, "lasso_snare": 1.5, "lasso_cd": 8.0, "lasso_r": 115.0},
 	"jungle_nuee_lucioles":       {"f": "jungle_inter_nuee_lucioles", "hp": 80.0,  "sz": 120.0, "nature": true, "block": 0.0,
 	                               "fireflies": true, "heal_dps": 3.0, "firefly_r": 110.0, "firefly_dur": 10.0},
 	"jungle_arbre_ruche":         {"f": "jungle_inter_arbre_ruche", "hp": 200.0, "sz": 200.0, "destruct": true, "glow": "orange",
@@ -263,7 +263,7 @@ const DECOR: Dictionary = {
 	"capsule_cryogenique": {"f": "capsule_cryogenique", "hp": 60.0, "sz": 130.0, "destruct": true, "glow": "cyan",
 	                       "capsule": true},
 	"jet_de_cryo":        {"f": "jet_de_cryo", "hp": 90.0,  "sz": 110.0, "destruct": true, "glow": "cyan",
-	                       "cryo_jet": true, "cryo_jet_r": 70.0, "cryo_jet_stun": 1.0},
+	                       "cryo_jet": true, "cryo_jet_r": 110.0, "cryo_jet_stun": 1.0},
 	"brouillard_froid":   {"f": "g20", "hp": 90.0,  "sz": 20.0,  "nature": true, "block": 0.0,
 	                       "fog": true, "fog_r": 260.0},
 	"radiateur":          {"f": "radiateur", "hp": 90.0, "sz": 118.0, "destruct": true, "glow": "orange",
@@ -509,7 +509,7 @@ const INFO: Dictionary = {
 	"reacteur_canon_particules": ["Canon à particules", "Tir à charge qui se divise en 3 fragments. En surchauffe, il explose.", "green"],
 	"reacteur_bobine_tesla": ["Bobine de Tesla", "Deux bobines reliées par un arc électrique continu qui inflige de lourds dégâts.", "green"],
 	"reacteur_barre_combustible": ["Barre de combustible", "Détruisez-la : XP, ferraille, soin ou compétence radioactive.", "green"],
-	"reacteur_barre_controle": ["Barre de contrôle", "RESTEZ 1,5 s près d'elle : réduit de 60 % tous les dégâts d'énergie pendant 8 s.", "yellow"],
+	"reacteur_barre_controle": ["Barre de contrôle", "RESTEZ 1,5 s près d'elle : réduit de 60 % tous les dégâts reçus pendant 8 s.", "yellow"],
 	"reacteur_cellule_confinement": ["Cellule de confinement", "Active un dôme protecteur de 220 u bloquant tous les projectiles ennemis pendant 6 s.", "green"],
 	"reacteur_turbine_hs": ["Turbine de refroidissement HS", "Rotor géant broyé et tordu d'une turbine nucléaire : obstacle métallique massif.", "green"],
 	"reacteur_cuve_plomb": ["Cuve de plomb éventrée", "Réservoir lourd de rétention fissuré fuyant des vapeurs toxiques : couverture solide.", "green"],
@@ -3159,7 +3159,7 @@ class Prop extends StaticBody2D:
 		if _catapult:
 			if _catapult_cd_t > 0.0:
 				_catapult_cd_t -= delta
-			elif dist < 80.0:
+			elif dist < 100.0:
 				_catapult_cd_t = _catapult_cd
 				var l_dir: Vector2 = _plr.velocity.normalized() if (_plr.velocity != null and _plr.velocity.length_squared() > 100.0) else (_plr.global_position - global_position).normalized()
 				if l_dir.length_squared() < 0.1:
@@ -3263,13 +3263,13 @@ class Prop extends StaticBody2D:
 				Audio.sfx("powerup", 0.08)
 
 		# Électroaimant de ferrailleur : aspire les pickups proches
-		if _scrap_magnet and dist < 220.0:
+		if _scrap_magnet and dist < _magnet_r:   # 17/10 : ne marchait qu'a < 220 u alors que la pancarte promet 450 u
 			var r2_mag: float = _magnet_r * _magnet_r
 			for p in get_tree().get_nodes_in_group("pickups"):
 				if p is Node2D and is_instance_valid(p):
 					var to_p: Vector2 = global_position - (p as Node2D).global_position
 					if to_p.length_squared() <= r2_mag and to_p.length_squared() > 16.0:
-						(p as Node2D).global_position += to_p.normalized() * 320.0 * delta
+						(p as Node2D).global_position += to_p.normalized() * 420.0 * delta
 
 		# Soufflerie à braises : rafale brûlante périodique
 		if _ember_bellows and dist < 1200.0:
@@ -3454,6 +3454,8 @@ class Prop extends StaticBody2D:
 				_control_rod_t += delta
 				if _control_rod_t >= 1.5:
 					_control_rod_active_t = 8.0
+					if "guard_t" in _plr:
+						_plr.guard_t = 8.0   # la promesse de la pancarte (-60 % de degats) n'etait lue par personne
 					_control_rod_t = 0.0
 					if game != null and game.has_method("spawn_vfx"):
 						game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(1.0, 0.85, 0.2))
@@ -3861,7 +3863,10 @@ class Prop extends StaticBody2D:
 					_depress_warn.modulate.a = 0.0
 				if dist < _depress_r and dist > 1.0:
 					var to_center: Vector2 = (global_position - _plr.global_position).normalized()
-					_plr.global_position += to_center * (_depress_force * 0.12)
+					_plr.global_position += to_center * (_depress_force * 0.5)   # 17/10 : 26 px (insignifiant) -> 110 px
+					for e in _enemies():
+						if e is Node2D and global_position.distance_to((e as Node2D).global_position) < _depress_r:
+							(e as Node2D).global_position += ((global_position - (e as Node2D).global_position).normalized()) * (_depress_force * 0.5)
 				if game != null and game.has_method("impact_fx"):
 					game.impact_fx(global_position, Color(1.0, 0.3, 0.2), kind, Vector2.ZERO, _depress_r / 95.0)
 

@@ -176,6 +176,8 @@ var _od_ring: Sprite2D       # sustained ground ring for the duration of Overdri
 var _mark: Sprite2D = null       # anneau au sol « c'est toi » (lisibilite en combat dense)
 var _mark_in: Sprite2D = null    # second anneau, plus serre
 var _mark_top: Sprite2D = null   # chevron au-dessus du chassis
+## 17/10 audit des decors : barre de controle du Noyau -> reduit de 60 % les degats recus pendant guard_t secondes
+var guard_t: float = 0.0
 var _hurt_t: float = 0.0         # minuterie du flash rouge quand on encaisse
 
 ## --- ESQUIVE : RETIREE ---------------------------------------------------------------
@@ -549,6 +551,7 @@ func _physics_process(delta: float) -> void:
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
 
+	guard_t = maxf(0.0, guard_t - delta)
 	_firing_t = maxf(0.0, _firing_t - delta)
 	_melee_t = maxf(0.0, _melee_t - delta)
 	if mv.length() > 0.1:
@@ -1507,6 +1510,8 @@ func _update_marker(delta: float) -> void:
 			mecha.set_tint(BASE_TINT.lerp(Color(2.6, 0.48, 0.40), clampf(f, 0.0, 1.0)))
 
 func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
+	if guard_t > 0.0:
+		amount *= 0.4
 	if _iframe > 0.0 or not GameState.alive:
 		return
 	if transformed:   # Overdrive = invincible; the hit just sparks off the aura

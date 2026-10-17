@@ -117,30 +117,34 @@ func _measure(kind: String, dist: float, secs: float) -> String:
 	var pick: DummyMob = DummyMob.new(); add_child(pick); pick.add_to_group("pickups"); pick.global_position = Vector2(-dist, 0.0)
 	var bul: DummyMob = DummyMob.new(); add_child(bul); bul.add_to_group("enemy_bullets"); bul.global_position = Vector2(0.0, -dist); bul.velocity = Vector2(0, 100)
 	var mob0: Vector2 = mob.global_position; var pick0: Vector2 = pick.global_position; var bul0: Vector2 = bul.global_position
-	var slow_seen: bool = false
+	var slow_min: float = 1.0
 	var frames: int = int(secs * 30.0)
 	for i in frames:
 		plr.field_slow = 1.0
 		PropScatter.Prop._enemy_cache_frame = -1
 		p._process(1.0 / 30.0)
-		if plr.field_slow < 0.999:
-			slow_seen = true
-	var out: String = ""
-	if plr.dmg_taken > 0.0: out += "D"
-	if slow_seen: out += "S"
-	if plr.global_position.distance_to(start) > 1.0: out += "M"
-	if plr.healed > 0.0: out += "H"
-	if g.zones.size() > 0: out += "Z"
-	if g.enemy_layer.get_child_count() > 0 or g.fx_layer.get_child_count() > 0 or g.projectile_layer.get_child_count() > 0: out += "E"
-	if g.vfx > 0: out += "V"
-	if mob.global_position.distance_to(mob0) > 1.0 or mob.dmg > 0.0: out += "N"
-	if pick.global_position.distance_to(pick0) > 1.0 or pick.dmg > 0.0: out += "K"
-	if not is_instance_valid(bul) or bul.global_position.distance_to(bul0) > 1.0 or bul.dmg > 0.0 or bul.velocity.distance_to(Vector2(0, 100)) > 1.0: out += "B"
-	if plr._patch_inertia > 0.0: out += "P"
+		slow_min = minf(slow_min, plr.field_slow)
+	var out: Array = []
+	if plr.dmg_taken > 0.0: out.append("D%.0f" % plr.dmg_taken)
+	if slow_min < 0.999: out.append("S%.2f" % slow_min)
+	var mv: float = plr.global_position.distance_to(start)
+	if mv > 1.0: out.append("M%.0f" % mv)
+	if plr.healed > 0.0: out.append("H%.0f" % plr.healed)
+	if g.zones.size() > 0:
+		var zd: float = 0.0
+		for z in g.zones: zd += float(z[2])
+		out.append("Z%d(%.0f)" % [g.zones.size(), zd])
+	var nf: int = g.enemy_layer.get_child_count() + g.fx_layer.get_child_count() + g.projectile_layer.get_child_count()
+	if nf > 0: out.append("E%d" % nf)
+	if mob.dmg > 0.0: out.append("n%.0f" % mob.dmg)
+	if mob.global_position.distance_to(mob0) > 1.0: out.append("N%.0f" % mob.global_position.distance_to(mob0))
+	if pick.global_position.distance_to(pick0) > 1.0: out.append("K%.0f" % pick.global_position.distance_to(pick0))
+	if not is_instance_valid(bul) or bul.global_position.distance_to(bul0) > 1.0 or bul.dmg > 0.0 or bul.velocity.distance_to(Vector2(0, 100)) > 1.0: out.append("B")
+	if plr._patch_inertia > 0.0: out.append("P")
 	for n in [mob, pick, bul]:
 		if is_instance_valid(n): n.queue_free()
 	p.queue_free(); plr.queue_free(); g.queue_free()
-	return out if out != "" else "-"
+	return " ".join(out) if not out.is_empty() else "-"
 
 func _ready() -> void:
 	print("=== AUDIT PERIMETRE DECORS ===")
@@ -155,7 +159,7 @@ func _ready() -> void:
 			continue
 		var secs: float = 7.0
 		var res: Array = []
-		for f in [0.5, 0.9, 1.25, 2.0]:
+		for f in [0.5, 0.9, 1.25]:
 			res.append(_measure(k, r * float(f), secs))
 		# rayon visible (anneau) et taille du sprite
 		var g2: StubGame = StubGame.new(); add_child(g2)
@@ -163,16 +167,14 @@ func _ready() -> void:
 		var vis: float = _visible_radius(pv)
 		pv.queue_free(); g2.queue_free()
 		var sz: float = float(def.get("sz", 0.0))
-		var line: String = "%-32s %-14s r=%4.0f sz=%4.0f anneau=%4.0f | 0.5r:%-4s 0.9r:%-4s 1.25r:%-4s 2r:%-4s" % [k, rr[0], r, sz, vis, res[0], res[1], res[2], res[3]]
+		var line: String = "%-32s %-14s r=%4.0f sz=%4.0f anneau=%4.0f | 0.5r:%s | 0.9r:%s | 1.25r:%s" % [k, rr[0], r, sz, vis, res[0], res[1], res[2]]
 		var flags: Array = []
 		if res[0] == "-" and res[1] == "-":
 			flags.append("INERTE")
 		elif res[1] == "-" and res[0] != "-":
 			flags.append("TROP COURT (rien a 0.9r)")
-		if res[2] != "-" and res[2] == res[1] and res[3] != "-":
+		if res[2] != "-" and res[2] == res[1]:
 			flags.append("SANS LIMITE")
-		elif res[2] != "-" and res[1] != "-" and res[3] == "-" and r < 120.0:
-			flags.append("deborde 1.25r")
 		if vis > 0.0 and absf(vis - r) / r > 0.35:
 			flags.append("anneau %.0f != r" % vis)
 		if sz > 0.0 and r < sz * 0.45:
