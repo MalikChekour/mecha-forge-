@@ -176,6 +176,87 @@ var _od_ring: Sprite2D       # sustained ground ring for the duration of Overdri
 var _mark: Sprite2D = null       # anneau au sol « c'est toi » (lisibilite en combat dense)
 var _mark_in: Sprite2D = null    # second anneau, plus serre
 var _mark_top: Sprite2D = null   # chevron au-dessus du chassis
+## ============================ COMPETENCES ACTIVES (17/10, patron : onglet en bas a droite) ============================
+## 3 competences a recharge, declenchees par le HUD (SkillDock) ou les touches J / K / L :
+##   shield  : BOUCLIER ENERGETIQUE - absorbe tout pendant SHIELD_DUR s (bulle visible, clignote a la fin)
+##   special : ATTAQUE SPECIALE     - onde de choc : degats + repoussement autour du mecha
+##   jet     : JET PACK             - poussee : vitesse x JET_MULT pendant JET_DUR s, flamme dorsale
+## (la SURCHARGE existante reste le 4e bouton, geree par Overdrive.)
+const SKILLS: Dictionary = {
+	"shield":  {"name": "BOUCLIER", "cd": 18.0, "dur": 4.0},
+	"special": {"name": "SPECIAL",  "cd": 12.0, "dur": 0.0},
+	"jet":     {"name": "JET PACK", "cd": 9.0,  "dur": 1.3},
+}
+const SPECIAL_RADIUS: float = 300.0
+const JET_MULT: float = 2.1
+var skill_cd: Dictionary = {"shield": 0.0, "special": 0.0, "jet": 0.0}
+var shield_t: float = 0.0
+var jet_t: float = 0.0
+var _shield_spr: Sprite2D = null
+
+func skill_ratio(id: String) -> float:
+	## 1.0 = pret ; 0..1 = progression de la recharge ; la duree d'effet compte comme « en cours » (retourne -1)
+	if id == "shield" and shield_t > 0.0: return -1.0
+	if id == "jet" and jet_t > 0.0: return -1.0
+	var cd: float = float(SKILLS[id]["cd"])
+	return 1.0 - clampf(float(skill_cd[id]) / cd, 0.0, 1.0)
+
+func use_skill(id: String) -> bool:
+	if not GameState.alive or not SKILLS.has(id) or float(skill_cd[id]) > 0.0 or _stun_t > 0.0:
+		return false
+	if id == "shield" and shield_t > 0.0: return false
+	if id == "jet" and jet_t > 0.0: return false
+	skill_cd[id] = float(SKILLS[id]["cd"]) + float(SKILLS[id]["dur"])
+	match id:
+		"shield":
+			shield_t = float(SKILLS[id]["dur"])
+			Audio.sfx("powerup", 0.05)
+			if game != null and game.has_method("shield_ripple"):
+				game.shield_ripple(global_position, 170.0, Color(0.45, 0.9, 1.0))
+		"special":
+			_cast_special()
+		"jet":
+			jet_t = float(SKILLS[id]["dur"])
+			Audio.sfx("dash", 0.08)
+	return true
+
+func _cast_special() -> void:
+	Audio.sfx("explosion", 0.05)
+	Events.screen_shake.emit(7.0)
+	if game != null and game.has_method("spawn_vfx"):
+		game.spawn_vfx("aaa_shockwave", global_position, 0.0, 1.5, Color(1.0, 0.7, 0.25))
+		game.spawn_vfx("shockwave", global_position, 0.0, 3.6, Color(0.5, 0.9, 1.0))
+	var dmg: float = maxf(20.0, damage * 6.0)
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e is Node2D and is_instance_valid(e):
+			var off: Vector2 = (e as Node2D).global_position - global_position
+			if off.length() <= SPECIAL_RADIUS:
+				if e.has_method("take_damage"):
+					e.take_damage(dmg, base_chassis, "special")
+				if is_instance_valid(e):
+					(e as Node2D).global_position += off.normalized() * 150.0 * (1.0 - off.length() / (SPECIAL_RADIUS * 1.4))
+
+func _update_skills(delta: float) -> void:
+	for k in skill_cd.keys():
+		skill_cd[k] = maxf(0.0, float(skill_cd[k]) - delta)
+	shield_t = maxf(0.0, shield_t - delta)
+	jet_t = maxf(0.0, jet_t - delta)
+	if shield_t > 0.0:
+		if _shield_spr == null:
+			_shield_spr = Sprite2D.new()
+			_shield_spr.texture = preload("res://assets/vfx/shield_bubble.png")
+			_shield_spr.material = Tex.add_mat()
+			_shield_spr.scale = Vector2.ONE * (300.0 / 1024.0)
+			_shield_spr.z_index = 7
+			_shield_spr.position = Vector2(0, -20)
+			add_child(_shield_spr)
+		var blink: float = 1.0 if shield_t > 1.0 else (0.45 + 0.55 * absf(sin(shield_t * 18.0)))
+		_shield_spr.modulate = Color(0.55, 0.95, 1.0, 0.85 * blink)
+		_shield_spr.scale = Vector2.ONE * (300.0 / 1024.0) * (1.0 + 0.03 * sin(shield_t * 9.0))
+		_shield_spr.visible = true
+	elif _shield_spr != null:
+		_shield_spr.visible = false
+
 ## 17/10 audit des decors : barre de controle du Noyau -> reduit de 60 % les degats recus pendant guard_t secondes
 var guard_t: float = 0.0
 var _hurt_t: float = 0.0         # minuterie du flash rouge quand on encaisse
@@ -524,6 +605,8 @@ func _physics_process(delta: float) -> void:
 		if _aim_stick_id != -1 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			reset_aim_stick()
 	var mv: Vector2 = Vector2.ZERO if _stun_t > 0.0 else _move_input()
+	if jet_t > 0.0 and mv.length() < 0.1 and _stun_t <= 0.0:
+		mv = aim_dir   # JET PACK : la poussee part meme sans direction (vers la visee)
 	if base_chassis == "pylone" and not transformed:
 		_anchor_t = minf(_anchor_t + delta, ANCHOR_DELAY) if mv == Vector2.ZERO else 0.0
 		anchored = _anchor_t >= ANCHOR_DELAY
@@ -539,8 +622,8 @@ func _physics_process(delta: float) -> void:
 		_thruster.direction = -_dash_dir
 		_thruster.color = Color(1.0, 0.55, 0.15)
 	else:
-		_thruster.color = Palette.CYAN
-		var target_vel: Vector2 = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0)
+		_thruster.color = Color(1.0, 0.6, 0.15) if jet_t > 0.0 else Palette.CYAN
+		var target_vel: Vector2 = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0) * (JET_MULT if jet_t > 0.0 else 1.0)
 		var eff_inertia: float = maxf(inertia, _patch_inertia)
 		if eff_inertia > 0.0:
 			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
@@ -552,6 +635,7 @@ func _physics_process(delta: float) -> void:
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
 
 	guard_t = maxf(0.0, guard_t - delta)
+	_update_skills(delta)
 	_firing_t = maxf(0.0, _firing_t - delta)
 	_melee_t = maxf(0.0, _melee_t - delta)
 	if mv.length() > 0.1:
@@ -1513,6 +1597,10 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
 	if guard_t > 0.0:
 		amount *= 0.4
 	if _iframe > 0.0 or not GameState.alive:
+		return
+	if shield_t > 0.0:   # BOUCLIER ENERGETIQUE : tout est absorbe
+		if game != null and game.has_method("shield_ripple"):
+			game.shield_ripple(global_position, 150.0, Color(0.45, 0.9, 1.0))
 		return
 	if transformed:   # Overdrive = invincible; the hit just sparks off the aura
 		if game != null and game.has_method("shield_ripple"):
