@@ -114,6 +114,12 @@ var aim_dir: Vector2 = Vector2.DOWN
 var _iframe: float = 0.0
 var _firing_t: float = 0.0   # >0 while a weapon fired recently (drives the standing shoot pose)
 var _stick_id: int = -1
+## 17/10 (patron : « mouvement au joystick pas assez fluide et intuitif ») : rayon agrandi (80 -> 105 px), zone morte de 12 %, pleine vitesse
+## a 85 % de la course, et stick FLOTTANT : si le doigt depasse le rayon, le centre le suit -> inverser la direction est immediat
+## (avant, il fallait ramener le doigt de 80 px avant que le mecha ne reparte dans l'autre sens).
+const STICK_R: float = 105.0
+const STICK_DEAD: float = 0.12
+const STICK_FULL: float = 0.85
 var _stick_origin: Vector2 = Vector2.ZERO
 var _stick_vec: Vector2 = Vector2.ZERO
 var _aim_stick_id: int = -1
@@ -537,7 +543,8 @@ func _physics_process(delta: float) -> void:
 		if eff_inertia > 0.0:
 			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
 		else:
-			velocity = target_vel   # Overdrive = x2 speed deja dans target_vel
+			# 17/10 : montee/descente en vitesse LISSEE (~50 ms) au lieu d'un saut instantane -> demarrage et arret fluides
+			velocity = velocity.lerp(target_vel, 1.0 - exp(-delta * 22.0))   # Overdrive = x2 speed deja dans target_vel
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
@@ -1272,7 +1279,11 @@ func _move_input() -> Vector2:
 	if kb.length() > 0.1:
 		return kb.normalized()
 	if _stick_id != -1:
-		return _stick_vec
+		var m: float = _stick_vec.length()
+		if m < STICK_DEAD:
+			return Vector2.ZERO
+		var k: float = clampf((m - STICK_DEAD) / (STICK_FULL - STICK_DEAD), 0.0, 1.0)
+		return _stick_vec / m * (k * (2.0 - k) * 0.9 + 0.1 * k)   # courbe douce : fin au debut, plein gaz en bout de course
 	return Vector2.ZERO
 
 func reset_input_state() -> void:
@@ -1312,7 +1323,11 @@ func _unhandled_input(e: InputEvent) -> void:
 				reset_aim_stick()
 	elif e is InputEventScreenDrag:
 		if e.index == _stick_id:
-			_stick_vec = (e.position - _stick_origin).limit_length(80.0) / 80.0
+			var off: Vector2 = e.position - _stick_origin
+			if off.length() > STICK_R:
+				_stick_origin += off - off.normalized() * STICK_R   # le centre suit le doigt
+				off = e.position - _stick_origin
+			_stick_vec = off / STICK_R
 		elif e.index == _aim_stick_id:
 			var d: Vector2 = e.position - _aim_stick_origin
 			_aim_stick_vec = d.limit_length(80.0) / 80.0   # HUD ring position, shown even under the deadzone

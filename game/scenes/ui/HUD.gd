@@ -647,7 +647,7 @@ class StickRing extends Control:
 			return
 		var o: Vector2 = p._stick_origin
 		var v: Vector2 = p._stick_vec
-		var r: float = 80.0
+		var r: float = Player.STICK_R
 		draw_circle(o, r, Color(0.5, 0.8, 1.0, 0.10))
 		draw_arc(o, r, 0.0, TAU, 48, Color(0.55, 0.85, 1.0, 0.55), 3.0, true)
 		draw_circle(o + v * r, r * 0.36, Color(0.65, 0.9, 1.0, 0.40))

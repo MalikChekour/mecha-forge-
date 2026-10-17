@@ -39,6 +39,11 @@ const DEFS: Dictionary = {
 	# juste decors/maps"). Code/tests/phases intacts, prets a etre reactives (decommenter les 4
 	# lignes) des que le vrai art Meshy de ces 4 boss sera pret - voir _test_boss_chapitres.gd,
 	# toujours vert, qui construit ces Enemy directement sans passer par DEFS.
+	# 17/10 (patron : « integre les ennemis de base pour tester ») : les 3 ennemis UNIVERSELS reviennent (Rodeur, Guepe, Belier), copies telles
+	# quelles de EnemySpawner.gd.fullroster. Les specialistes par biome et les boss restent desactives.
+	"brute":     {"name": "Rodeur", "chassis": "u_rodeur", "proc": true, "hp": 14.0, "speed": 224.0, "dmg": 6.0, "radius": 30.0, "size": 124.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "unlock": 0.0},
+	"drone":     {"name": "Guepe", "chassis": "u_guepe", "proc": true, "hp": 10.0, "speed": 300.0, "dmg": 3.0, "radius": 18.0, "size": 78.0, "motion": "hover", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 4.0, "attack_cd": 1.9, "prefer_dist": 280.0, "unlock": 40.0},
+	"quadshell": {"name": "Belier", "chassis": "u_belier", "proc": true, "hp": 18.0, "speed": 214.0, "dmg": 9.0, "radius": 26.0, "size": 122.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "dasher", "unlock": 55.0},
 	# "cryoboss":      {"name": "Le Cryarque",   "chassis": "cryoboss",      "hp": 2800.0, "speed": 236.0, "dmg": 30.0, "radius": 78.0, "size": 360.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 26.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 380.0},
 	# "reacteurboss":  {"name": "Le Fulgurant",  "chassis": "reacteurboss",  "hp": 2940.0, "speed": 240.0, "dmg": 31.0, "radius": 78.0, "size": 370.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 27.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 400.0},
 	# "rucheboss":     {"name": "La Matriarche", "chassis": "rucheboss",     "hp": 3080.0, "speed": 244.0, "dmg": 32.0, "radius": 80.0, "size": 385.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 28.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 420.0},
@@ -54,7 +59,13 @@ const BOSS_PHASE_THRESHOLDS: Dictionary = {
 	"citadelleboss": [0.5, 0.2],
 }
 
-const BIOME_POOL: Dictionary = {}
+const BIOME_POOL: Dictionary = {
+	"tech": ["brute", "drone", "quadshell"], "earth": ["brute", "drone", "quadshell"], "spaceship": ["brute", "drone", "quadshell"],
+	"volcanic": ["brute", "drone", "quadshell"], "desert": ["brute", "drone", "quadshell"], "ice": ["brute", "drone", "quadshell"],
+	"jungle": ["brute", "drone", "quadshell"], "swamp": ["brute", "drone", "quadshell"], "ruines": ["brute", "drone", "quadshell"],
+	"cryo": ["brute", "drone", "quadshell"], "reacteur": ["brute", "drone", "quadshell"], "ruche": ["brute", "drone", "quadshell"],
+	"citadelle": ["brute", "drone", "quadshell"],
+}
 
 # CORRUPTION visuelle par biome : teinte multiplicative sur CHAQUE ennemi (self_modulate). Subtile.
 const BIOME_TINT: Dictionary = {
