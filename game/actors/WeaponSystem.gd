@@ -15,7 +15,7 @@ const WEAPON_ORDER: Array[String] = ["autocannon", "missilepod", "railgun", "pla
 ## 15/10 (patron : « supprime toutes les armes des mecha, on va refaire tout le systeme de tir ») :
 ## INTERRUPTEUR GENERAL. false = aucun mecha ne tire (ni projectile, ni faisceau, ni corps-a-corps, ni
 ## flash de bouche, ni arme dessinee, ni laser de visee, ni son). Remettre true pour retrouver l ancien systeme.
-const ARMES_ACTIVES: bool = false
+const ARMES_ACTIVES: bool = true
 const MAX_LEVEL: int = 5   # a weapon at MAX + its required passive can EVOLVE
 const EVOLVED: Array[String] = ["vulcan", "hydra", "annihilator", "singularity", "tempest",
 	"deflagrateur", "carambole", "guillotine", "rayon_spectre"]
