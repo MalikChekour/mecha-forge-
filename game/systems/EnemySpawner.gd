@@ -65,6 +65,15 @@ const BIOME_POOL: Dictionary = {
 	"jungle": ["brute", "drone", "quadshell"], "swamp": ["brute", "drone", "quadshell"], "ruines": ["brute", "drone", "quadshell"],
 	"cryo": ["brute", "drone", "quadshell"], "reacteur": ["brute", "drone", "quadshell"], "ruche": ["brute", "drone", "quadshell"],
 	"citadelle": ["brute", "drone", "quadshell"],
+	"abyss": ["brute", "drone", "quadshell"],
+	"ether": ["brute", "drone", "quadshell"],
+	"titans": ["brute", "drone", "quadshell"],
+	"orbit": ["brute", "drone", "quadshell"],
+	"quantum": ["brute", "drone", "quadshell"],
+	"ozone": ["brute", "drone", "quadshell"],
+	"prism": ["brute", "drone", "quadshell"],
+	"steampunk": ["brute", "drone", "quadshell"],
+	"colosseum": ["brute", "drone", "quadshell"],
 }
 
 # CORRUPTION visuelle par biome : teinte multiplicative sur CHAQUE ennemi (self_modulate). Subtile.
@@ -82,6 +91,15 @@ const BIOME_TINT: Dictionary = {
 	"reacteur":  Color(0.80, 1.10, 0.75),
 	"ruche":     Color(1.05, 0.80, 1.10),
 	"citadelle": Color(1.15, 1.05, 0.75),
+	"abyss":     Color(0.65, 0.95, 1.20),
+	"ether":     Color(0.85, 0.65, 1.15),
+	"titans":    Color(1.15, 0.85, 0.65),
+	"orbit":     Color(0.80, 0.95, 1.15),
+	"quantum":   Color(1.10, 1.05, 0.70),
+	"ozone":     Color(1.10, 0.70, 1.15),
+	"prism":     Color(0.95, 1.10, 1.15),
+	"steampunk": Color(1.15, 0.90, 0.70),
+	"colosseum": Color(0.90, 1.05, 1.10),
 }
 
 # Timed run structure: bosses at 5 min (build filter), 10 min, 15 min (final -> victory).
@@ -100,7 +118,7 @@ const BOSS_SCHEDULE: Array = [
 	{"t": 900.0, "kind": "endboss"},   # 15 min : SOUVERAIN (boss final = victoire, obsidienne)
 ]
 var _bosses_fired: int = 0
-const BIOME_ORDER: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp", "cryo", "reacteur", "ruche", "citadelle"]
+const BIOME_ORDER: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp", "cryo", "reacteur", "ruche", "citadelle", "abyss", "ether", "titans", "orbit", "quantum", "ozone", "prism", "steampunk", "colosseum"]
 const MID_BOSSES: Array = ["midboss", "midboss_a", "crusherboss", "midboss_b"]
 func _mid_boss_for(offset: int) -> String:
 	var bi: int = maxi(0, BIOME_ORDER.find(current_biome))

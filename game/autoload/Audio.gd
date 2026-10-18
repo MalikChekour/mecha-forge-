@@ -97,6 +97,15 @@ const MUSIC_FALLBACK: Dictionary = {
 	"reacteur": "tech",
 	"ruche": "swamp",
 	"citadelle": "spaceship",
+	"abyss": "swamp",
+	"ether": "jungle",
+	"titans": "desert",
+	"orbit": "spaceship",
+	"quantum": "tech",
+	"ozone": "volcanic",
+	"prism": "ice",
+	"steampunk": "tech",
+	"colosseum": "spaceship",
 }
 
 func music(track: String) -> void:

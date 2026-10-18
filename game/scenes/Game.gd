@@ -34,7 +34,7 @@ var _hitstop: bool = false
 # 8 biome maps (Gemini-generated ground textures in assets/decor/ground_<name>.png)
 # NOTE: "ruines" (ville detruite) is PARKED — the art didn't hold up, we'll revisit it later.
 # Its ground texture, decor and BIOME_DECOR entry all stay on disk: re-adding it here is enough.
-const BIOMES: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp", "cryo", "reacteur", "ruche", "citadelle"]
+const BIOMES: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice", "jungle", "swamp", "cryo", "reacteur", "ruche", "citadelle", "abyss", "ether", "titans", "orbit", "quantum", "ozone", "prism", "steampunk", "colosseum"]
 # PROGRESSION façon Survivor.io : 5 chapitres qui se débloquent en chaîne. Chaque chapitre = un
 # biome fixe + un palier de difficulté + un palier de puissance conseillé (gate). Battre le boss
 # final d'un chapitre (mode campagne) débloque le suivant + donne une récompense de 1er clear.
@@ -71,6 +71,15 @@ const BIOME_MODS: Dictionary = {
 	"reacteur":  {"label": "NOYAU INSTABLE  —  reacteur en surchauffe"},
 	"ruche":     {"label": "BIOMECANIQUE  —  la ruche respire"},
 	"citadelle": {"label": "FORGE FINALE  —  citadelle orbitale"},
+	"abyss":     {"label": "CITÉ SUBMERGÉE  —  ruines abyssales", "player_speed_mult": 0.88},
+	"ether":     {"label": "FORÊT D'ÉTHER  —  canopée fongique bioluminescente"},
+	"titans":    {"label": "NÉCROPOLE DES TITANS  —  cimetière d'acier colossal"},
+	"orbit":     {"label": "CHAMP ORBITAL  —  gravité zéro & débris spatiaux", "player_speed_mult": 1.12, "player_proj_speed": 1.25},
+	"quantum":   {"label": "ARCHIVES QUANTIQUES  —  matrice de données & réfractions"},
+	"ozone":     {"label": "FAILLE D'OZONE  —  orage ionique perpétuel"},
+	"prism":     {"label": "ABÎME PRISMATIQUE  —  cavernes de quartz réflectif"},
+	"steampunk": {"label": "BASTION VAPEUR  —  usine victorienne d'airain & de laiton"},
+	"colosseum": {"label": "COLISÉE VIRTUEL  —  arène tactique de calibrage militaire"},
 }
 ## Flavour lines for the per-map intro/outro cutscenes (see _map_intro / _map_outro). One short
 ## line each; the intro title is the biome label, the outro title is a generic victory banner.
@@ -87,6 +96,15 @@ const CUT_LINES: Dictionary = {
 	"reacteur":  {"in": "Le noyau respire mal. Chaque alarme est un compte a rebours.", "out": "Le coeur se stabilise. Pour l'instant."},
 	"ruche":     {"in": "Les parois pulsent. Quelque chose grandit ici, et ca ne dort pas.", "out": "La ruche se tait. Pour combien de temps ?"},
 	"citadelle": {"in": "La citadelle orbitale tourne encore. Le vide n'attend personne.", "out": "La forge se refroidit. Le silence a un poids, ici."},
+	"abyss":     {"in": "La pression des abysses broie les coques. Les néons bleus percent l'obscurité.", "out": "L'océan s'apaise. Les secrets engloutis demeurent."},
+	"ether":     {"in": "Des spores incandescentes flottent dans l'air lourd. La forêt observe chaque pas.", "out": "La brume d'éther se disperse sous vos tirs."},
+	"titans":    {"in": "Des carcasses d'automates géants dorment sous la rouille. Quelque chose veille encore.", "out": "Les colosses de fer s'effondrent enfin dans le silence."},
+	"orbit":     {"in": "La station est en morceaux. Le silence de l'espace est brisé par les arcs IEM.", "out": "L'orbite est nettoyée. Cap vers l'infini."},
+	"quantum":   {"in": "Les serveurs d'obsidienne vibrent de code pur. La matrice calcule votre fin.", "out": "Les algorithmes s'éteignent. Les données sont purgées."},
+	"ozone":     {"in": "La foudre déchire le ciel sans fin. L'air sent l'ozone et le plasma brûlé.", "out": "L'orage s'éloigne. La terre ionisée fume encore."},
+	"prism":     {"in": "Les cristaux démultiplient chaque reflet et chaque tir. La lumière est une arme.", "out": "Les géodes scintillent doucement dans le calme retrouvé."},
+	"steampunk": {"in": "Le grondement des pistons résonne dans la vapeur brûlante. L'industrie ne dort jamais.", "out": "Les cheminées cessent de fumer. La machinerie est vaincue."},
+	"colosseum": {"in": "Les projecteurs de l'arène s'allument. L'épreuve suprême commence.", "out": "Victoire écrasante. Le protocole d'exercice est validé."},
 }
 ## 04/10, trou signale par le patron : la derive d'une map a l'autre a l'interieur d'un chapitre
 ## (PropScatter.BIOME_MAP_SEGMENTS / current_map_phase) etait 100% silencieuse - rien ne la
@@ -103,6 +121,15 @@ const MAP_PHASE_NAMES: Dictionary = {
 	"reacteur":  ["Bassins Toxiques", "Salle des Turbines", "Noyau Fissure"],
 	"ruche":     ["Couvoir Mecanique", "Veines Vivantes", "Jardin de Spores"],
 	"citadelle": ["Pont Orbital", "Anneau de Gravite", "Chambre de la Forge"],
+	"abyss":     ["Quais Immergés", "Faille Abyssale", "Nécropole Sous-Marine"],
+	"ether":     ["Sous-Bois Toxique", "Canopée Luminescente", "Cœur de Mycélium"],
+	"titans":    ["Fosse des Châssis", "Chantier des Cuirassés", "Trône du Roi d'Acier"],
+	"orbit":     ["Sas Dépressurisé", "Champ de Panneaux", "Noyau de Propulsion"],
+	"quantum":   ["Portail Vectoriel", "Couloirs de Monolithes", "Sanctuaire du Noyau"],
+	"ozone":     ["Plaine des Fulgurites", "Pylônes Parafoudres", "Œil de la Tempête"],
+	"prism":     ["Galerie de Silice", "Forêt de Calcite", "Chambre Réfringente"],
+	"steampunk": ["Fonderie de Cuivre", "Salle des Soupapes", "Beffroi d'Horlogerie"],
+	"colosseum": ["Gradins Blindés", "Fosse d'Échauffement", "Noyau des Champions"],
 }
 var _map_phase_shown: int = -1   # -1 = rien affiche encore ce run ; reset a chaque nouveau biome
 var _mods: Dictionary = {}

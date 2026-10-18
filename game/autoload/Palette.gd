@@ -27,6 +27,15 @@ const BIOME_TINT: Dictionary = {
 	"ruche":     Color(1.05, 0.78, 1.08),
 	"citadelle": Color(1.08, 1.02, 0.82),
 	"ruines":    Color(0.95, 0.88, 0.80),
+	"abyss":     Color(0.65, 0.95, 1.20),
+	"ether":     Color(0.85, 0.65, 1.15),
+	"titans":    Color(1.15, 0.85, 0.65),
+	"orbit":     Color(0.80, 0.95, 1.15),
+	"quantum":   Color(1.10, 1.05, 0.70),
+	"ozone":     Color(1.10, 0.70, 1.15),
+	"prism":     Color(0.95, 1.10, 1.15),
+	"steampunk": Color(1.15, 0.90, 0.70),
+	"colosseum": Color(0.90, 1.05, 1.10),
 }
 
 static func biome_tint(name: String) -> Color:
