@@ -584,6 +584,8 @@ func _do_fire(id: String, w: Dictionary, muzzle_world: Vector2) -> void:
 		aim = Vector2(_player.aim_dir)
 	if aim == Vector2.ZERO:
 		aim = Vector2.RIGHT
+	if _player.has_method("aim_solution"):
+		aim = _player.aim_solution(muzzle_world, float(params["speed"]))   # precision : depuis la bouche, avec avance sur cible mobile
 	var count: int = int(MULTISHOT.get(id, 1))
 	if count <= 1:
 		game.spawn_shot(muzzle_world, aim, params)

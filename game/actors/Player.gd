@@ -1455,6 +1455,32 @@ func _nearest_enemy() -> Node2D:
 ## Comme un vrai HUD de chasse garde un contact affiche meme hors boresight : on prefere la cible
 ## dans l'axe (_cone_target), mais a defaut on retombe sur la menace la plus proche quand meme —
 ## il y a donc TOUJOURS un verrouillage affiche des qu'un ennemi existe, meme en visee manuelle.
+## 17/10 (patron : « les tirs ne sont pas assez precis ») : direction REELLE du tir depuis la BOUCHE du canon.
+## Avant : le tir partait de la bouche (jusqu'a ~70 px a cote du centre) avec la direction « centre -> cible » : il passait donc a cote
+## (decalage parallele), et ne tenait aucun compte du deplacement de la cible. Maintenant : on vise le point d'INTERCEPTION (position de la
+## cible + sa vitesse x temps de vol du projectile) depuis la bouche. Sans cible dans l'axe, les tirs convergent a 520 u le long de la visee.
+func aim_solution(muzzle: Vector2, proj_speed: float) -> Vector2:
+	var dir: Vector2 = aim_dir if aim_dir != Vector2.ZERO else Vector2.DOWN
+	var tgt: Node2D = null
+	if (auto_aim or bot_active) and not _aim_stick_active:
+		tgt = _nearest_enemy()
+	else:
+		tgt = _cone_target()
+	if tgt != null and is_instance_valid(tgt):
+		var to_t: Vector2 = tgt.global_position - global_position
+		# la cible doit etre dans l'axe de visee (±28°) : on ne detourne jamais un tir manuel vers autre chose
+		if to_t.length() > 1.0 and absf(dir.angle_to(to_t.normalized())) <= deg_to_rad(28.0):
+			var p: Vector2 = tgt.global_position
+			var v: Vector2 = Vector2.ZERO
+			if "velocity" in tgt:
+				v = tgt.velocity
+			var sp: float = maxf(proj_speed, 120.0)
+			for i in 3:   # intercept : t = distance / vitesse, recalcule 3 fois
+				var tt: float = muzzle.distance_to(p) / sp
+				p = tgt.global_position + v * tt
+			return (p - muzzle).normalized()
+	return (global_position + dir * 520.0 - muzzle).normalized()
+
 func _aim_target() -> Node2D:
 	# 🚨 25/09 (patron) : "quand je vise manuellement la cible visee doit etre verrouillee" — ce
 	# garde avait disparu au fix precedent (_aim_target suivait TOUJOURS l'auto-visee), alors que
