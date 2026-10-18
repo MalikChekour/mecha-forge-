@@ -145,7 +145,7 @@ func _ready() -> void:
 	_ok(ps.current_map_phase() == 2, "current_map_phase() : reste a la phase 2 au-dela (jamais hors limites)")
 
 	# --- MAP_PHASE_NAMES (Game.gd) : un triplet par biome, aligne avec BIOME_MAP_SEGMENTS ---
-	for b in ["tech", "desert", "jungle", "volcanic", "swamp", "cryo", "reacteur", "ruche", "citadelle"]:
+	for b in ["tech", "desert", "jungle", "volcanic", "swamp", "cryo", "reacteur", "ruche", "citadelle", "abyss", "ether", "titans", "orbit", "quantum", "ozone", "prism", "steampunk", "colosseum"]:
 		_ok(GameScript.MAP_PHASE_NAMES.has(b) and GameScript.MAP_PHASE_NAMES[b].size() == 3,
 			"MAP_PHASE_NAMES['%s'] a bien 3 noms" % b)
 

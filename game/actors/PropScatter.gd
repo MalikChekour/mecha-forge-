@@ -835,7 +835,7 @@ func build_border(half: float) -> void:
 ## One wall prop: sprite + ground shadow, no collider, no logic. Rendered from the shared decor art.
 func _place_border(kind: String, pos: Vector2, scl: float, flip: bool) -> void:
 	var d: Dictionary = DECOR.get(kind, {})
-	var tex: Texture2D = load("res://assets/decor/%s.png" % String(d.get("f", "g29")))
+	var tex: Texture2D = Tex.get_tex("res://assets/decor/%s.png" % String(d.get("f", "g29")))
 	if tex == null:
 		return
 	var th: float = maxf(1.0, float(tex.get_height()))
@@ -996,6 +996,51 @@ const BIOME_MAP_SEGMENTS: Dictionary = {
 		["porte_securite_orbitale", "zone_depressurisation", "citadelle_lanceur_guide", "citadelle_panneau_solaire"], # Map 13 - Pont Orbital
 		["zone_push_pull", "emetteur_laser_rotatif", "citadelle_relais_satellite", "citadelle_sas_pressurise", "citadelle_reacteur_orbital"], # Map 14 - Anneau de Gravite
 		["pilier_energie", "segment_mur_modulaire", "citadelle_module_ravitaillement", "citadelle_dome_bouclier", "citadelle_grappin_magnetique"], # Map 15 - Chambre de la Forge
+	],
+	"abyss": [
+		["abyss_terrain_colonne_recif", "abyss_inter_dome_oxygene"],
+		["abyss_emetteur_geyser", "abyss_inter_mine_ancree"],
+		["abyss_tourelle_torpille", "abyss_butin_caisson_etanche"],
+	],
+	"ether": [
+		["ether_terrain_fongus_arbre", "ether_emetteur_gaz"],
+		["ether_inter_pollen_regen", "ether_inter_champignon_rebond"],
+		["ether_tourelle_spores", "ether_butin_cosse_fluo"],
+	],
+	"titans": [
+		["titans_emetteur_fuite_huile", "titans_inter_mine_antichar"],
+		["titans_terrain_main_colosse", "titans_inter_electroaimant_epave"],
+		["titans_tourelle_artillerie", "titans_butin_coffre_blindage"],
+	],
+	"orbit": [
+		["orbit_inter_borne_antigravite", "orbit_terrain_panneau_solaire_brise"],
+		["orbit_emetteur_propulseur_rcs", "orbit_inter_piege_emp"],
+		["orbit_tourelle_laser_impulsion", "orbit_butin_capsule_cargo"],
+	],
+	"quantum": [
+		["quantum_inter_dalle_transfert", "quantum_inter_cube_glitch"],
+		["quantum_emetteur_grille_code", "quantum_terrain_monolithe_flottant"],
+		["quantum_tourelle_faisceau_vecteur", "quantum_butin_cube_memoire"],
+	],
+	"ozone": [
+		["ozone_terrain_fleche_fulgurite", "ozone_inter_cristal_piezo"],
+		["ozone_emetteur_parafoudre", "ozone_inter_condensateur_surcharge"],
+		["ozone_tourelle_arc_eclair", "ozone_butin_accumulateur"],
+	],
+	"prism": [
+		["prism_terrain_grappe_cristaux", "prism_inter_stalagmite_fragile"],
+		["prism_emetteur_faisceau_laser", "prism_inter_miroir_deflexion"],
+		["prism_tourelle_refracteur", "prism_butin_geode_cristal"],
+	],
+	"steampunk": [
+		["steampunk_terrain_engrenage_monumental", "steampunk_inter_vanne_surchauffe"],
+		["steampunk_emetteur_purge_vapeur", "steampunk_inter_chaudiere_instable"],
+		["steampunk_tourelle_gatling_vapeur", "steampunk_butin_coffre_fort_laiton"],
+	],
+	"colosseum": [
+		["colosseum_terrain_pilier_holomur", "colosseum_inter_mine_exercice"],
+		["colosseum_emetteur_barre_exercice", "colosseum_inter_pod_overdrive"],
+		["colosseum_tourelle_simulation", "colosseum_butin_module_test"],
 	],
 }
 
@@ -2725,7 +2770,7 @@ class Prop extends StaticBody2D:
 			or _particle_cannon or _tesla_coil or _control_rod or _containment_cell
 			or _acid_turret or _spawner_egg or _vein_pulse
 			or _guided_launcher or _satellite_relay or _airlock or _dome_shield or _magnetic_hook)
-		var tex: Texture2D = load("res://assets/decor/%s.png" % String(def.get("f", "g20")))
+		var tex: Texture2D = Tex.get_tex("res://assets/decor/%s.png" % String(def.get("f", "g20")))
 		if tex == null:
 			tex = PlaceholderTexture2D.new()
 		var th: float = maxf(1.0, float(tex.get_height()))

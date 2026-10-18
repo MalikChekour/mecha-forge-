@@ -85,6 +85,60 @@ func apply_biome(biome_name: String) -> void:
 			_embers.color = Color(1.0, 0.85, 0.4, 0.32)
 			_embers.amount = 20
 			_set_shaft_color(Color(0.5, 0.85, 1.0))
+		"abyss":
+			_dust.color = Color(0.2, 0.7, 0.95, 0.25)
+			_dust.gravity = Vector2(0, -12)
+			_embers.color = Color(0.1, 0.9, 0.8, 0.35)
+			_embers.amount = 24
+			_set_shaft_color(Color(0.15, 0.75, 0.95))
+		"ether":
+			_dust.color = Color(0.7, 0.3, 0.9, 0.26)
+			_dust.gravity = Vector2(4, -8)
+			_embers.color = Color(0.9, 0.4, 1.0, 0.45)
+			_embers.amount = 30
+			_set_shaft_color(Color(0.75, 0.35, 0.95))
+		"titans":
+			_dust.color = Color(0.85, 0.65, 0.4, 0.30)
+			_dust.gravity = Vector2(-20, 4)
+			_embers.color = Color(1.0, 0.5, 0.2, 0.30)
+			_embers.amount = 18
+			_set_shaft_color(Color(0.9, 0.65, 0.35))
+		"orbit":
+			_dust.color = Color(0.6, 0.8, 1.0, 0.16)
+			_dust.gravity = Vector2(0, 0)
+			_embers.color = Color(0.4, 0.85, 1.0, 0.25)
+			_embers.amount = 14
+			_set_shaft_color(Color(0.4, 0.8, 1.0))
+		"quantum":
+			_dust.color = Color(1.0, 0.9, 0.4, 0.22)
+			_dust.gravity = Vector2(0, -15)
+			_embers.color = Color(1.0, 0.8, 0.2, 0.40)
+			_embers.amount = 24
+			_set_shaft_color(Color(1.0, 0.85, 0.3))
+		"ozone":
+			_dust.color = Color(0.8, 0.5, 1.0, 0.25)
+			_dust.gravity = Vector2(-15, -10)
+			_embers.color = Color(0.85, 0.6, 1.0, 0.50)
+			_embers.amount = 36
+			_set_shaft_color(Color(0.75, 0.45, 1.0))
+		"prism":
+			_dust.color = Color(0.5, 0.9, 1.0, 0.25)
+			_dust.gravity = Vector2(0, -6)
+			_embers.color = Color(0.6, 0.95, 0.9, 0.35)
+			_embers.amount = 22
+			_set_shaft_color(Color(0.5, 0.9, 1.0))
+		"steampunk":
+			_dust.color = Color(0.9, 0.75, 0.55, 0.32)
+			_dust.gravity = Vector2(10, -22)
+			_embers.color = Color(1.0, 0.6, 0.2, 0.45)
+			_embers.amount = 34
+			_set_shaft_color(Color(1.0, 0.7, 0.35))
+		"colosseum":
+			_dust.color = Color(0.5, 0.85, 1.0, 0.18)
+			_dust.gravity = Vector2(0, -8)
+			_embers.color = Color(0.3, 0.9, 1.0, 0.30)
+			_embers.amount = 20
+			_set_shaft_color(Color(0.4, 0.85, 1.0))
 		_:
 			_dust.color = Color(0.7, 0.8, 1.0, 0.15)
 			_embers.color = Color(1.0, 0.55, 0.2, 0.25)

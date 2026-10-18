@@ -1290,6 +1290,42 @@ func _apply_biome_lighting(biome_name: String) -> void:
 			c = Color(0.96, 0.96, 1.02)
 			plight_c = Color(0.4, 0.8, 1.0)
 			plight_e = 0.45
+		"abyss":
+			c = Color(0.72, 0.88, 1.05)
+			plight_c = Color(0.2, 0.8, 1.0)
+			plight_e = 0.55
+		"ether":
+			c = Color(0.88, 0.80, 1.02)
+			plight_c = Color(0.8, 0.4, 1.0)
+			plight_e = 0.50
+		"titans":
+			c = Color(0.98, 0.90, 0.80)
+			plight_c = Color(1.0, 0.65, 0.35)
+			plight_e = 0.45
+		"orbit":
+			c = Color(0.82, 0.90, 1.05)
+			plight_c = Color(0.4, 0.75, 1.0)
+			plight_e = 0.50
+		"quantum":
+			c = Color(0.95, 0.95, 0.85)
+			plight_c = Color(1.0, 0.9, 0.4)
+			plight_e = 0.50
+		"ozone":
+			c = Color(0.90, 0.82, 1.05)
+			plight_c = Color(0.9, 0.5, 1.0)
+			plight_e = 0.60
+		"prism":
+			c = Color(0.88, 0.96, 1.05)
+			plight_c = Color(0.5, 0.95, 1.0)
+			plight_e = 0.50
+		"steampunk":
+			c = Color(1.05, 0.90, 0.78)
+			plight_c = Color(1.0, 0.65, 0.25)
+			plight_e = 0.55
+		"colosseum":
+			c = Color(0.92, 0.96, 1.00)
+			plight_c = Color(0.4, 0.85, 1.0)
+			plight_e = 0.50
 		_:
 			c = Color(0.92, 0.94, 0.98)
 			plight_c = Color(0.5, 0.85, 1.0)
@@ -2530,10 +2566,10 @@ func _apply_biome_floor(biome_name: String) -> void:
 	# Point the (persistent) floor material at this biome's ground. Used at build time
 	# and again on every map change, so switching zones only repaints — no rebuild.
 	var ground_path: String = "res://assets/decor/ground_%s.png" % biome_name
-	if ResourceLoader.exists(ground_path):
+	if ResourceLoader.exists(ground_path) or FileAccess.file_exists(ground_path):
 		# seamless Blender-baked ground tile, repeated in world space (sharp + scrolls)
 		_floor_mat.shader = load("res://shaders/floor_tex.gdshader")
-		_floor_mat.set_shader_parameter("ground", load(ground_path))
+		_floor_mat.set_shader_parameter("ground", Tex.get_tex(ground_path))
 		_floor_mat.set_shader_parameter("tile", 1080.0)   # ~1 tile per screen -> no side-by-side repeat
 	else:
 		_floor_mat.shader = load("res://shaders/floor.gdshader")
