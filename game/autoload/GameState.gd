@@ -148,12 +148,12 @@ const MECHS: Array = [
 		"ligne": "ÉNERGIE DIRIGÉE — perce, traverse, aligne.",
 		"desc": "Prototype VORTEX — armure noire, néon cyan, cœur orange, visée 360°"},
 	{"id": "bluestrike", "name": "BLUESTRIKE", "cost": 1400,
-		"weapons": ["disperseur"], "hp": 6.0, "dmg": 1.05, "speed": 1.24, "crit": 0.15,
+		"weapons": ["disperseur"], "hp": 6.0, "dmg": 1.05, "speed": 1.05, "crit": 0.15,
 		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
 		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
 		"sig_muzzle": ["fire_blast", 0.40],
 		"ligne": "SOUFFLE RAPPROCHÉ — sature, disloque, se replie.",
-		"desc": "Éclaireur léger, très rapide, gerbe à courte portée. Frappe et se replie."},
+		"desc": "Éclaireur léger, gerbe à courte portée. Frappe et se replie."},
 	## TITAN (patron, 24/09) — INTEGRATION D'ESSAI. Premier chassis choregraphie a la main
 	## (build_titan_anims.py, sur le modele de Vortex/Bluestrike) plutot que par le pipeline
 	## generique qui avait produit les 6 chassis ecartes. 28 planches verifiees une par une :
@@ -161,12 +161,12 @@ const MECHS: Array = [
 	## chaque animation. « Si c'est pas bon on retire » : stats/arme choisies pour un premier
 	## test, pas figees.
 	{"id": "titan", "name": "TITAN", "cost": 1800,
-		"weapons": ["missilepod"], "hp": 30.0, "dmg": 1.15, "speed": 0.88, "crit": 0.05,
+		"weapons": ["missilepod"], "hp": 30.0, "dmg": 1.15, "speed": 1.05, "crit": 0.05,
 		"arsenal": ["missilepod", "railgun", "plasma", "disque", "faisceau"],
 		"signature": "missilepod", "accent": Color(0.55, 0.68, 0.42),
 		"sig_muzzle": ["fire_blast", 0.44],
 		"ligne": "BLINDAGE LOURD — encaisse, avance, ne recule pas.",
-		"desc": "Chassis blinde, lent mais massif. Garde basse, tir stabilise, absorbe plus qu'il n'esquive."},
+		"desc": "Chassis blinde et massif. Garde basse, tir stabilise, absorbe plus qu'il n'esquive."},
 	## BRUISER (patron, 24/09) — INTEGRATION D'ESSAI. Premier chassis genere FRAIS via Meshy
 	## pour ce jeu (pas un modele recycle) : concept FLUX -> image-to-3D -> rig, 4 corrections
 	## successives du patron avant validation (pas de lame car c'est un tireur ; plus musclu/
@@ -176,7 +176,7 @@ const MECHS: Array = [
 	## vortex reprise A L'IDENTIQUE (build_bruiser_anims.py). « Si c'est pas bon on retire » :
 	## stats/arme choisies pour un premier test, pas figees.
 	{"id": "bruiser", "name": "BRUISER", "cost": 0,
-		"weapons": ["plasma"], "hp": 22.0, "dmg": 1.35, "speed": 0.92, "crit": 0.06,
+		"weapons": ["plasma"], "hp": 22.0, "dmg": 1.35, "speed": 1.05, "crit": 0.06,
 		"arsenal": ["plasma", "autocannon", "railgun", "disque", "faisceau"],
 		"signature": "plasma", "accent": Color(0.82, 0.24, 0.20),
 		"sig_muzzle": ["fire_blast", 0.46],
@@ -191,7 +191,7 @@ const MECHS: Array = [
 	## choregraphie de vortex reprise A L'IDENTIQUE. « Si c'est pas bon on retire » : stats/
 	## arme choisies pour un premier test, pas figees.
 	{"id": "vanquisher", "name": "VANQUISHER", "cost": 0,
-		"weapons": ["ricochet"], "hp": 23.0, "dmg": 1.10, "speed": 0.90, "crit": 0.10,
+		"weapons": ["ricochet"], "hp": 23.0, "dmg": 1.10, "speed": 1.05, "crit": 0.10,
 		"arsenal": ["ricochet", "autocannon", "missilepod", "disque", "faisceau"],
 		"signature": "ricochet", "accent": Color(0.45, 0.55, 0.68),
 		"sig_muzzle": ["aaa_beam", 0.44],
@@ -203,14 +203,14 @@ const MECHS: Array = [
 	## d'image/3D IA sans validation prealable. Mecanique reelle propre a chacun malgre le
 	## sprite partage (voir Player.gd "pylone"/"cerclier" et Projectile.gd pour le disque).
 	{"id": "pylone", "name": "PYLÔNE", "cost": 1600,
-		"weapons": ["faisceau"], "hp": 28.0, "dmg": 1.05, "speed": 0.86, "crit": 0.05,
+		"weapons": ["faisceau"], "hp": 28.0, "dmg": 1.05, "speed": 1.05, "crit": 0.05,
 		"arsenal": ["faisceau", "autocannon", "railgun", "plasma", "disque"],
 		"signature": "faisceau", "accent": Color(1.0, 0.78, 0.25),
 		"sig_muzzle": ["aaa_beam", 0.48],
 		"ligne": "ANCRAGE — immobile, le faisceau s'allonge et se resserre.",
 		"desc": "Tient un couloir a l'arret : rester immobile ~0,5s deploie l'ancrage, portee et precision du Faisceau augmentent. Bouger le rompt aussitot."},
 	{"id": "cerclier", "name": "CERCLIER", "cost": 1600,
-		"weapons": ["disque"], "hp": 18.0, "dmg": 1.08, "speed": 1.10, "crit": 0.12,
+		"weapons": ["disque"], "hp": 18.0, "dmg": 1.08, "speed": 1.05, "crit": 0.12,
 		"arsenal": ["disque", "autocannon", "railgun", "plasma", "faisceau"],
 		"signature": "disque", "accent": Color(0.55, 1.0, 0.35),
 		"sig_muzzle": ["fire_blast", 0.40],
@@ -219,42 +219,42 @@ const MECHS: Array = [
 	## ---- VERSIONS MK (16/10, ESSAI) : memes rig, poses et meca que leur chassis de base (Player.chassis_family), pieces 3D en plus
 	## (tools/mk_parts.py, cuites par tools/build_mk_anims.py). cout 0 = jouables tout de suite pour juger. A retirer si non retenues.
 	{"id": "vortexmk2", "name": "VORTEX MK II", "cost": 0, "mk": 2, "base": "vortex",
-		"weapons": ["autocannon"], "hp": 24.0, "dmg": 1.28, "speed": 1.07, "crit": 0.09,
+		"weapons": ["autocannon"], "hp": 24.0, "dmg": 1.28, "speed": 1.05, "crit": 0.09,
 		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
 		"signature": "autocannon", "accent": Color(0.38, 0.92, 1.00),
 		"sig_muzzle": ["aaa_beam", 0.46],
 		"ligne": "ÉNERGIE DIRIGÉE — blindage renforcé.",
 		"desc": "Mk II : pauldrons, canon d'avant-bras, émetteur de paume. Même style que le VORTEX, plus robuste."},
 	{"id": "vortexmk3", "name": "VORTEX MK III", "cost": 0, "mk": 3, "base": "vortex",
-		"weapons": ["autocannon"], "hp": 28.0, "dmg": 1.36, "speed": 1.08, "crit": 0.1,
+		"weapons": ["autocannon"], "hp": 28.0, "dmg": 1.36, "speed": 1.05, "crit": 0.1,
 		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
 		"signature": "autocannon", "accent": Color(0.38, 0.92, 1.00),
 		"sig_muzzle": ["aaa_beam", 0.46],
 		"ligne": "ÉNERGIE DIRIGÉE — double canon.",
 		"desc": "Mk III : canons jumeaux d'avant-bras, propulseurs dorsaux, plastron."},
 	{"id": "vortexmk4", "name": "VORTEX MK IV", "cost": 0, "mk": 4, "base": "vortex",
-		"weapons": ["autocannon"], "hp": 34.0, "dmg": 1.46, "speed": 1.1, "crit": 0.12,
+		"weapons": ["autocannon"], "hp": 34.0, "dmg": 1.46, "speed": 1.05, "crit": 0.12,
 		"arsenal": ["autocannon", "railgun", "faisceau", "disque", "plasma"],
 		"signature": "autocannon", "accent": Color(0.38, 0.92, 1.00),
 		"sig_muzzle": ["aaa_beam", 0.46],
 		"ligne": "ÉNERGIE DIRIGÉE — version d'élite.",
 		"desc": "Mk IV : gatling au bras, plaques flottantes et halos."},
 	{"id": "bluestrikemk2", "name": "BLUESTRIKE MK II", "cost": 0, "mk": 2, "base": "bluestrike",
-		"weapons": ["disperseur"], "hp": 9.0, "dmg": 1.12, "speed": 1.26, "crit": 0.16,
+		"weapons": ["disperseur"], "hp": 9.0, "dmg": 1.12, "speed": 1.05, "crit": 0.16,
 		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
 		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
 		"sig_muzzle": ["fire_blast", 0.40],
 		"ligne": "SOUFFLE RAPPROCHÉ — blindage renforcé.",
 		"desc": "Mk II : blasters aux mains, évents d'épaule, genouillères."},
 	{"id": "bluestrikemk3", "name": "BLUESTRIKE MK III", "cost": 0, "mk": 3, "base": "bluestrike",
-		"weapons": ["disperseur"], "hp": 12.0, "dmg": 1.2, "speed": 1.28, "crit": 0.17,
+		"weapons": ["disperseur"], "hp": 12.0, "dmg": 1.2, "speed": 1.05, "crit": 0.17,
 		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
 		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
 		"sig_muzzle": ["fire_blast", 0.40],
 		"ligne": "SOUFFLE RAPPROCHÉ — assaut.",
 		"desc": "Mk III : canons jumeaux d'avant-bras, propulseurs dorsaux."},
 	{"id": "bluestrikemk4", "name": "BLUESTRIKE MK IV", "cost": 0, "mk": 4, "base": "bluestrike",
-		"weapons": ["disperseur"], "hp": 16.0, "dmg": 1.3, "speed": 1.3, "crit": 0.19,
+		"weapons": ["disperseur"], "hp": 16.0, "dmg": 1.3, "speed": 1.05, "crit": 0.19,
 		"arsenal": ["disperseur", "missilepod", "ricochet", "sabre", "plasma"],
 		"signature": "disperseur", "accent": Color(1.00, 0.54, 0.16),
 		"sig_muzzle": ["fire_blast", 0.40],
