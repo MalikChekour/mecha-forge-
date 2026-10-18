@@ -54,6 +54,15 @@ const CHAPTERS: Array = [
 	{"name": "Le Noyau Instable",    "sub": "Le Compte a Rebours",         "biome": "reacteur",  "diff": 3, "gate": 28000},
 	{"name": "La Ruche",             "sub": "Ce Qui Grandit Dans l'Ombre", "biome": "ruche",     "diff": 3, "gate": 34000},
 	{"name": "La Citadelle Orbitale","sub": "La Forge Finale",             "biome": "citadelle", "diff": 3, "gate": 40000},
+	{"name": "Les Abysses",          "sub": "La Cité Engloutie",           "biome": "abyss",     "diff": 3, "gate": 46000},
+	{"name": "La Forêt d'Éther",     "sub": "Les Spores Luissantes",       "biome": "ether",     "diff": 3, "gate": 52000},
+	{"name": "La Nécropole d'Acier", "sub": "Le Tombeau des Titans",       "biome": "titans",    "diff": 3, "gate": 58000},
+	{"name": "Le Champ Orbital",     "sub": "Dérive Zéro-G",               "biome": "orbit",     "diff": 3, "gate": 64000},
+	{"name": "Archives Quantiques",  "sub": "La Matrice Pure",             "biome": "quantum",   "diff": 3, "gate": 70000},
+	{"name": "La Faille d'Ozone",    "sub": "L'Orage Perpétuel",           "biome": "ozone",     "diff": 3, "gate": 76000},
+	{"name": "L'Abîme Prismatique",  "sub": "Les Grottes Réfringentes",    "biome": "prism",     "diff": 3, "gate": 82000},
+	{"name": "Le Bastion Vapeur",    "sub": "La Fournaise Victorienne",    "biome": "steampunk", "diff": 3, "gate": 88000},
+	{"name": "Le Colisée Virtuel",   "sub": "L'Épreuve Finale",            "biome": "colosseum", "diff": 3, "gate": 95000},
 ]
 var _chapter: int = 1   # chapitre campagne en cours (1-based)
 # Each biome is GAMEPLAY, not just cosmetic: speed/spawn modifiers + optional ground hazard.
@@ -460,6 +469,15 @@ const BIOME_ART: Dictionary = {
 	"reacteur": "res://assets/chapters/chap_7_reacteur.jpg",
 	"ruche": "res://assets/chapters/chap_8_ruche.jpg",
 	"citadelle": "res://assets/chapters/chap_9_citadelle.jpg",
+	"abyss":     "res://assets/chapters/chap_10_abyss.jpg",
+	"ether":     "res://assets/chapters/chap_11_ether.jpg",
+	"titans":    "res://assets/chapters/chap_12_titans.jpg",
+	"orbit":     "res://assets/chapters/chap_13_orbit.jpg",
+	"quantum":   "res://assets/chapters/chap_14_quantum.jpg",
+	"ozone":     "res://assets/chapters/chap_15_ozone.jpg",
+	"prism":     "res://assets/chapters/chap_16_prism.jpg",
+	"steampunk": "res://assets/chapters/chap_17_steampunk.jpg",
+	"colosseum": "res://assets/chapters/chap_18_colosseum.jpg",
 	"earth": "res://assets/chapters/chap_earth.jpg",
 	"spaceship": "res://assets/chapters/chap_spaceship.jpg",
 	"ice": "res://assets/chapters/chap_ice.jpg",
@@ -1196,6 +1214,15 @@ func _biome_label(b: String) -> String:
 		"reacteur": return "Cœur Réacteur"
 		"ruche": return "Ruche Xéno"
 		"citadelle": return "Citadelle Orbitale"
+		"abyss": return "Abysses Englouties"
+		"ether": return "Forêt d'Éther"
+		"titans": return "Nécropole des Titans"
+		"orbit": return "Champ Orbital 0G"
+		"quantum": return "Archives Quantiques"
+		"ozone": return "Faille d'Ozone"
+		"prism": return "Abîme Prismatique"
+		"steampunk": return "Bastion Vapeur"
+		"colosseum": return "Colisée Virtuel"
 		_: return b.capitalize()
 
 
