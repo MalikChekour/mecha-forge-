@@ -69,21 +69,23 @@ const BOSS_PHASE_THRESHOLDS: Dictionary = {
 	"citadelleboss": [0.5, 0.2],
 }
 
+# 19/10 (patron : « supprime les ennemis de la demo ») : plus de Rodeur/Guepe/Belier dans les pools. Chaque niveau 10-18 n'a QUE son ennemi de base,
+# des le debut (unlock 0). Niveaux 1-9 : aucun ennemi tant que leurs mecha ne sont pas modelises (les DEFS brute/drone/quadshell restent : refs carcasse/balise).
 const BIOME_POOL: Dictionary = {
-	"tech": ["brute", "drone", "quadshell"], "earth": ["brute", "drone", "quadshell"], "spaceship": ["brute", "drone", "quadshell"],
-	"volcanic": ["brute", "drone", "quadshell"], "desert": ["brute", "drone", "quadshell"], "ice": ["brute", "drone", "quadshell"],
-	"jungle": ["brute", "drone", "quadshell"], "swamp": ["brute", "drone", "quadshell"], "ruines": ["brute", "drone", "quadshell"],
-	"cryo": ["brute", "drone", "quadshell"], "reacteur": ["brute", "drone", "quadshell"], "ruche": ["brute", "drone", "quadshell"],
-	"citadelle": ["brute", "drone", "quadshell"],
-	"abyss": ["mech10", "brute", "quadshell"],
-	"ether": ["mech11", "brute", "quadshell"],
-	"titans": ["mech12", "brute", "quadshell"],
-	"orbit": ["mech13", "brute", "quadshell"],
-	"quantum": ["mech14", "brute", "quadshell"],
-	"ozone": ["mech15", "brute", "quadshell"],
-	"prism": ["mech16", "brute", "quadshell"],
-	"steampunk": ["mech17", "brute", "quadshell"],
-	"colosseum": ["mech18", "brute", "quadshell"],
+	"tech": [], "earth": [], "spaceship": [],
+	"volcanic": [], "desert": [], "ice": [],
+	"jungle": [], "swamp": [], "ruines": [],
+	"cryo": [], "reacteur": [], "ruche": [],
+	"citadelle": [],
+	"abyss": ["mech10"],
+	"ether": ["mech11"],
+	"titans": ["mech12"],
+	"orbit": ["mech13"],
+	"quantum": ["mech14"],
+	"ozone": ["mech15"],
+	"prism": ["mech16"],
+	"steampunk": ["mech17"],
+	"colosseum": ["mech18"],
 }
 
 # CORRUPTION visuelle par biome : teinte multiplicative sur CHAQUE ennemi (self_modulate). Subtile.
