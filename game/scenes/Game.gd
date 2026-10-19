@@ -61,7 +61,7 @@ const CHAPTERS: Array = [
 	{"name": "Archives Quantiques",  "sub": "La Matrice Pure",             "biome": "quantum",   "diff": 3, "gate": 70000},
 	{"name": "La Faille d'Ozone",    "sub": "L'Orage Perpétuel",           "biome": "ozone",     "diff": 3, "gate": 76000},
 	{"name": "L'Abîme Prismatique",  "sub": "Les Grottes Réfringentes",    "biome": "prism",     "diff": 3, "gate": 82000},
-	{"name": "Le Bastion Vapeur",    "sub": "La Fournaise Victorienne",    "biome": "steampunk", "diff": 3, "gate": 88000},
+	{"name": "Le Bastion Vapeur",    "sub": "Bastion Stellaire",           "biome": "steampunk", "diff": 3, "gate": 88000},
 	{"name": "Le Colisée Virtuel",   "sub": "L'Épreuve Finale",            "biome": "colosseum", "diff": 3, "gate": 95000},
 ]
 var _chapter: int = 1   # chapitre campagne en cours (1-based)
