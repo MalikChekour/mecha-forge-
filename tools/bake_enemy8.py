@@ -82,20 +82,40 @@ def frame_bounds(objs):
 
 R = math.radians
 def apply_pose(arm_obj, i, n):
-    """Attaque : les deux bras du rig se tendent vers l'avant (canons braques), recul au tir, buste legerement penche."""
+    """Poses PROCEDURALES sur le rig Meshy (memes os que Vortex) : marche = celle de Vortex (jambes 28 deg, genoux 45, rebond du bassin,
+    bras en garde puis tendu), attaque = bras tendus + recul, mort = effondrement (bassin, genoux, buste)."""
     pb = arm_obj.pose.bones
     for b in pb:
         b.rotation_mode = "XYZ"; b.rotation_euler = (0, 0, 0); b.location = (0, 0, 0)
-    t = i / float(n)
-    pulse = max(0.0, math.sin(2 * math.pi * t))        # recul : une bouffee par cycle
-    up = 0.5 - 0.5 * math.cos(2 * math.pi * min(1.0, t * 1.6))   # montee des bras sur le debut
     def S(name, e):
         if name in pb: pb[name].rotation_euler = e
-    S("RightArm", (R(-86) * up + R(7) * pulse, R(-2), R(2)))
-    S("LeftArm", (R(-86) * up + R(5) * pulse, R(2), R(-2)))
-    S("RightForeArm", (0, 0, 0)); S("LeftForeArm", (0, 0, 0))
-    S("Spine", (R(-5) * up - R(3) * pulse, 0, 0)); S("Spine02", (R(-3) * up, 0, 0))
-    if "Hips" in pb: pb["Hips"].location = (0, 0.012 * pulse, 0)
+    def L(name, loc):
+        if name in pb: pb[name].location = loc
+    if POSE == "walk":
+        p = 2 * math.pi * i / n
+        L("Hips", (0, 0, -0.04 * abs(math.sin(p)) + 0.018)); S("Hips", (0, 0, 0.024 * math.sin(p)))
+        for side, ph in (("Left", 0.0), ("Right", math.pi)):
+            pit = R(28) * math.sin(p + ph)
+            kn = R(45) * max(0.0, -math.sin(p + ph - 0.25))
+            S(side + "UpLeg", (pit, 0, 0)); S(side + "Leg", (kn, 0, 0)); S(side + "Foot", (-pit * 0.6, 0, 0))
+        S("Spine", (R(-6), 0, 0)); S("Spine02", (R(2), 0, 0))
+        # bras en garde, balancement oppose aux jambes (comme Vortex marche en tenant son arme)
+        S("RightArm", (R(-70) + R(10) * math.sin(p), R(-6), R(4))); S("RightForeArm", (R(-16), 0, 0))
+        S("LeftArm", (R(-30) - R(10) * math.sin(p), R(14), R(-10))); S("LeftForeArm", (R(-52), 0, 0))
+    elif POSE == "attack":
+        t = i / float(n)
+        pulse = max(0.0, math.sin(2 * math.pi * t))
+        up = 0.5 - 0.5 * math.cos(2 * math.pi * min(1.0, t * 1.6))
+        S("RightArm", (R(-86) * up + R(7) * pulse, R(-2), R(2))); S("LeftArm", (R(-86) * up + R(5) * pulse, R(2), R(-2)))
+        S("Spine", (R(-5) * up - R(3) * pulse, 0, 0)); S("Spine02", (R(-3) * up, 0, 0))
+        L("Hips", (0, 0.012 * pulse, 0))
+    elif POSE == "die":
+        p = min(1.0, (i / float(max(1, n - 1))) / 0.85)
+        L("Hips", (0, 0, -0.18 * p)); S("Hips", (R(-10) * p, 0, 0))
+        for side in ("Left", "Right"):
+            S(side + "Leg", (R(55) * p, 0, 0)); S(side + "UpLeg", (R(-20) * p, 0, 0))
+        S("Spine", (R(-42) * 0.5 * p, 0, 0))
+        S("RightArm", (R(20) * p, 0, 0)); S("LeftArm", (R(20) * p, 0, 0))
 
 
 def main():
@@ -136,13 +156,21 @@ def main():
     # Size the ortho frame from a representative pose (not the union — Meshy walks
     # carry root motion, so the union would shrink the character and it would drift).
     if POSE:
+        # cadrage SERRE : union des bornes sur toutes les images de la pose (plus de pixels sur la creature, sans agrandir la planche)
+        umn = mathutils.Vector((1e9, 1e9, 1e9)); umx = -umn
+        for fi in range(FRAMES):
+            apply_pose(ARM, fi, FRAMES); bpy.context.view_layer.update()
+            a, b2 = frame_bounds(objs)
+            for k in range(3):
+                umn[k] = min(umn[k], a[k]); umx[k] = max(umx[k], b2[k])
         apply_pose(ARM, 0, FRAMES); bpy.context.view_layer.update()
+        mn0, mx0 = umn, umx
     else:
         sc.frame_set(frames[0])
-    mn0, mx0 = frame_bounds(objs)
+        mn0, mx0 = frame_bounds(objs)
     center0 = (mn0 + mx0) * 0.5
     size = max((mx0 - mn0).x, (mx0 - mn0).y, (mx0 - mn0).z, 1e-3)
-    cam_d = bpy.data.cameras.new("cam"); cam_d.type = "ORTHO"; cam_d.ortho_scale = size * 1.12
+    cam_d = bpy.data.cameras.new("cam"); cam_d.type = "ORTHO"; cam_d.ortho_scale = size * (1.08 if POSE else 1.12)
     cam = bpy.data.objects.new("cam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
     e = math.radians(EL); dist = size * 4.0
 
