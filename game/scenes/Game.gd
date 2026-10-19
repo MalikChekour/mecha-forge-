@@ -2165,6 +2165,12 @@ func pancarte_prop(kind: String, tex: Texture2D, prop: Node2D = null) -> void:
 		_pancarte_add(kind, PropScatter.INFO[kind], tex, prop)
 
 func pancarte_enemy(key: String, tex: Texture2D, node: Node2D = null) -> void:
+	# 19/10 : une planche d'animation (ex. 6 images de 176 px cote a cote) s'affichait ENTIERE, en bande minuscule : on ne garde que l'image 1
+	if tex != null and tex.get_height() > 0 and tex.get_width() >= tex.get_height() * 3:
+		var at: AtlasTexture = AtlasTexture.new()
+		at.atlas = tex
+		at.region = Rect2(0, 0, tex.get_height(), tex.get_height())
+		tex = at
 	if ENEMY_INFO.has(key):
 		_pancarte_add("enemy:" + key, ENEMY_INFO[key], tex, node)
 

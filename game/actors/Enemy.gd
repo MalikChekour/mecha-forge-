@@ -174,6 +174,7 @@ var _die_timer: float = 0.0
 var _dir: String = "front"           # facing, chosen from movement like the player mecha
 var _directional: bool = false       # true once any anim has 4-view sheets
 const _DIRS: Array[String] = ["front", "back", "left", "right"]
+const _DIAGS: Array[String] = ["front_right", "front_left", "back_right", "back_left"]   # 17/10 : ennemis a 8 directions (chapitres 1-18)
 
 # Tuning constants
 const _ACCEL: float = 700.0
@@ -557,6 +558,12 @@ func _load_anim(anim_name: String) -> Variant:
 			if r is Texture2D:
 				dirs[d] = r
 	if dirs.size() == _DIRS.size():
+		for dg: String in _DIAGS:   # diagonales (optionnelles) : si presentes, le sprite regarde dans 8 directions
+			var pd: String = "res://assets/enemies/%s_%s_%s.png" % [chassis, anim_name, dg]
+			if ResourceLoader.exists(pd):
+				var rd: Variant = load(pd)
+				if rd is Texture2D:
+					dirs[dg] = rd
 		return dirs
 	var sp: String = "res://assets/enemies/%s_%s.png" % [chassis, anim_name]
 	if ResourceLoader.exists(sp):
@@ -590,7 +597,10 @@ func play(name: String, one_shot: bool = false) -> void:
 
 
 func _frames_for(t: Texture2D) -> int:
-	return 8 if (t != null and t.get_width() >= t.get_height() * 4) else 1
+	# 17/10 : nombre d'images = largeur / hauteur (cellules carrees) -> accepte 5, 6 ou 8 images par planche
+	if t != null and t.get_height() > 0 and t.get_width() >= t.get_height() * 3:
+		return maxi(1, int(round(float(t.get_width()) / float(t.get_height()))))
+	return 1
 
 
 ## Canon lourd : 2 gros bolts LENTS (perçants visuellement) tirés des 2 barillets,
@@ -1520,7 +1530,17 @@ func _update_facing(v: Vector2) -> void:
 	if v.length() < 8.0:
 		return
 	var nd: String
-	if absf(v.x) > absf(v.y):
+	var a_cur: Variant = _anims.get(_cur_anim)
+	if a_cur is Dictionary and (a_cur as Dictionary).has("front_right"):
+		# 8 directions : secteur de 45 deg centre sur chaque direction (repere ecran : +y = face camera)
+		var ang: float = rad_to_deg(v.angle())
+		var sec: int = int(round(ang / 45.0))
+		nd = ["right", "front_right", "front", "front_left", "left", "back_left", "back", "back_right"][posmod(sec, 8)]
+		# hysteresis : on ne change que si on est sorti de ~30 deg du centre courant
+		var centers: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0, "left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0}
+		if _dir != nd and centers.has(_dir) and absf(wrapf(ang - float(centers[_dir]), -180.0, 180.0)) < 30.0:
+			return
+	elif absf(v.x) > absf(v.y):
 		nd = "right" if v.x > 0.0 else "left"
 	else:
 		nd = "front" if v.y > 0.0 else "back"
