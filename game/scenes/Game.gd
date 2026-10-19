@@ -55,8 +55,8 @@ const CHAPTERS: Array = [
 	{"name": "La Ruche",             "sub": "Ce Qui Grandit Dans l'Ombre", "biome": "ruche",     "diff": 3, "gate": 34000},
 	{"name": "La Citadelle Orbitale","sub": "La Forge Finale",             "biome": "citadelle", "diff": 3, "gate": 40000},
 	{"name": "Les Abysses",          "sub": "La Cité Engloutie",           "biome": "abyss",     "diff": 3, "gate": 46000},
-	{"name": "La Forêt d'Éther",     "sub": "Les Spores Luissantes",       "biome": "ether",     "diff": 3, "gate": 52000},
-	{"name": "La Nécropole d'Acier", "sub": "Le Tombeau des Titans",       "biome": "titans",    "diff": 3, "gate": 58000},
+	{"name": "Forêt Psychédélique",  "sub": "Les Spores Luissantes",       "biome": "ether",     "diff": 3, "gate": 52000},
+	{"name": "La Nécropole d'Acier", "sub": "Sanctuaire Titans",           "biome": "titans",    "diff": 3, "gate": 58000},
 	{"name": "Le Champ Orbital",     "sub": "Dérive Zéro-G",               "biome": "orbit",     "diff": 3, "gate": 64000},
 	{"name": "Archives Quantiques",  "sub": "La Matrice Pure",             "biome": "quantum",   "diff": 3, "gate": 70000},
 	{"name": "La Faille d'Ozone",    "sub": "L'Orage Perpétuel",           "biome": "ozone",     "diff": 3, "gate": 76000},
@@ -81,7 +81,7 @@ const BIOME_MODS: Dictionary = {
 	"ruche":     {"label": "BIOMECANIQUE  —  la ruche respire"},
 	"citadelle": {"label": "FORGE FINALE  —  citadelle orbitale"},
 	"abyss":     {"label": "CITÉ SUBMERGÉE  —  ruines abyssales", "player_speed_mult": 0.88},
-	"ether":     {"label": "FORÊT D'ÉTHER  —  canopée fongique bioluminescente"},
+	"ether":     {"label": "FORÊT PSYCHÉDÉLIQUE  —  canopée fongique bioluminescente"},
 	"titans":    {"label": "NÉCROPOLE DES TITANS  —  cimetière d'acier colossal"},
 	"orbit":     {"label": "CHAMP ORBITAL  —  gravité zéro & débris spatiaux", "player_speed_mult": 1.12, "player_proj_speed": 1.25},
 	"quantum":   {"label": "ARCHIVES QUANTIQUES  —  matrice de données & réfractions"},
@@ -1215,7 +1215,7 @@ func _biome_label(b: String) -> String:
 		"ruche": return "Ruche Xéno"
 		"citadelle": return "Citadelle Orbitale"
 		"abyss": return "Abysses Englouties"
-		"ether": return "Forêt d'Éther"
+		"ether": return "Forêt Psychédélique"
 		"titans": return "Nécropole des Titans"
 		"orbit": return "Champ Orbital 0G"
 		"quantum": return "Archives Quantiques"
