@@ -24,7 +24,7 @@ CH_ALL = [
  ("steampunk", "en17_steampunk", "Terreur a vapeur", 132.0),
  ("colosseum", "en18_colosseum", "Gladiateur", 134.0),
 ]
-CH = [c for c in CH_ALL if c[1] >= "en10"]   # chapitres 10-18 seulement
+CH = list(CH_ALL)   # 20/10 : les 18 chapitres
 lines = []
 for i, (biome, chassis, name, size) in [(CH_ALL.index(c) + 1, c) for c in CH]:
     hp = 26.0 + 2.5 * i

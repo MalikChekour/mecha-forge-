@@ -7,10 +7,12 @@ import os, sys, json, time, subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 IMG = os.path.join(ROOT, "images_18_mechas")
-LIST = [   # 19/10 (patron : « surtout ne modelise pas celles de 1 a 9 ») : UNIQUEMENT les chapitres 10 a 18 (rendus fournis)
+LIST = [   # 20/10 : chapitres 10-18 (rendus fournis, anim Meshy walk/die conservees) PUIS 1-9 (images du pack_mechas_aujourdhui, recadrees dans images_18_mechas/sel)
  ("en10_abyss", "Ch10_Abyss_Nautilus01.png"), ("en11_ether", "Ch11_Ether_SporeStrider.png"), ("en12_titans", "Ch12_Titans_GoliathRelic.png"),
  ("en13_orbit", "Ch13_Orbit_AstroVecteur.png"), ("en14_quantum", "Ch14_Quantum_CipherByte.png"), ("en15_ozone", "Ch15_Ozone_VoltJumper.png"),
  ("en16_prism", "Ch16_Prism_SpectraMech.png"), ("en17_steampunk", "Ch17_Steampunk_SteamDread.png"), ("en18_colosseum", "Ch18_Colosseum_ColosseumGladiator.png"),
+ ("en01_tech", "sel/Ch01.png"), ("en02_desert", "sel/Ch02.png"), ("en03_jungle", "sel/Ch03.png"), ("en04_volcanic", "sel/Ch04.png"), ("en05_swamp", "sel/Ch05.png"),
+ ("en06_cryo", "sel/Ch06.png"), ("en07_reacteur", "sel/Ch07.png"), ("en08_ruche", "sel/Ch08.png"), ("en09_citadelle", "sel/Ch09.png"),
 ]
 def gen():
     os.environ["MESHY_KEY"] = open(os.path.join(ROOT, ".meshy_key")).read().strip()
@@ -25,9 +27,6 @@ def gen():
                 tid = json.load(open(os.path.join(d, "meta.json")))["id"]
                 m.rig(tid, name, 2.2)
             rid = json.load(open(os.path.join(d, "rig_task.json")))["rig_task_id"]
-            for lab in ("walk", "die"):
-                if not os.path.exists(os.path.join(d, "anim_%s.glb" % lab)):
-                    m.animate(rid, lab, name, lab)
             print("PRET", name, flush=True)
         except Exception as e:
             print("ECHEC", name, str(e)[:200], flush=True)
@@ -38,7 +37,7 @@ def bake():
             d = os.path.join(ROOT, "meshy_in", name)
             done = os.path.join(ROOT, "game", "assets", "enemies", name + "_die_back_left.png")
             if os.path.exists(done): continue
-            if all(os.path.exists(os.path.join(d, "anim_%s.glb" % a)) for a in ("walk", "die")):
+            if os.path.exists(os.path.join(d, "rigged.glb")):
                 subprocess.run([sys.executable, os.path.join(ROOT, "tools", "bake_enemy_all.py"), name, name], cwd=ROOT)
                 print("CUIT", name, flush=True); todo += 1
         pending = [n for n, _ in LIST if not os.path.exists(os.path.join(ROOT, "game", "assets", "enemies", n + "_die_back_left.png"))]
