@@ -15,10 +15,12 @@ LIST = [   # 20/10 : chapitres 10-18 (rendus fournis, anim Meshy walk/die conser
  ("en06_cryo", "sel/Ch06.png"), ("en07_reacteur", "sel/Ch07.png"), ("en08_ruche", "sel/Ch08.png"), ("en09_citadelle", "sel/Ch09.png"),
 ]
 def gen():
+    only = set(sys.argv[2:])   # optionnel : noms a traiter (ex. en03_jungle en05_swamp)
     os.environ["MESHY_KEY"] = open(os.path.join(ROOT, ".meshy_key")).read().strip()
     import meshy_client as m
     m.KEY = os.environ["MESHY_KEY"]
     for name, img in LIST:
+        if only and name not in only: continue
         d = os.path.join(ROOT, "meshy_in", name)
         try:
             if not os.path.exists(os.path.join(d, "model.glb")):

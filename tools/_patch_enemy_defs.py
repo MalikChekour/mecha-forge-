@@ -31,7 +31,7 @@ for i, (biome, chassis, name, size) in [(CH_ALL.index(c) + 1, c) for c in CH]:
     spd = 168.0 + (i % 4) * 4.0
     dmg = 7.0 + 0.4 * i
     ad = 4.0 + 0.35 * i
-    lines.append('\t"mech%02d": {"name": "%s", "chassis": "%s", "hp": %.1f, "speed": %.1f, "dmg": %.1f, "radius": 44.0, "size": %.1f, "motion": "walk", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": %.1f, "attack_cd": 2.2, "prefer_dist": 240.0, "unlock": 0.0},' % (i, name, chassis, hp, spd, dmg, size, ad))
+    lines.append('\t"mech%02d": {"name": "%s", "chassis": "%s", "hp": %.1f, "speed": %.1f, "dmg": %.1f, "radius": 40.0, "size": %.1f, "motion": "walk", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": %.1f, "attack_cd": 2.2, "prefer_dist": 240.0, "unlock": 0.0},' % (i, name, chassis, hp, spd, dmg, round(size * 1.2, 1), ad))
 # 1) DEFS : remplace les lignes mechNN existantes puis les reecrit
 s = re.sub(r'\t"mech\d\d": \{[^\n]*\},\n', "", s)
 anchor = '	# "cryoboss":'
