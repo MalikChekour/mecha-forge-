@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 name, chassis = sys.argv[1], sys.argv[2]
 res = sys.argv[sys.argv.index("--res") + 1] if "--res" in sys.argv else "176"
 out = os.path.join(ROOT, "game", "assets", "enemies")
-for anim, frames, extra in (("walk", 6, ["--pose", "walk"]), ("attack", 6, ["--pose", "attack"]), ("die", 5, ["--pose", "die", "--oneshot"])):
+for anim, frames, extra in (("walk", 8, ["--pose", "walk"]), ("attack", 6, ["--pose", "attack"]), ("die", 5, ["--pose", "die", "--oneshot"])):
     # attaque = pose procedurale des BRAS sur le rig (rigged.glb) ; walk/die = animations Meshy
     glb = os.path.join(ROOT, "meshy_in", name, "rigged.glb")
     if not os.path.exists(glb):

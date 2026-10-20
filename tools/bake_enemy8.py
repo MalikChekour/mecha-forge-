@@ -82,40 +82,62 @@ def frame_bounds(objs):
 
 R = math.radians
 def apply_pose(arm_obj, i, n):
-    """Poses PROCEDURALES sur le rig Meshy (memes os que Vortex) : marche = celle de Vortex (jambes 28 deg, genoux 45, rebond du bassin,
-    bras en garde puis tendu), attaque = bras tendus + recul, mort = effondrement (bassin, genoux, buste)."""
+    """Poses PROCEDURALES sur le rig Meshy. 19/10 (patron : « la demarche n'est pas aussi naturelle que Vortex ») : les os de ces rigs ont des jambes ECARTEES
+    a ~45 deg (Vortex : pendantes) -> un pitch en repere LOCAL faisait balancer les jambes de COTE. Ici chaque rotation est un pitch autour de l'axe X MONDE
+    (avant/arriere), converti dans le repere de l'os : basis = rest^-1 * Rx(b) * rest (la rotation du parent s'accumule deja dans le monde)."""
     pb = arm_obj.pose.bones
     for b in pb:
         b.rotation_mode = "XYZ"; b.rotation_euler = (0, 0, 0); b.location = (0, 0, 0)
-    def S(name, e):
-        if name in pb: pb[name].rotation_euler = e
+    def W(name, ang, yaw=0.0):
+        """pitch monde (ang) + yaw monde optionnel, converti en repere de l'os"""
+        if name not in pb: return
+        rest = arm_obj.data.bones[name].matrix_local.to_3x3()
+        rw = mathutils.Matrix.Rotation(yaw, 3, "Z") @ mathutils.Matrix.Rotation(ang, 3, "X")
+        pb[name].rotation_euler = (rest.inverted() @ rw @ rest).to_euler("XYZ")
     def L(name, loc):
         if name in pb: pb[name].location = loc
+    def rest_dir(name):
+        bn = arm_obj.data.bones[name]
+        return (bn.tail_local - bn.head_local).normalized()
+    def aim_arm(side, lift=0.0, spread=0.10):
+        """BRAS TENDU vers l'avant (comme Vortex/Blue Strike en visee) : l'os du bras ET de l'avant-bras sont orientes vers une cible monde
+        (avant = -Y, legerement ecartee), quelle que soit leur orientation de repos ; lift = leve (rad) pour le recul."""
+        a, f = side + "Arm", side + "ForeArm"
+        if a not in pb: return
+        sgn = 1.0 if side == "Left" else -1.0
+        tgt = mathutils.Vector((sgn * spread, -1.0, -0.06)).normalized()   # jamais vers le haut : horizontal, tres legerement vers le sol
+        tgt = mathutils.Matrix.Rotation(abs(lift), 3, "X") @ tgt     # le recul ne fait QUE baisser le canon
+        ra = arm_obj.data.bones[a].matrix_local.to_3x3()
+        d1 = rest_dir(a).rotation_difference(tgt).to_matrix()
+        pb[a].rotation_euler = (ra.inverted() @ d1 @ ra).to_euler("XYZ")
+        if f in pb:
+            rf = arm_obj.data.bones[f].matrix_local.to_3x3()
+            cur = d1 @ rest_dir(f)
+            d2 = cur.rotation_difference(tgt).to_matrix()
+            pb[f].rotation_euler = (rf.inverted() @ d1.inverted() @ d2 @ d1 @ rf).to_euler("XYZ")
     if POSE == "walk":
         p = 2 * math.pi * i / n
-        L("Hips", (0, 0, -0.04 * abs(math.sin(p)) + 0.018)); S("Hips", (0, 0, 0.024 * math.sin(p)))
+        L("Hips", (0, 0, -0.045 * abs(math.sin(p)) + 0.02)); W("Hips", 0.0, 0.03 * math.sin(p))
         for side, ph in (("Left", 0.0), ("Right", math.pi)):
-            pit = R(28) * math.sin(p + ph)
-            kn = R(45) * max(0.0, -math.sin(p + ph - 0.25))
-            S(side + "UpLeg", (pit, 0, 0)); S(side + "Leg", (kn, 0, 0)); S(side + "Foot", (-pit * 0.6, 0, 0))
-        S("Spine", (R(-6), 0, 0)); S("Spine02", (R(2), 0, 0))
-        # bras en garde, balancement oppose aux jambes (comme Vortex marche en tenant son arme)
-        S("RightArm", (R(-70) + R(10) * math.sin(p), R(-6), R(4))); S("RightForeArm", (R(-16), 0, 0))
-        S("LeftArm", (R(-30) - R(10) * math.sin(p), R(14), R(-10))); S("LeftForeArm", (R(-52), 0, 0))
+            pit = R(30) * math.sin(p + ph)
+            kn = R(48) * max(0.0, -math.sin(p + ph - 0.25))
+            W(side + "UpLeg", pit); W(side + "Leg", kn); W(side + "Foot", -pit * 0.6)
+        W("Spine", R(-5)); W("Spine02", R(2))
+        # bras en garde (leve vers l'avant) qui se balancent a l'oppose des jambes
+        aim_arm("Right", R(4) * math.sin(p)); aim_arm("Left", -R(4) * math.sin(p))
     elif POSE == "attack":
         t = i / float(n)
         pulse = max(0.0, math.sin(2 * math.pi * t))
         up = 0.5 - 0.5 * math.cos(2 * math.pi * min(1.0, t * 1.6))
-        S("RightArm", (R(-86) * up + R(7) * pulse, R(-2), R(2))); S("LeftArm", (R(-86) * up + R(5) * pulse, R(2), R(-2)))
-        S("Spine", (R(-5) * up - R(3) * pulse, 0, 0)); S("Spine02", (R(-3) * up, 0, 0))
+        aim_arm("Right", R(9) * pulse); aim_arm("Left", R(6) * pulse)
+        W("Spine", R(-5) * up - R(3) * pulse); W("Spine02", R(-3) * up)
         L("Hips", (0, 0.012 * pulse, 0))
     elif POSE == "die":
         p = min(1.0, (i / float(max(1, n - 1))) / 0.85)
-        L("Hips", (0, 0, -0.18 * p)); S("Hips", (R(-10) * p, 0, 0))
+        L("Hips", (0, 0, -0.18 * p)); W("Hips", R(-10) * p)
         for side in ("Left", "Right"):
-            S(side + "Leg", (R(55) * p, 0, 0)); S(side + "UpLeg", (R(-20) * p, 0, 0))
-        S("Spine", (R(-42) * 0.5 * p, 0, 0))
-        S("RightArm", (R(20) * p, 0, 0)); S("LeftArm", (R(20) * p, 0, 0))
+            W(side + "UpLeg", R(-20) * p); W(side + "Leg", R(55) * p)
+        W("Spine", R(-21) * p); W("RightArm", R(20) * p); W("LeftArm", R(20) * p)
 
 
 def main():
