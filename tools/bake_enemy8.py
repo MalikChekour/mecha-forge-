@@ -99,7 +99,7 @@ def apply_pose(arm_obj, i, n):
     def rest_dir(name):
         bn = arm_obj.data.bones[name]
         return (bn.tail_local - bn.head_local).normalized()
-    def aim_arm(side, lift=0.0, spread=0.10):
+    def aim_arm(side, lift=0.0, spread=0.42):
         """BRAS TENDU vers l'avant (comme Vortex/Blue Strike en visee) : l'os du bras ET de l'avant-bras sont orientes vers une cible monde
         (avant = -Y, legerement ecartee), quelle que soit leur orientation de repos ; lift = leve (rad) pour le recul."""
         a, f = side + "Arm", side + "ForeArm"
