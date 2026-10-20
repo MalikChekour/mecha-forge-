@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/bluestrikemk2_idle_back_left.png-7de0cc94b7bd
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0

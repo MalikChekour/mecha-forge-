@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/new_mecha_die_right.png-ce8a0baaf8d0ad678b9f8
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.8
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
