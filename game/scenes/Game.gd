@@ -39,30 +39,30 @@ const BIOMES: Array = ["tech", "earth", "spaceship", "volcanic", "desert", "ice"
 # biome fixe + un palier de difficulté + un palier de puissance conseillé (gate). Battre le boss
 # final d'un chapitre (mode campagne) débloque le suivant + donne une récompense de 1er clear.
 const CHAPTERS: Array = [
-	{"name": "L'Usine",          "sub": "Le Reveil",       "biome": "tech",     "diff": 0, "gate": 1000},
-	{"name": "Terres Calcinees", "sub": "La Traversee",    "biome": "desert",   "diff": 1, "gate": 2500},
-	{"name": "La Ruine Verte",   "sub": "L'Enlisement",    "biome": "jungle",   "diff": 1, "gate": 5000},
-	{"name": "La Forge",         "sub": "Le Coeur Ardent", "biome": "volcanic", "diff": 2, "gate": 9000},
-	{"name": "La Cite Dechue",   "sub": "Le Souverain",    "biome": "swamp",    "diff": 3, "gate": 15000},
+	{"name": "L'Usine",                 "sub": "Le Reveil",                   "biome": "tech",      "diff": 0, "gate": 1000},
+	{"name": "Terres Arides",           "sub": "La Traversee",                "biome": "desert",    "diff": 1, "gate": 2500},
+	{"name": "La Ruine Verte",          "sub": "L'Enlisement",                "biome": "jungle",    "diff": 1, "gate": 5000},
+	{"name": "Le Coeur des Ressources", "sub": "Le Coeur Ardent",             "biome": "volcanic",  "diff": 2, "gate": 9000},
+	{"name": "La Cite Dechue",          "sub": "Le Souverain",                "biome": "swamp",     "diff": 3, "gate": 15000},
 	# 03/10, suite demandee par le patron (plan "15 maps") : 4 chapitres bonus post-campagne, tous
 	# a la difficulte MAX (pas de palier au-dela de VETERAN) - verifie INOFFENSIF avant d'ajouter :
 	# chapter_unlocked()/clear_chapter() (SaveManager.gd) lisent un simple compteur, aucun "5" en
 	# dur ; le seul "5" en dur vivait dans MetaScreen.gd (corrige dans le meme lot). "gate" n'est
 	# deja lu nulle part (bug connu, cf. commentaire plus bas) : garde seulement pour la coherence
 	# visuelle avec les 5 chapitres existants.
-	{"name": "Le Cryo-Laboratoire",  "sub": "Le Sommeil Froid",            "biome": "cryo",      "diff": 3, "gate": 22000},
-	{"name": "Le Noyau Instable",    "sub": "Le Compte a Rebours",         "biome": "reacteur",  "diff": 3, "gate": 28000},
-	{"name": "La Ruche",             "sub": "Ce Qui Grandit Dans l'Ombre", "biome": "ruche",     "diff": 3, "gate": 34000},
-	{"name": "La Citadelle Orbitale","sub": "La Forge Finale",             "biome": "citadelle", "diff": 3, "gate": 40000},
-	{"name": "Les Abysses",          "sub": "La Cité Engloutie",           "biome": "abyss",     "diff": 3, "gate": 46000},
-	{"name": "Forêt Psychédélique",  "sub": "Les Spores Luissantes",       "biome": "ether",     "diff": 3, "gate": 52000},
-	{"name": "La Nécropole d'Acier", "sub": "Sanctuaire Titans",           "biome": "titans",    "diff": 3, "gate": 58000},
-	{"name": "Le Champ Orbital",     "sub": "Dérive Zéro-G",               "biome": "orbit",     "diff": 3, "gate": 64000},
-	{"name": "Archives Quantiques",  "sub": "La Matrice Pure",             "biome": "quantum",   "diff": 3, "gate": 70000},
-	{"name": "Faille d'Ozone (Orage)", "sub": "L'Orage Perpétuel",          "biome": "ozone",     "diff": 3, "gate": 76000},
-	{"name": "Grotte Prismatique",   "sub": "Les Grottes Réfringentes",    "biome": "prism",     "diff": 3, "gate": 82000},
-	{"name": "Le Bastion Vapeur",    "sub": "Bastion Stellaire",           "biome": "steampunk", "diff": 3, "gate": 88000},
-	{"name": "Le Colisée Virtuel",   "sub": "L'Épreuve Finale",            "biome": "colosseum", "diff": 3, "gate": 95000},
+	{"name": "Le Cryo-Laboratoire",     "sub": "Le Sommeil Froid",            "biome": "cryo",      "diff": 3, "gate": 22000},
+	{"name": "Le Noyau Instable",       "sub": "Le Compte a Rebours",         "biome": "reacteur",  "diff": 3, "gate": 28000},
+	{"name": "La Ruche",                "sub": "Ce Qui Grandit Dans l'Ombre", "biome": "ruche",     "diff": 3, "gate": 34000},
+	{"name": "La Citadelle Orbitale",   "sub": "La Forge Finale",             "biome": "citadelle", "diff": 3, "gate": 40000},
+	{"name": "Les Abysses",             "sub": "La Cité Engloutie",           "biome": "abyss",     "diff": 3, "gate": 46000},
+	{"name": "Forêt Psychédélique",     "sub": "Les Spores Luissantes",       "biome": "ether",     "diff": 3, "gate": 52000},
+	{"name": "La Nécropole d'Acier",    "sub": "Sanctuaire Titans",           "biome": "titans",    "diff": 3, "gate": 58000},
+	{"name": "Le Champ Orbital",        "sub": "Dérive Zéro-G",               "biome": "orbit",     "diff": 3, "gate": 64000},
+	{"name": "Miroir Quantique",        "sub": "La Matrice Pure",             "biome": "quantum",   "diff": 3, "gate": 70000},
+	{"name": "Faille d'Ozone (Orage)",  "sub": "L'Orage Perpétuel",          "biome": "ozone",     "diff": 3, "gate": 76000},
+	{"name": "Grotte Prismatique",      "sub": "Les Grottes Réfringentes",    "biome": "prism",     "diff": 3, "gate": 82000},
+	{"name": "Le Bastion Vapeur",       "sub": "Bastion Stellaire",           "biome": "steampunk", "diff": 3, "gate": 88000},
+	{"name": "Le Colisée Virtuel",      "sub": "L'Épreuve Finale",            "biome": "colosseum", "diff": 3, "gate": 95000},
 ]
 var _chapter: int = 1   # chapitre campagne en cours (1-based)
 # Each biome is GAMEPLAY, not just cosmetic: speed/spawn modifiers + optional ground hazard.
@@ -84,7 +84,7 @@ const BIOME_MODS: Dictionary = {
 	"ether":     {"label": "FORÊT PSYCHÉDÉLIQUE  —  canopée fongique bioluminescente"},
 	"titans":    {"label": "NÉCROPOLE DES TITANS  —  cimetière d'acier colossal"},
 	"orbit":     {"label": "CHAMP ORBITAL  —  gravité zéro & débris spatiaux", "player_speed_mult": 1.12, "player_proj_speed": 1.25},
-	"quantum":   {"label": "ARCHIVES QUANTIQUES  —  matrice de données & réfractions"},
+	"quantum":   {"label": "MIROIR QUANTIQUE  —  matrice de données & réfractions"},
 	"ozone":     {"label": "FAILLE D'OZONE (ORAGE)  —  orage ionique perpétuel"},
 	"prism":     {"label": "GROTTE PRISMATIQUE  —  cavernes de quartz réflectif"},
 	"steampunk": {"label": "BASTION VAPEUR  —  usine victorienne d'airain & de laiton"},
@@ -1218,7 +1218,7 @@ func _biome_label(b: String) -> String:
 		"ether": return "Forêt Psychédélique"
 		"titans": return "Nécropole des Titans"
 		"orbit": return "Champ Orbital 0G"
-		"quantum": return "Archives Quantiques"
+		"quantum": return "Miroir Quantique"
 		"ozone": return "Faille d'Ozone (Orage)"
 		"prism": return "Grotte Prismatique"
 		"steampunk": return "Bastion Vapeur"
