@@ -545,7 +545,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		var tw: float = maxf(1.0, float(stex.get_width()))
 		var sh_w: float = vsize * float(st["w"])
 		var sh_h: float = vsize * float(st["h"])
-		var spos: Vector2 = Vector2(vsize * float(st.get("ox", 0.0)), vsize * float(st["oy"]))
+		var spos: Vector2 = Vector2(vsize * float(st.get("ox", 0.0)), vsize * float(st["oy"])) + _visual_offset()   # centre sur le CORPS, pas sur l'origine du cadre
 		var srot: float = deg_to_rad(float(st.get("rot", 0.0)))   # rotation de base (puis tourne)
 		var gap: float = float(st["gap"])
 		# couche FOND (pulse quand ca encaisse)
@@ -592,6 +592,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		_garde_dome = GardeDome.new()
 		_garde_dome.radius = _body_radius * 1.55
 		_garde_dome.z_index = 4
+		_garde_dome.position = _visual_offset()
 		_garde_dome.visible = false
 		add_child(_garde_dome)
 	if grade != "":
@@ -1555,7 +1556,7 @@ func _physics_process(delta: float) -> void:
 		# melee foes face where they move (which is toward the player anyway).
 		var face_vec: Vector2 = velocity
 		if behavior == "ranged" and player != null and is_instance_valid(player):
-			face_vec = Vector2.from_angle(_aim) if _aim_init else player.global_position - global_position
+			face_vec = Vector2.from_angle(_aim) * 100.0 if _aim_init else player.global_position - global_position
 		_update_facing(face_vec)
 		_aim_tilt(delta)
 	elif abs(velocity.x) > 2.0:
@@ -1663,6 +1664,26 @@ func _update_shield(delta: float) -> void:
 ## mouvement). Il ne tire que lorsque l'ecart est < 0,28 rad : un joueur qui change de direction brusquement se fait
 ## rattraper moins vite par les niveaux bas (lent, peu d'anticipation) que par les hauts. Le sprite 8 directions est
 ## incline vers l'angle exact (+/- 0,4 rad) : le bras suit entre deux directions cuites.
+## Le mecha cuit n'est pas centre dans son cadre (bbox ~23 px au-dessus du centre sur 176) : les boucliers se centrent sur le
+## CENTRE VISIBLE du corps (bbox de l'alpha, mesuree une fois par chassis), pas sur l'origine du noeud.
+static var _vc_cache: Dictionary = {}
+func _visual_offset() -> Vector2:
+	if _spr == null or _spr.texture == null:
+		return Vector2.ZERO
+	var off: Vector2
+	if Enemy._vc_cache.has(chassis):
+		off = Enemy._vc_cache[chassis]
+	else:
+		off = Vector2.ZERO
+		var img: Image = _spr.texture.get_image()
+		if img != null and not img.is_empty():
+			var fw: int = mini(img.get_width(), img.get_height())   # cadres carres (cf. _frames_for) : hframes pas encore pose ici
+			var r: Rect2i = img.get_region(Rect2i(0, 0, fw, img.get_height())).get_used_rect()
+			if r.size.x > 0 and r.size.y > 0:
+				off = Vector2(r.get_center()) - Vector2(float(fw) * 0.5, float(img.get_height()) * 0.5)
+		Enemy._vc_cache[chassis] = off
+	return off * _spr.scale
+
 func _aim_tick(delta: float) -> void:
 	var to_p: Vector2 = player.global_position - global_position
 	var goal: Vector2 = player.global_position
