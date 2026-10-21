@@ -58,7 +58,7 @@ const CHAPTERS: Array = [
 	{"name": "Forêt Psychédélique",     "sub": "Les Spores Luissantes",       "biome": "ether",     "diff": 3, "gate": 52000},
 	{"name": "La Nécropole d'Acier",    "sub": "Sanctuaire Titans",           "biome": "titans",    "diff": 3, "gate": 58000},
 	{"name": "Le Champ Orbital",        "sub": "Dérive Zéro-G",               "biome": "orbit",     "diff": 3, "gate": 64000},
-	{"name": "Miroir Quantique",        "sub": "La Matrice Pure",             "biome": "quantum",   "diff": 3, "gate": 70000},
+	{"name": "Station Géométrique Quantique", "sub": "La Matrice Pure", "biome": "quantum",   "diff": 3, "gate": 70000},
 	{"name": "Faille d'Ozone (Orage)",  "sub": "L'Orage Perpétuel",          "biome": "ozone",     "diff": 3, "gate": 76000},
 	{"name": "Grotte Prismatique",      "sub": "Les Grottes Réfringentes",    "biome": "prism",     "diff": 3, "gate": 82000},
 	{"name": "Le Bastion Vapeur",       "sub": "Bastion Stellaire",           "biome": "steampunk", "diff": 3, "gate": 88000},
@@ -84,7 +84,7 @@ const BIOME_MODS: Dictionary = {
 	"ether":     {"label": "FORÊT PSYCHÉDÉLIQUE  —  canopée fongique bioluminescente"},
 	"titans":    {"label": "NÉCROPOLE DES TITANS  —  cimetière d'acier colossal"},
 	"orbit":     {"label": "CHAMP ORBITAL  —  gravité zéro & débris spatiaux", "player_speed_mult": 1.12, "player_proj_speed": 1.25},
-	"quantum":   {"label": "MIROIR QUANTIQUE  —  matrice de données & réfractions"},
+	"quantum":   {"label": "STATION GÉOMÉTRIQUE QUANTIQUE  —  matrice de données & réfractions"},
 	"ozone":     {"label": "FAILLE D'OZONE (ORAGE)  —  orage ionique perpétuel"},
 	"prism":     {"label": "GROTTE PRISMATIQUE  —  cavernes de quartz réflectif"},
 	"steampunk": {"label": "BASTION VAPEUR  —  usine victorienne d'airain & de laiton"},
@@ -1218,7 +1218,7 @@ func _biome_label(b: String) -> String:
 		"ether": return "Forêt Psychédélique"
 		"titans": return "Nécropole des Titans"
 		"orbit": return "Champ Orbital 0G"
-		"quantum": return "Miroir Quantique"
+		"quantum": return "Station Géométrique Quantique"
 		"ozone": return "Faille d'Ozone (Orage)"
 		"prism": return "Grotte Prismatique"
 		"steampunk": return "Bastion Vapeur"
