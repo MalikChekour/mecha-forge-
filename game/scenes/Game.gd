@@ -146,6 +146,10 @@ var _cut_seen: Dictionary = {}   # per-run guard: a biome's intro/outro panel sh
 var _hazard: String = ""
 var _hazard_t: float = 0.0
 var _proj_pool: Array = []      # recycled Projectile nodes (no queue_free in the hot loop)
+## PLAFOND DE BALLES ENNEMIES VIVANTES (21/10, « quand il y a trop d'ennemis plus les attaques ca rame ») : anneau/eventail/rafale
+## multiplient les projectiles ; au-dela de ENEMY_BOLT_CAP le tir est ignore (la pression reste enorme, le moteur ne s'effondre pas).
+const ENEMY_BOLT_CAP: int = 150
+var _enemy_bolts_made: int = 0
 var _enemy_proj_pool: Array = []   # balles ennemies recyclees (fix latence : plus de new/queue_free en boucle)
 var _pickup_pool: Array = []    # recycled Pickup nodes (xp/scrap/bonus)
 var _revived: bool = false      # one watch-ad revive per run
@@ -1460,7 +1464,10 @@ func grant_skill() -> void:
 
 func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false, homing: float = 0.0) -> void:
 	var b: EnemyProjectile
+	if _enemy_bolts_made - _enemy_proj_pool.size() >= ENEMY_BOLT_CAP:
+		return
 	if _enemy_proj_pool.is_empty():
+		_enemy_bolts_made += 1
 		b = EnemyProjectile.new()
 		b.game = self
 		projectile_layer.add_child(b)
@@ -1835,6 +1842,8 @@ const VFX_DEF: Dictionary = {
 	"aaa_shockwave": {"frames": 26, "fps": 62},
 	"aaa_charge":    {"frames": 28, "fps": 46},
 }
+var _vfx_frame: int = -1
+var _vfx_n: int = 0
 var _vfx_pool: Array = []
 var _vfx_tex: Dictionary = {}   # id -> Texture2D (cached load)
 var cover_list: Array = []      # decor props (PropScatter) enemies steer around (blocks the player physically)
@@ -1846,6 +1855,13 @@ func spawn_vfx(id: String, pos: Vector2, rot: float = 0.0, scl: float = 1.0, col
 		stretch: Vector2 = Vector2.ONE) -> void:
 	var d: Dictionary = VFX_DEF.get(id, {})
 	if d.is_empty() or fx_layer == null:
+		return
+	var vf: int = Engine.get_physics_frames()
+	if vf != _vfx_frame:
+		_vfx_frame = vf
+		_vfx_n = 0
+	_vfx_n += 1
+	if _vfx_n > 28:   # budget d'effets par image : un mur d'ennemis qui tirent ne doit pas noyer le rendu
 		return
 	if not _vfx_tex.has(id):
 		var p: String = "res://assets/vfx/%s.png" % id

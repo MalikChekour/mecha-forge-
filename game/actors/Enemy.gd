@@ -51,6 +51,7 @@ var _garde_pulse: float = 0.0
 var form_pos: Vector2 = Vector2.ZERO
 var form_w: float = 0.0            # 0 = comportement libre ; 1 = suit son emplacement de formation
 var grade: String = ""             # "" soldat | "lieutenant" | "chef"
+const _DIR_NAMES: Array = ["right", "front_right", "front", "front_left", "left", "back_left", "back", "back_right"]
 const _DIR_DEG: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0, "left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0}
 # >>> IA22 vars (21/10 : signatures de tir par niveau, esquive, ordre du chef)
 var tir_style: String = ""         # "" tir de palier | rafale | eventail | sniper | guide | anneau | orbe
@@ -71,6 +72,9 @@ var _sniper_laser: Line2D = null
 class GardeDome extends Node2D:
 	var radius: float = 38.0
 	var _t: float = 0.0
+	func _ready() -> void:
+		set_process(visible)
+		visibility_changed.connect(func() -> void: set_process(visible))   # inactif tant que la garde n'est pas levee
 	func _process(delta: float) -> void:
 		if visible:
 			_t += delta
@@ -91,6 +95,9 @@ class GardeDome extends Node2D:
 class RankBadge extends Node2D:
 	var grade_type: String = ""
 	var _t: float = 0.0
+	func _ready() -> void:
+		set_process(visible)
+		visibility_changed.connect(func() -> void: set_process(visible))
 	func _process(delta: float) -> void:
 		if visible:
 			_t += delta
@@ -363,6 +370,8 @@ func _iq() -> float:
 
 const _SEP_SCAN: int = 26      # entrees examinees par image (cout borne, meme a 220 ennemis)
 const _SEP_MAX: int = 8        # voisins REELLEMENT proches retenus
+var _sep_vec: Vector2 = Vector2.ZERO
+var _sep_tick: int = 0
 var _sep_cursor: int = 0       # curseur tournant : sur quelques images, tout le voisinage est vu
 const _WANDER_STR: float = 9.0
 
@@ -747,7 +756,7 @@ func _tire_arme(dir: Vector2) -> void:
 		var a: float = 0.0 if n == 1 else (-demi + 2.0 * demi * float(i) / float(n - 1))
 		game.spawn_enemy_bolt(muzzle, dir.rotated(a), attack_dmg * ARME_PART[t], c,
 			ARME_TAILLE[t], ARME_VITESSE[t], false, ARME_GUIDAGE[t])
-	if game.has_method("spawn_vfx"):
+	if game.has_method("spawn_vfx") and Enemy._fx_ok():
 		# effet de bouche PROPRE A CHAQUE PALIER : c'est le tell instantane du danger.
 		game.spawn_vfx(ARME_MUZZLE[t], muzzle, dir.angle(), 0.42 + 0.16 * float(t), c)
 		if t >= 2:
@@ -1469,11 +1478,15 @@ func _physics_process(delta: float) -> void:
 			# mais on BALAIE a partir d'un curseur tournant, et seuls les voisins REELLEMENT
 			# dans le rayon consomment le budget. En quelques images, chaque ennemi a donc vu
 			# son vrai voisinage.
-			var separation: Vector2 = Vector2.ZERO
+			var separation: Vector2 = _sep_vec
 			var enemies: Array = _shared_enemies()
 			var sep_rad_sq: float = _SEP_RADIUS * _SEP_RADIUS
 			var nb: int = enemies.size()
-			if nb > 1:
+			_sep_tick += 1
+			# 21/10 (« trop d'ennemis, ca rame ») : balayage de voisinage 1 image sur 3 par ennemi (decale par instance) ; le vecteur
+			# est reutilise entre-temps. MESURE a 200 ennemis : la separation pesait ~43 % du cout d'un ennemi.
+			if nb > 1 and (_sep_tick + int(get_instance_id())) % 3 == 0:
+				separation = Vector2.ZERO
 				var depart: int = _sep_cursor % nb
 				_sep_cursor = (_sep_cursor + 7) % nb   # pas premier : balaie tout le monde
 				var examines: int = 0
@@ -1495,6 +1508,7 @@ func _physics_process(delta: float) -> void:
 						separation += to_other.normalized() * (1.0 - (d2 / sep_rad_sq))
 			
 				_allies = proches
+				_sep_vec = separation
 			if form_w > 0.0 and _bull_state != 2 and _phase != _PH_DASH_ACTIVE and not _kamikaze_arming:
 				var to_slot: Vector2 = form_pos - global_position
 				var sl: float = to_slot.length()
@@ -1727,6 +1741,17 @@ const _STYLES: Dictionary = {
 	"orbe":     {"col": Color(1.0, 0.3, 0.25), "charge": 0.45},
 }
 
+## budget d'effets de bouche : 6 par image au plus (au-dela, le tir part mais sans flamme)
+static var _fx_frame: int = -1
+static var _fx_n: int = 0
+static func _fx_ok() -> bool:
+	var f: int = Engine.get_physics_frames()
+	if f != Enemy._fx_frame:
+		Enemy._fx_frame = f
+		Enemy._fx_n = 0
+	Enemy._fx_n += 1
+	return Enemy._fx_n <= 6
+
 func _tire_dispatch(dir: Vector2) -> void:
 	if tir_style == "" or not _STYLES.has(tir_style):
 		_tire_arme(dir)
@@ -1758,13 +1783,14 @@ func _style_fire(dir: Vector2) -> void:
 		"guide":
 			game.spawn_enemy_bolt(muzzle, dir, d * 1.3, col, 1.2, 230.0, true, 2.2)
 		"anneau":
-			for i in 10:
-				game.spawn_enemy_bolt(global_position, Vector2.from_angle(TAU * float(i) / 10.0 + _aim), d * 0.55, col, 1.0, 210.0, false, 0.0)
+			var nr: int = 10 if get_tree().get_nodes_in_group("enemies").size() < 90 else 6   # en foule : anneau allege (rendu)
+			for i in nr:
+				game.spawn_enemy_bolt(global_position, Vector2.from_angle(TAU * float(i) / float(nr) + _aim), d * 0.55, col, 1.0, 210.0, false, 0.0)
 			if game.has_method("spawn_vfx"):
 				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.5, col)
 		"orbe":
 			game.spawn_enemy_bolt(muzzle, dir, d * 2.0, col, 2.1, 175.0, true, 0.0)
-	if tir_style != "anneau" and game.has_method("spawn_vfx"):
+	if tir_style != "anneau" and game.has_method("spawn_vfx") and Enemy._fx_ok():
 		game.spawn_vfx("fire_blast", muzzle, dir.angle(), 0.45, col)
 	play("attack", true)
 
@@ -1808,10 +1834,10 @@ func _style_tick(delta: float, player_valid: bool) -> void:
 			var pulse: float = 0.65 + 0.35 * absf(sin(float(Time.get_ticks_msec()) * 0.03))
 			_sniper_laser.default_color = Color(1.0, 0.15, 0.15, pulse)
 		elif tir_style == "anneau":
-			if game != null and game.has_method("spawn_vfx") and randf() < 0.2:
+			if game != null and game.has_method("spawn_vfx") and (Engine.get_physics_frames() + get_instance_id()) % 12 == 0:
 				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.15, Color(0.4, 1.0, 0.5))
 		elif tir_style == "orbe":
-			if game != null and game.has_method("spawn_vfx") and randf() < 0.2:
+			if game != null and game.has_method("spawn_vfx") and (Engine.get_physics_frames() + get_instance_id()) % 12 == 0:
 				game.spawn_vfx("fire_blast", global_position + _aim_dir(_burst_dir) * 22.0, 0.0, 0.3, Color(1.0, 0.3, 0.25))
 		if _style_charge <= 0.0:
 			_style_charge = 0.0
@@ -1883,9 +1909,9 @@ func _update_facing(v: Vector2) -> void:
 		# 8 directions : secteur de 45 deg centre sur chaque direction (repere ecran : +y = face camera)
 		var ang: float = rad_to_deg(v.angle())
 		var sec: int = int(round(ang / 45.0))
-		nd = ["right", "front_right", "front", "front_left", "left", "back_left", "back", "back_right"][posmod(sec, 8)]
+		nd = _DIR_NAMES[posmod(sec, 8)]
 		# hysteresis : on ne change que si on est sorti de ~30 deg du centre courant
-		var centers: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0, "left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0}
+		var centers: Dictionary = _DIR_DEG
 		if _dir != nd and centers.has(_dir) and absf(wrapf(ang - float(centers[_dir]), -180.0, 180.0)) < 30.0:
 			return
 	elif absf(v.x) > absf(v.y):
