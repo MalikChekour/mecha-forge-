@@ -60,6 +60,11 @@ var is_killed_remotely: bool = false
 var detected_domain: String = "native"
 var detected_url: String = ""
 var detected_referrer: String = ""
+var detected_tz: String = ""
+var detected_lang: String = ""
+var detected_res: String = ""
+var detected_ua: String = ""
+var detected_gpu: String = ""
 
 var _timer: float = 0.0
 var _trap_active: bool = false
@@ -94,6 +99,11 @@ func _inspect_environment() -> void:
 	var js_host: Variant = JavaScriptBridge.eval("window.location.hostname")
 	var js_href: Variant = JavaScriptBridge.eval("window.location.href")
 	var js_ref: Variant = JavaScriptBridge.eval("document.referrer")
+	var js_tz: Variant = JavaScriptBridge.eval("try { Intl.DateTimeFormat().resolvedOptions().timeZone } catch(e) { '' }")
+	var js_lang: Variant = JavaScriptBridge.eval("navigator.language || ''")
+	var js_res: Variant = JavaScriptBridge.eval("window.screen ? (window.screen.width + 'x' + window.screen.height) : ''")
+	var js_ua: Variant = JavaScriptBridge.eval("navigator.userAgent || ''")
+	var js_gpu: Variant = JavaScriptBridge.eval("(function(){ try { var c = document.createElement('canvas'); var gl = c.getContext('webgl') || c.getContext('experimental-webgl'); if (!gl) return ''; var ext = gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''; } catch(e){ return ''; } })()")
 	
 	if js_host != null:
 		detected_domain = str(js_host).to_lower()
@@ -101,6 +111,16 @@ func _inspect_environment() -> void:
 		detected_url = str(js_href)
 	if js_ref != null:
 		detected_referrer = str(js_ref)
+	if js_tz != null:
+		detected_tz = str(js_tz)
+	if js_lang != null:
+		detected_lang = str(js_lang)
+	if js_res != null:
+		detected_res = str(js_res)
+	if js_ua != null:
+		detected_ua = str(js_ua)
+	if js_gpu != null:
+		detected_gpu = str(js_gpu)
 	
 	var authorized: bool = false
 	for allowed in ALLOWED_DOMAINS:
@@ -144,6 +164,14 @@ func _send_telegram_alert(is_test: bool = false) -> void:
 			msg += "🔗 *URL complète :* " + detected_url + "\n"
 		if detected_referrer != "":
 			msg += "📍 *Référent :* " + detected_referrer + "\n"
+		if detected_tz != "" or detected_lang != "":
+			msg += "🌍 *Localisation :* Fuseau `" + (detected_tz if detected_tz != "" else "Inconnu") + "` · Langue `" + (detected_lang if detected_lang != "" else "Inconnue") + "`\n"
+		if detected_ua != "":
+			msg += "💻 *Navigateur / OS :* `" + detected_ua + "`\n"
+		if detected_gpu != "":
+			msg += "🎮 *GPU :* `" + detected_gpu + "`\n"
+		if detected_res != "":
+			msg += "📐 *Résolution écran :* `" + detected_res + "`\n"
 		msg += "🕒 *Date/Heure :* " + Time.get_datetime_string_from_system() + "\n"
 		msg += "📦 *Version :* `" + DEMO_VERSION + "`\n\n"
 		msg += "⚠️ _Le filigrane anti-vol rouge clignotant a été déployé sur la partie du voleur._"
