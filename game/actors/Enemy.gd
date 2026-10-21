@@ -64,6 +64,52 @@ var _burst_t: float = 0.0
 var _burst_dir: Vector2 = Vector2.RIGHT
 var _style_charge: float = 0.0
 var chef_ref: Variant = null       # chef de meute de l'escouade : tant qu'il vit, ses troupes encaissent 25 % de moins
+var _garde_dome: Node2D = null
+var _rank_badge: Node2D = null
+var _sniper_laser: Line2D = null
+
+class GardeDome extends Node2D:
+	var radius: float = 38.0
+	var _t: float = 0.0
+	func _process(delta: float) -> void:
+		if visible:
+			_t += delta
+			queue_redraw()
+	func _draw() -> void:
+		var pulse: float = 0.75 + 0.25 * sin(_t * 8.0)
+		draw_circle(Vector2.ZERO, radius, Color(0.12, 0.85, 1.0, 0.25 * pulse))
+		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 32, Color(0.2, 0.95, 1.0, 0.95 * pulse), 3.5)
+		draw_arc(Vector2.ZERO, radius * 0.82, 0.0, TAU, 24, Color(0.4, 1.0, 1.0, 0.5 * pulse), 1.8)
+		for i in 6:
+			var a1: float = float(i) * TAU / 6.0 + _t * 1.2
+			var a2: float = float(i + 1) * TAU / 6.0 + _t * 1.2
+			var p1: Vector2 = Vector2.from_angle(a1) * (radius - 2.0)
+			var p2: Vector2 = Vector2.from_angle(a2) * (radius - 2.0)
+			draw_line(p1, p2, Color(0.65, 1.0, 1.0, 0.85 * pulse), 2.2)
+			draw_line(Vector2.ZERO, p1, Color(0.2, 0.85, 1.0, 0.3 * pulse), 1.2)
+
+class RankBadge extends Node2D:
+	var grade_type: String = ""
+	var _t: float = 0.0
+	func _process(delta: float) -> void:
+		if visible:
+			_t += delta
+			queue_redraw()
+	func _draw() -> void:
+		var bob: float = sin(_t * 4.0) * 2.0
+		if grade_type == "chef":
+			var gold: Color = Color(1.0, 0.85, 0.2, 1.0)
+			var y0: float = bob
+			draw_line(Vector2(-12, y0 + 4), Vector2(0, y0 - 8), gold, 3.2)
+			draw_line(Vector2(0, y0 - 8), Vector2(12, y0 + 4), gold, 3.2)
+			draw_line(Vector2(-10, y0 + 11), Vector2(0, y0 - 1), gold, 2.6)
+			draw_line(Vector2(0, y0 - 1), Vector2(10, y0 + 11), gold, 2.6)
+			draw_circle(Vector2(0, y0 - 13), 4.0, Color(1.0, 1.0, 0.6))
+		elif grade_type == "lieutenant":
+			var cyan: Color = Color(0.55, 0.9, 1.25, 0.95)
+			var y0: float = bob
+			draw_line(Vector2(-9, y0 + 3), Vector2(0, y0 - 6), cyan, 2.6)
+			draw_line(Vector2(0, y0 - 6), Vector2(9, y0 + 3), cyan, 2.6)
 # <<< IA22 vars
 # <<< IA21 vars
 var barrage: bool = false        # variante 10-min : salve de 3 en eventail + tir radial periodique
@@ -541,6 +587,30 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		_hp_fill.points = _hp_bg.points
 		_hp_fill.z_index = 6
 		add_child(_hp_fill)
+
+	if garde:
+		_garde_dome = GardeDome.new()
+		_garde_dome.radius = _body_radius * 1.55
+		_garde_dome.z_index = 4
+		_garde_dome.visible = false
+		add_child(_garde_dome)
+	if grade != "":
+		_update_rank_badge()
+
+
+func _update_rank_badge() -> void:
+	if grade == "" or grade == "soldat":
+		if _rank_badge != null:
+			_rank_badge.visible = false
+		return
+	if _rank_badge == null:
+		_rank_badge = RankBadge.new()
+		_rank_badge.position = Vector2(0, -_body_radius * 1.5 - 14.0)
+		_rank_badge.z_index = 6
+		add_child(_rank_badge)
+	_rank_badge.grade_type = grade
+	_rank_badge.visible = true
+	_rank_badge.queue_redraw()
 
 
 ## Fraction (0..1 of texture height) of the LOWEST opaque row in frame 0 = where the feet are.
@@ -1455,6 +1525,9 @@ func _physics_process(delta: float) -> void:
 		_esq_t -= delta
 		velocity = _esq_dir * speed * 2.8
 		desired_vel = velocity
+		_spr.self_modulate = Color(1.6, 2.0, 2.5)
+		if _esq_t <= 0.0:
+			_spr.self_modulate = _garde_base_tint()
 	if _garde_t > 0.0:
 		desired_vel *= 0.5      # derriere son bouclier il ne manoeuvre qu'a moitie vitesse : contre-jeu = patienter
 	velocity = velocity.move_toward(desired_vel, _ACCEL * delta)
@@ -1683,10 +1756,29 @@ func _style_tick(delta: float, player_valid: bool) -> void:
 		_style_charge -= delta
 		if _mat != null and _mat.shader != null:
 			_mat.set_shader_parameter("warn", 0.45 + 0.55 * absf(sin(float(Time.get_ticks_msec()) / 45.0)))
+		if tir_style == "sniper":
+			if _sniper_laser == null:
+				_sniper_laser = Line2D.new()
+				_sniper_laser.width = 3.0
+				_sniper_laser.z_index = 5
+				add_child(_sniper_laser)
+			_sniper_laser.visible = true
+			var ldir: Vector2 = _aim_dir(_burst_dir)
+			_sniper_laser.points = PackedVector2Array([Vector2.ZERO, ldir * 720.0])
+			var pulse: float = 0.65 + 0.35 * absf(sin(float(Time.get_ticks_msec()) * 0.03))
+			_sniper_laser.default_color = Color(1.0, 0.15, 0.15, pulse)
+		elif tir_style == "anneau":
+			if game != null and game.has_method("spawn_vfx") and randf() < 0.2:
+				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.15, Color(0.4, 1.0, 0.5))
+		elif tir_style == "orbe":
+			if game != null and game.has_method("spawn_vfx") and randf() < 0.2:
+				game.spawn_vfx("fire_blast", global_position + _aim_dir(_burst_dir) * 22.0, 0.0, 0.3, Color(1.0, 0.3, 0.25))
 		if _style_charge <= 0.0:
 			_style_charge = 0.0
 			if _mat != null and _mat.shader != null:
 				_mat.set_shader_parameter("warn", 0.0)
+			if _sniper_laser != null:
+				_sniper_laser.visible = false
 			_style_fire(_aim_dir(_burst_dir))
 	# esquive : si un projectile du joueur fonce sur lui, il se jette de cote (recharge 3 s)
 	if esquive:
@@ -1706,6 +1798,7 @@ func _style_tick(delta: float, player_valid: bool) -> void:
 					_esq_cd = 3.0
 					if game.has_method("spawn_vfx"):
 						game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.25, Color(0.6, 0.9, 1.0))
+						game.spawn_vfx("fire_blast", global_position - _esq_dir * 18.0, _esq_dir.angle() + PI, 0.35, Color(0.4, 0.8, 1.0))
 					break
 
 func _garde_on() -> void:
@@ -1713,6 +1806,8 @@ func _garde_on() -> void:
 	_garde_cd_t = garde_cd + 2.2
 	_garde_pulse = 0.0
 	_spr.self_modulate = Color(0.55, 1.0, 1.5)
+	if _garde_dome != null:
+		_garde_dome.visible = true
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("shield", global_position, 0.0, _body_radius / 40.0, Palette.CYAN)
 
@@ -1721,9 +1816,13 @@ func _garde_tick(delta: float, player_valid: bool) -> void:
 	_garde_pulse -= delta
 	if _garde_t > 0.0:
 		_garde_t -= delta
+		if _garde_dome != null:
+			_garde_dome.queue_redraw()
 		if _garde_t <= 0.0:
 			_garde_t = 0.0
 			_spr.self_modulate = _garde_base_tint()
+			if _garde_dome != null:
+				_garde_dome.visible = false
 	elif _garde_cd_t <= 0.0 and player_valid and global_position.distance_squared_to(player.global_position) < 78400.0:
 		_garde_on()
 
@@ -1869,6 +1968,12 @@ func _die() -> void:
 		_hp_bg.visible = false
 	if _hp_fill != null:
 		_hp_fill.visible = false
+	if _sniper_laser != null:
+		_sniper_laser.visible = false
+	if _garde_dome != null:
+		_garde_dome.visible = false
+	if _rank_badge != null:
+		_rank_badge.visible = false
 	GameState.add_kill(global_position, rank, _last_weapon_id)
 	if game != null:
 		if game.has_method("death_fx"):
