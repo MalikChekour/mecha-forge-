@@ -222,6 +222,7 @@ func update(delta: float, p: Vector2, mspeed: float) -> void:
 	for i in n:
 		var m: Variant = ms[i]
 		m.form_pos = slot(i, n, p)
+		m.chef_ref = chef
 		var w: float = 1.0
 		if form == "leurre" and m == _decoy:
 			w = 0.0

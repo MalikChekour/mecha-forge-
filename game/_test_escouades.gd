@@ -115,6 +115,37 @@ func _ready() -> void:
 	ge._garde_cd_t = 99.0
 	ge.take_damage(3.0)
 	_check(absf((hp0 - ge.hp) - (hp0 - ge.hp)) < 1.0 and ge.hp < hp0 - 1.5, "hors garde : degats pleins")
+	# signatures de tir : chaque style produit sa propre salve
+	for st in ["rafale", "eventail", "sniper", "guide", "anneau", "orbe"]:
+		var se: Enemy = Enemy.new()
+		se.global_position = Vector2(400, 0)
+		g.enemy_layer.add_child(se)
+		se.setup("mech09", sp._role_def("mech09", ["tir", st], 9), pl, g)
+		se._aim_init = true
+		se._aim = PI
+		var b0: int = g.bolts.size()
+		se._tire_dispatch(Vector2.LEFT)
+		for k in 60:
+			se._style_tick(1.0 / 30.0, true)
+		var nb: int = g.bolts.size() - b0
+		var want: int = {"rafale": 3, "eventail": 5, "sniper": 1, "guide": 1, "anneau": 10, "orbe": 1}[st]
+		_check(nb == want, "style %-8s -> %d projectile(s) (attendu %d)" % [st, nb, want])
+	# ordre du chef : -25 % de degats subis a portee
+	var so: Enemy = Enemy.new()
+	so.global_position = Vector2(400, 0)
+	g.enemy_layer.add_child(so)
+	so.setup("mech09", sp._role_def("mech09", ["tir"], 9), pl, g)
+	var hpo: float = so.hp
+	so.take_damage(10.0)
+	var plein: float = hpo - so.hp
+	so.hp = hpo
+	var chf: Enemy = Enemy.new()
+	chf.global_position = Vector2(450, 0)
+	g.enemy_layer.add_child(chf)
+	chf.setup("mech09", sp._role_def("mech09", ["tir"], 9), pl, g)
+	so.chef_ref = chf
+	so.take_damage(10.0)
+	_check(absf((hpo - so.hp) - plein * 0.75) < 0.01, "ordre du chef : %.2f degats au lieu de %.2f" % [hpo - so.hp, plein])
 	var ae: Enemy = Enemy.new()
 	ae.global_position = Vector2(400, 0)
 	g.enemy_layer.add_child(ae)

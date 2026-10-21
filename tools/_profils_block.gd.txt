@@ -9,23 +9,23 @@
 ##   roles  : tir | charge (dasher) | mine (zones au sol) | kamikaze | bull (melee a charge) | blinde (bouclier) | lourd | barrage
 const PROFILES: Dictionary = {
 	"tech":      {"tier": 1, "forms": ["ligne","colonne"],  "pat": "ring",     "main": ["tir"],              "alt": [],                   "share": 0.0},
-	"desert":    {"tier": 2, "forms": ["tenaille","colonne","ligne"],  "pat": "pincer",   "main": ["charge"],           "alt": ["tir"],              "share": 0.20},
-	"jungle":    {"tier": 3, "forms": ["embuscade","tirailleurs"],  "pat": "ambush",   "main": ["tir"],              "alt": ["bull"],             "share": 0.25},
-	"volcanic":  {"tier": 4, "forms": ["coin","feu_et_mouvement"],  "pat": "ahead",    "main": ["mine"],             "alt": ["tir"],              "share": 0.25},
-	"swamp":     {"tier": 5, "forms": ["colonne","fer_a_cheval"],  "pat": "close",    "main": ["bull"],             "alt": ["mine"],             "share": 0.20},
-	"cryo":      {"tier": 6, "forms": ["ligne","vague","tirailleurs"],  "pat": "line",     "main": ["tir", "blinde", "garde"], "alt": ["charge"],       "share": 0.25},
-	"reacteur":  {"tier": 7, "forms": ["coin","vague","embuscade"],  "pat": "burst",    "main": ["kamikaze"],         "alt": ["tir"],              "share": 0.30},
-	"ruche":     {"tier": 8, "forms": ["encerclement","vague"],  "pat": "burst",    "main": ["bull"],             "alt": ["tir"],              "share": 0.30},
+	"desert":    {"tier": 2, "forms": ["tenaille","colonne","ligne"],  "pat": "pincer",   "main": ["charge", "esquive"],           "alt": ["tir", "rafale"],              "share": 0.20},
+	"jungle":    {"tier": 3, "forms": ["embuscade","tirailleurs"],  "pat": "ambush",   "main": ["eventail"],              "alt": ["bull", "garde"],             "share": 0.25},
+	"volcanic":  {"tier": 4, "forms": ["coin","feu_et_mouvement"],  "pat": "ahead",    "main": ["mine", "esquive"],             "alt": ["orbe"],              "share": 0.25},
+	"swamp":     {"tier": 5, "forms": ["colonne","fer_a_cheval"],  "pat": "close",    "main": ["bull", "garde"],             "alt": ["mine"],             "share": 0.20},
+	"cryo":      {"tier": 6, "forms": ["ligne","vague","tirailleurs"],  "pat": "line",     "main": ["sniper", "blinde", "garde"], "alt": ["charge"],       "share": 0.25},
+	"reacteur":  {"tier": 7, "forms": ["coin","vague","embuscade"],  "pat": "burst",    "main": ["kamikaze", "esquive"],         "alt": ["anneau"],              "share": 0.30},
+	"ruche":     {"tier": 8, "forms": ["encerclement","vague"],  "pat": "burst",    "main": ["bull", "esquive"],             "alt": ["rafale", "garde"],              "share": 0.30},
 	"citadelle": {"tier": 9, "forms": ["vague","echelon","feu_et_mouvement"],  "pat": "pincer",   "main": ["tir", "blinde", "lourd", "garde"], "alt": ["mine"], "share": 0.25},
-	"abyss":     {"tier": 10, "forms": ["encerclement","spirale","fer_a_cheval"], "pat": "encircle", "main": ["tir", "lourd"],     "alt": ["charge"],           "share": 0.25},
-	"ether":     {"tier": 11, "forms": ["leurre","embuscade","tenaille"], "pat": "dropin",   "main": ["charge"],           "alt": ["kamikaze"],         "share": 0.20},
-	"titans":    {"tier": 12, "forms": ["coin","echelon","ligne"], "pat": "ahead",    "main": ["mine", "blinde", "garde"], "alt": ["bull"],       "share": 0.25},
-	"orbit":     {"tier": 13, "forms": ["spirale","feu_et_mouvement","encerclement"], "pat": "fan",      "main": ["tir", "barrage"],   "alt": ["charge"],           "share": 0.30},
-	"quantum":   {"tier": 14, "forms": ["tenaille","leurre","encerclement"], "pat": "sandwich", "main": ["kamikaze"],         "alt": ["tir", "blinde", "garde"], "share": 0.35},
-	"ozone":     {"tier": 15, "forms": ["echelon","tenaille","tirailleurs"], "pat": "line",     "main": ["charge"],           "alt": ["barrage", "tir"],   "share": 0.30},
-	"prism":     {"tier": 16, "forms": ["fer_a_cheval","feu_et_mouvement","spirale"], "pat": "fan",      "main": ["tir", "blinde", "garde"], "alt": ["kamikaze"],   "share": 0.30},
-	"steampunk": {"tier": 17, "forms": ["vague","tenaille","echelon","fer_a_cheval"], "pat": "sandwich", "main": ["mine", "blinde", "garde"], "alt": ["charge"],     "share": 0.35},
-	"colosseum": {"tier": 18, "forms": ["encerclement","tenaille","leurre","vague","feu_et_mouvement","spirale"], "pat": "gates",    "main": ["tir", "barrage", "blinde", "garde"], "alt": ["charge", "kamikaze"], "share": 0.40},
+	"abyss":     {"tier": 10, "forms": ["encerclement","spirale","fer_a_cheval"], "pat": "encircle", "main": ["guide", "garde"],     "alt": ["charge", "esquive"],           "share": 0.25},
+	"ether":     {"tier": 11, "forms": ["leurre","embuscade","tenaille"], "pat": "dropin",   "main": ["charge", "esquive"],           "alt": ["kamikaze"],         "share": 0.20},
+	"titans":    {"tier": 12, "forms": ["coin","echelon","ligne"], "pat": "ahead",    "main": ["mine", "blinde", "garde"], "alt": ["orbe"],       "share": 0.25},
+	"orbit":     {"tier": 13, "forms": ["spirale","feu_et_mouvement","encerclement"], "pat": "fan",      "main": ["tir", "barrage", "esquive"],   "alt": ["charge"],           "share": 0.30},
+	"quantum":   {"tier": 14, "forms": ["tenaille","leurre","encerclement"], "pat": "sandwich", "main": ["kamikaze", "esquive"],         "alt": ["sniper", "blinde", "garde"], "share": 0.35},
+	"ozone":     {"tier": 15, "forms": ["echelon","tenaille","tirailleurs"], "pat": "line",     "main": ["charge", "esquive"],           "alt": ["rafale", "garde"],   "share": 0.30},
+	"prism":     {"tier": 16, "forms": ["fer_a_cheval","feu_et_mouvement","spirale"], "pat": "fan",      "main": ["eventail", "blinde", "garde"], "alt": ["kamikaze"],   "share": 0.30},
+	"steampunk": {"tier": 17, "forms": ["vague","tenaille","echelon","fer_a_cheval"], "pat": "sandwich", "main": ["mine", "blinde", "garde"], "alt": ["orbe", "esquive"],     "share": 0.35},
+	"colosseum": {"tier": 18, "forms": ["encerclement","tenaille","leurre","vague","feu_et_mouvement","spirale"], "pat": "gates",    "main": ["anneau", "blinde", "garde"], "alt": ["charge", "kamikaze", "rafale"], "share": 0.40},
 }
 var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
 var _pat_n: int = 0
@@ -63,6 +63,10 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 			"bull":
 				d["behavior"] = "rush"
 				d["bull"] = true
+			"rafale", "eventail", "sniper", "guide", "anneau", "orbe":
+				d["tir_style"] = String(f)
+			"esquive":
+				d["esquive"] = true
 			"garde":
 				d["garde"] = true
 				d["garde_cd"] = lerpf(11.0, 6.5, (t - 1.0) / 17.0)
