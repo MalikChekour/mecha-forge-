@@ -1707,8 +1707,8 @@ func _aim_dir(fallback: Vector2) -> Vector2:
 func _aim_tilt(delta: float) -> void:
 	var want: float = 0.0
 	if _aim_init and _DIR_DEG.has(_dir) and _anims.get(_cur_anim) is Dictionary and (_anims.get(_cur_anim) as Dictionary).has("front_right"):
-		want = clampf(angle_difference(deg_to_rad(float(_DIR_DEG[_dir])), _aim), -0.4, 0.4)
-	_spr.rotation = lerp_angle(_spr.rotation, want, clampf(delta * 14.0, 0.0, 1.0))
+		want = clampf(angle_difference(deg_to_rad(float(_DIR_DEG[_dir])), _aim), -0.2, 0.2)
+	_spr.rotation = lerp_angle(_spr.rotation, want, clampf(delta * 6.0, 0.0, 1.0))   # douce : pas de saut quand le secteur de direction change
 
 ## ======================= GARDE ACTIVE : bouclier energetique temporaire =======================
 ## 2,2 s a ~12 % des degats, puis recharge `garde_cd`. Se declenche quand le joueur est proche (~280 px) ou au premier coup
@@ -1768,6 +1768,20 @@ func _style_fire(dir: Vector2) -> void:
 		game.spawn_vfx("fire_blast", muzzle, dir.angle(), 0.45, col)
 	play("attack", true)
 
+## Projectiles du joueur [pos, vitesse], releves UNE fois toutes les 0,1 s pour tous les ennemis (avant : chaque esquiveur
+## reparcourait tout le calque a chaque scan -> plusieurs dizaines de milliers de tests/s en Web = saccades).
+static var _shots_cache: Array = []
+static var _shots_t: int = -999
+static func _player_shots(game_ref: Node) -> Array:
+	var f: int = Engine.get_physics_frames()
+	if f - Enemy._shots_t >= 6:
+		Enemy._shots_t = f
+		Enemy._shots_cache = []
+		for pr in game_ref.projectile_layer.get_children():
+			if pr is Projectile and (pr as Projectile).visible and (pr as Projectile).velocity.length_squared() > 1.0:
+				Enemy._shots_cache.append([(pr as Node2D).global_position, (pr as Projectile).velocity])
+	return Enemy._shots_cache
+
 func _style_tick(delta: float, player_valid: bool) -> void:
 	# salve de rafale : un coup toutes les 0,11 s dans la direction figee au depart (lisible : on peut la contourner)
 	if _burst_left > 0:
@@ -1812,12 +1826,10 @@ func _style_tick(delta: float, player_valid: bool) -> void:
 		_esq_scan -= delta
 		if _esq_cd <= 0.0 and _esq_scan <= 0.0 and _esq_t <= 0.0 and player_valid and game != null and "projectile_layer" in game and game.projectile_layer != null:
 			_esq_scan = 0.1
-			for pr in game.projectile_layer.get_children():
-				if not (pr is Projectile) or not (pr as Projectile).visible:
-					continue
-				var rel: Vector2 = global_position - (pr as Node2D).global_position
-				var pv: Vector2 = (pr as Projectile).velocity
-				if rel.length_squared() < 22500.0 and pv.length_squared() > 1.0 and pv.dot(rel) > 0.0 and absf(pv.normalized().cross(rel.normalized())) < 0.5:
+			for pp in Enemy._player_shots(game):
+				var rel: Vector2 = global_position - (pp[0] as Vector2)
+				var pv: Vector2 = pp[1]
+				if rel.length_squared() < 22500.0 and pv.dot(rel) > 0.0 and absf(pv.normalized().cross(rel.normalized())) < 0.5:
 					var perp: Vector2 = Vector2(-pv.y, pv.x).normalized()
 					_esq_dir = perp if perp.dot(rel) >= 0.0 else -perp
 					_esq_t = 0.28
@@ -1835,7 +1847,7 @@ func _garde_on() -> void:
 	if _garde_dome != null:
 		_garde_dome.visible = true
 	if game != null and game.has_method("spawn_vfx"):
-		game.spawn_vfx("shield", global_position, 0.0, _body_radius / 40.0, Palette.CYAN)
+		game.spawn_vfx("shield", global_position + _visual_offset(), 0.0, _body_radius / 40.0, Palette.CYAN)
 
 func _garde_tick(delta: float, player_valid: bool) -> void:
 	_garde_cd_t -= delta
@@ -1937,7 +1949,7 @@ func take_damage(amount: float, source_chassis: String = "", weapon_id: String =
 			amount *= 0.12
 			if game != null and game.has_method("shield_ripple") and _garde_pulse <= 0.0:
 				_garde_pulse = 0.25
-				game.shield_ripple(global_position, _body_radius * 1.6, Palette.CYAN)
+				game.shield_ripple(global_position + _visual_offset(), _body_radius * 1.6, Palette.CYAN)
 			if amount <= 0.05:
 				return
 	# the energy shield soaks damage first; only the overflow reaches HP
@@ -1948,13 +1960,13 @@ func take_damage(amount: float, source_chassis: String = "", weapon_id: String =
 		_shield_flash = 1.0
 		_shield_regen_t = 3.0
 		if game != null and game.has_method("shield_ripple"):
-			game.shield_ripple(global_position, _body_radius * 1.5, Palette.CYAN)
+			game.shield_ripple(global_position + _visual_offset(), _body_radius * 1.5, Palette.CYAN)
 		if shield <= 0.0:
 			shield = 0.0
 			if game != null and game.has_method("shield_break"):
-				game.shield_break(global_position, _body_radius * 1.7, Palette.CYAN)
+				game.shield_break(global_position + _visual_offset(), _body_radius * 1.7, Palette.CYAN)
 			if game != null and game.has_method("spawn_vfx"):
-				game.spawn_vfx("shield", global_position, 0.0, _body_radius / 55.0, Palette.CYAN)
+				game.spawn_vfx("shield", global_position + _visual_offset(), 0.0, _body_radius / 55.0, Palette.CYAN)
 		if amount <= 0.0:
 			return
 	hp -= amount
