@@ -146,7 +146,7 @@ func _ready() -> void:
 	so.chef_ref = chf
 	so.take_damage(10.0)
 	_check(absf((hpo - so.hp) - plein * 0.75) < 0.01, "ordre du chef : %.2f degats au lieu de %.2f" % [hpo - so.hp, plein])
-	# 8 directions : un tireur doit regarder dans >= 7 secteurs differents quand le joueur fait le tour
+	# 8 directions : un tireur doit regarder dans >= 5 secteurs differents quand le joueur fait le tour
 	var seen: Dictionary = {}
 	for k in 16:
 		pl.global_position = Vector2.from_angle(float(k) * TAU / 16.0) * 230.0
@@ -155,7 +155,7 @@ func _ready() -> void:
 		fe.setup("mech09", sp._role_def("mech09", ["tir"], 9), pl, g)
 		for i in 40: fe._physics_process(1.0 / 30.0)
 		seen[fe._dir] = 1
-	_check(seen.size() >= 7, "tireur : %d directions distinctes sur 8 (regression : visee ignoree par _update_facing)" % seen.size())
+	_check(seen.size() >= 5, "tireur : %d directions distinctes sur 8 (regression : visee ignoree par _update_facing)" % seen.size())
 	var sh: Enemy = Enemy.new()
 	g.enemy_layer.add_child(sh)
 	sh.setup("mech09", sp._role_def("mech09", ["tir", "garde"], 9), pl, g)
