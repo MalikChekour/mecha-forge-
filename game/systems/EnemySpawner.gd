@@ -223,7 +223,7 @@ func _process(delta: float) -> void:
 		# pire qu'un rythme normal), puis le laisse remonter jusqu'a sa vraie valeur.
 		var full_mult: float = spawn_mult * float(GameState.diff().get("spawn", 1.0)) * Protocols.spawn_rate
 		var eff_mult: float = lerpf(minf(1.0, full_mult), full_mult, grace)
-		_spawn_t = rate / maxf(0.2, eff_mult)
+		_spawn_t = rate / maxf(0.2, eff_mult * (1.0 + 0.02 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)))
 		_spawn()
 	if _bosses_fired < BOSS_SCHEDULE.size() and GameState.run_time >= float(BOSS_SCHEDULE[_bosses_fired]["t"]) * _boss_scale:
 		if not _boss_alive():   # never let two bosses coexist -> avoids double next_map in one frame
@@ -278,7 +278,7 @@ func _drain_wave() -> void:
 		var e: Enemy = Enemy.new()
 		e.global_position = player.global_position + Vector2(cos(w["ang"]), sin(w["ang"])) * float(w["dist"])
 		game.enemy_layer.add_child(e)
-		e.setup(kind, DEFS[kind], player, game)
+		e.setup(kind, _def_for(kind), player, game)
 		_scale_enemy(e)
 
 ## Spawn one specific enemy at an exact spot (used by the robot carcass awakening).
@@ -396,6 +396,159 @@ func _spawn_offset() -> Vector2:
 	var ang: float = randf() * TAU
 	return Vector2(cos(ang), sin(ang)) * SPAWN_R
 
+## >>> PROFILS DE NIVEAU (21/10, patron : « une strategie d'apparition ET de combat par ennemi de base, plus dure a chaque niveau, mais pas impossible »)
+## Chaque niveau a : un MOTIF d'apparition (ou/comment ils arrivent), un ROLE principal et un role secondaire (part `share`).
+## Le rang `tier` (1..18) durcit : cadence +2 %/niveau, tirs plus rapides, boucliers plus epais, plus de roles speciaux
+## simultanes. GARDE-FOUS (jamais impossible) : vitesse <= 80 % du joueur (cf. _scale_enemy), plafond de roles speciaux
+## vivants (_special_cap), ENEMY_CAP, et aucun motif ne pose un ennemi a moins de ~420 px du joueur.
+##   motifs : ring anneau regulier | ahead mur devant la fuite | pincer deux flancs | ambush grappe d'un cote
+##            line rangee tangente | burst petites salves serrees | close anneau serre | encircle 4 points tournants
+##            dropin proche mais rare | gates deux portes cardinales | fan trois eventails | sandwich devant/derriere
+##   roles  : tir | charge (dasher) | mine (zones au sol) | kamikaze | bull (melee a charge) | blinde (bouclier) | lourd | barrage
+const PROFILES: Dictionary = {
+	"tech":      {"tier": 1,  "pat": "ring",     "main": ["tir"],              "alt": [],                   "share": 0.0},
+	"desert":    {"tier": 2,  "pat": "pincer",   "main": ["charge"],           "alt": ["tir"],              "share": 0.20},
+	"jungle":    {"tier": 3,  "pat": "ambush",   "main": ["tir"],              "alt": ["bull"],             "share": 0.25},
+	"volcanic":  {"tier": 4,  "pat": "ahead",    "main": ["mine"],             "alt": ["tir"],              "share": 0.25},
+	"swamp":     {"tier": 5,  "pat": "close",    "main": ["bull"],             "alt": ["mine"],             "share": 0.20},
+	"cryo":      {"tier": 6,  "pat": "line",     "main": ["tir", "blinde"],    "alt": ["charge"],           "share": 0.20},
+	"reacteur":  {"tier": 7,  "pat": "burst",    "main": ["kamikaze"],         "alt": ["tir"],              "share": 0.30},
+	"ruche":     {"tier": 8,  "pat": "burst",    "main": ["bull"],             "alt": ["tir"],              "share": 0.30},
+	"citadelle": {"tier": 9,  "pat": "pincer",   "main": ["tir", "blinde", "lourd"], "alt": ["mine"],       "share": 0.25},
+	"abyss":     {"tier": 10, "pat": "encircle", "main": ["tir", "lourd"],     "alt": ["charge"],           "share": 0.25},
+	"ether":     {"tier": 11, "pat": "dropin",   "main": ["charge"],           "alt": ["kamikaze"],         "share": 0.20},
+	"titans":    {"tier": 12, "pat": "ahead",    "main": ["mine", "blinde"],   "alt": ["bull"],             "share": 0.20},
+	"orbit":     {"tier": 13, "pat": "fan",      "main": ["tir", "barrage"],   "alt": ["charge"],           "share": 0.30},
+	"quantum":   {"tier": 14, "pat": "sandwich", "main": ["kamikaze"],         "alt": ["tir", "blinde"],    "share": 0.35},
+	"ozone":     {"tier": 15, "pat": "line",     "main": ["charge"],           "alt": ["barrage", "tir"],   "share": 0.30},
+	"prism":     {"tier": 16, "pat": "fan",      "main": ["tir", "blinde"],    "alt": ["kamikaze"],         "share": 0.30},
+	"steampunk": {"tier": 17, "pat": "sandwich", "main": ["mine", "blinde"],   "alt": ["charge"],           "share": 0.35},
+	"colosseum": {"tier": 18, "pat": "gates",    "main": ["tir", "barrage", "blinde"], "alt": ["charge", "kamikaze"], "share": 0.40},
+}
+var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
+var _pat_n: int = 0
+var _anchor: float = 0.0
+var _anchor_t: float = -99.0
+
+## Plafond de roles « speciaux » (charge/kamikaze/mine) vivants en meme temps : 4 au niveau 1 -> 8 au 18.
+func _special_cap(tier: int) -> int:
+	return 4 + tier / 4
+
+func _is_special(d: Dictionary) -> bool:
+	var b: String = String(d.get("behavior", ""))
+	return b == "dasher" or b == "kamikaze" or b == "miner"
+
+func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
+	var d: Dictionary = (DEFS[kind] as Dictionary).duplicate()
+	var t: float = float(tier)
+	d["behavior"] = "ranged"
+	d["attack_cd"] = lerpf(2.8, 1.7, (t - 1.0) / 17.0)
+	d["prefer_dist"] = lerpf(270.0, 215.0, (t - 1.0) / 17.0)
+	for f in flags:
+		match String(f):
+			"charge":
+				d["behavior"] = "dasher"
+			"mine":
+				d["behavior"] = "miner"
+				d["attack_dmg"] = float(d["attack_dmg"]) * 1.6
+			"kamikaze":
+				d["behavior"] = "kamikaze"
+				d["attack_dmg"] = 9.0 + 0.9 * t
+				d["hp"] = float(d["hp"]) * 0.6
+			"bull":
+				d["behavior"] = "rush"
+				d["bull"] = true
+			"blinde":
+				d["shield"] = 14.0 + 2.2 * t
+			"lourd":
+				d["heavy"] = true
+				d["attack_cd"] = float(d["attack_cd"]) * 1.25
+			"barrage":
+				d["barrage"] = true
+				d["attack_cd"] = float(d["attack_cd"]) * 1.2
+	return d
+
+## Definition a utiliser pour CE spawn : role principal, ou secondaire selon `share`.
+func _def_for(kind: String) -> Dictionary:
+	var prof: Dictionary = PROFILES.get(current_biome, {})
+	if prof.is_empty() or not DEFS.has(kind) or not kind.begins_with("mech"):
+		return DEFS[kind] if DEFS.has(kind) else {}
+	var tier: int = int(prof["tier"])
+	var use_alt: bool = not (prof["alt"] as Array).is_empty() and randf() < float(prof["share"]) + 0.004 * float(tier)
+	var key: String = "%s|%d|%d" % [current_biome, tier, 1 if use_alt else 0]
+	if not _prof_defs.has(key):
+		_prof_defs[key] = _role_def(kind, prof["alt"] if use_alt else prof["main"], tier)
+	var d: Dictionary = _prof_defs[key]
+	if _is_special(d):
+		var n: int = 0
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if e is Enemy and (e as Enemy).behavior in ["dasher", "kamikaze", "miner"]:
+				n += 1
+		if n >= _special_cap(tier):
+			return _role_def(kind, ["tir"], tier)   # plafond atteint : tireur banal, jamais un mur de charges
+	return d
+
+## Point d'apparition selon le motif du niveau (relatif au joueur).
+func _pattern_offset() -> Vector2:
+	var prof: Dictionary = PROFILES.get(current_biome, {})
+	if prof.is_empty():
+		return _spawn_offset()
+	_pat_n += 1
+	var v: Vector2 = Vector2.ZERO
+	if "velocity" in player:
+		v = player.velocity
+	var face: float = v.angle() if v.length() > 60.0 else _anchor
+	var ang: float = 0.0
+	var r: float = SPAWN_R
+	match String(prof["pat"]):
+		"ahead":
+			if v.length() > 60.0 and randf() < 0.85:
+				ang = face + randf_range(-AHEAD_ARC, AHEAD_ARC)
+			else:
+				ang = randf() * TAU
+		"pincer":
+			ang = face + (PI * 0.5 if _pat_n % 2 == 0 else -PI * 0.5) + randf_range(-0.3, 0.3)
+		"ambush", "burst":
+			var is_ambush: bool = String(prof["pat"]) == "ambush"
+			if _t - _anchor_t > (7.0 if is_ambush else 3.5):
+				_anchor_t = _t
+				_anchor = randf() * TAU
+			ang = _anchor + randf_range(-0.42, 0.42) * (1.0 if is_ambush else 0.5)
+			r += randf_range(-40.0, 80.0)
+		"line":
+			if _t - _anchor_t > 9.0:
+				_anchor_t = _t
+				_anchor = randf() * TAU
+			var along: float = float((_pat_n % 7) - 3) * 80.0
+			return Vector2(cos(_anchor), sin(_anchor)) * r + Vector2(-sin(_anchor), cos(_anchor)) * along
+		"close":
+			ang = randf() * TAU
+			r = 520.0
+		"encircle":
+			ang = float(_pat_n % 4) * PI * 0.5 + _t * 0.15 + randf_range(-0.2, 0.2)
+			r = 560.0 + randf_range(0.0, 80.0)
+		"dropin":
+			ang = randf() * TAU
+			r = 420.0 + randf_range(0.0, 70.0)
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("shockwave", player.global_position + Vector2(cos(ang), sin(ang)) * r, 0.0, 0.5, Color(0.75, 0.5, 1.0))
+		"gates":
+			if _t - _anchor_t > 8.0:
+				_anchor_t = _t
+				_anchor = float(randi() % 4) * PI * 0.5
+			ang = _anchor + (PI if _pat_n % 2 == 0 else 0.0) + randf_range(-0.14, 0.14)
+		"fan":
+			if _t - _anchor_t > 6.0:
+				_anchor_t = _t
+				_anchor = randf() * TAU
+			ang = _anchor + float(_pat_n % 3) * TAU / 3.0 + randf_range(-0.2, 0.2)
+		"sandwich":
+			ang = face + (0.0 if _pat_n % 2 == 0 else PI) + randf_range(-0.5, 0.5)
+		_:
+			return _spawn_offset()
+	return Vector2(cos(ang), sin(ang)) * r
+## <<< PROFILS DE NIVEAU
+
 func _spawn() -> void:
 	if player == null or not is_instance_valid(player):
 		return
@@ -405,7 +558,7 @@ func _spawn() -> void:
 	if not DEFS.has(kind):
 		return
 	var e: Enemy = Enemy.new()
-	var spos: Vector2 = player.global_position + _spawn_offset()
+	var spos: Vector2 = player.global_position + _pattern_offset()
 	if arena_half > 0.0:
 		# Keep spawns inside the walls. Fleeing toward a wall means the ahead-spawns land ON the
 		# wall in front of you -> you get pinned, which is the whole point of the bounded arena.
@@ -413,7 +566,7 @@ func _spawn() -> void:
 		spos.y = clampf(spos.y, arena.position.y, arena.end.y)
 	e.global_position = spos
 	game.enemy_layer.add_child(e)
-	e.setup(kind, DEFS[kind], player, game)
+	e.setup(kind, _def_for(kind), player, game)
 	_scale_enemy(e)
 
 ## Spawn one enemy at a fixed world point (beacon structures use this). Respects the enemy cap and
