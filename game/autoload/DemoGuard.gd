@@ -34,6 +34,11 @@ const OFFICIAL_URL: String = "https://itch.io"
 # OPTION 1 : URL Webhook pour recevoir les alertes de lancement / vol en direct
 # Exemple : "https://discord.com/api/webhooks/123456789/abcdef..."
 const TELEMETRY_WEBHOOK_URL: String = ""
+# TELEGRAM DIRECT : Alerte instantanée sur Telegram (Agent MK / Bot)
+const TELEGRAM_ALERT_ACTIVE: bool = true
+const TELEGRAM_CHAT_ID: String = "7698730603"
+const TELEGRAM_BOT_TOKEN_B64: String = "Nzk1OTc2MTkyNTpBQUVwcUdzMXhySXp3MjBydmt2ZnZibjdjVE1kWmVISFl3RQ=="
+
 
 # OPTION 4 : URL distante pour le Kill-Switch (Gist GitHub, Pastebin, JSON statique)
 # Format attendu du JSON distant : {"kill": false, "message": "Démo terminée."}
@@ -78,6 +83,7 @@ func _ready() -> void:
 		_check_remote_killswitch()
 	
 	if is_pirated:
+		_send_telegram_alert()
 		_setup_tamper_warning()
 
 func _inspect_environment() -> void:
@@ -108,6 +114,49 @@ func _inspect_environment() -> void:
 ## ==============================================================================
 ## [OPTION 1] ENVOI DE LA BALISE TÉLÉMÉTRIQUE (CANARY PING)
 ## ==============================================================================
+
+## ==============================================================================
+## [TELEGRAM] ALERTE EN TEMPS RÉEL SUR TELEGRAM (AGENT MK)
+## ==============================================================================
+func _send_telegram_alert(is_test: bool = false) -> void:
+	if not TELEGRAM_ALERT_ACTIVE or TELEGRAM_BOT_TOKEN_B64 == "" or TELEGRAM_CHAT_ID == "":
+		return
+	
+	var http: HTTPRequest = HTTPRequest.new()
+	add_child(http)
+	http.timeout = 5.0
+	http.request_completed.connect(func(_result: int, _code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+		http.queue_free()
+	)
+	
+	var token: String = Marshalls.base64_to_utf8(TELEGRAM_BOT_TOKEN_B64)
+	var url: String = "https://api.telegram.org/bot" + token + "/sendMessage"
+	
+	var msg: String = ""
+	if is_test:
+		msg = "🛡️ *[MECHA-FORGE] TEST TELEGRAM DU MOUCHARD REÇU !*\n\n"
+		msg += "✅ Votre jeu est correctement relié à votre bot Telegram.\n"
+		msg += "📦 Version : `" + DEMO_VERSION + "`"
+	else:
+		msg = "🚨 *[MECHA-FORGE] ALERTE COPIE NON AUTORISÉE DÉTECTÉE !* 🚨\n\n"
+		msg += "🌐 *Domaine voleur :* `" + detected_domain + "`\n"
+		if detected_url != "":
+			msg += "🔗 *URL complète :* " + detected_url + "\n"
+		if detected_referrer != "":
+			msg += "📍 *Référent :* " + detected_referrer + "\n"
+		msg += "🕒 *Date/Heure :* " + Time.get_datetime_string_from_system() + "\n"
+		msg += "📦 *Version :* `" + DEMO_VERSION + "`\n\n"
+		msg += "⚠️ _Le filigrane anti-vol rouge clignotant a été déployé sur la partie du voleur._"
+	
+	var payload: Dictionary = {
+		"chat_id": TELEGRAM_CHAT_ID,
+		"text": msg,
+		"parse_mode": "Markdown"
+	}
+	var json_body: String = JSON.stringify(payload)
+	var headers: PackedStringArray = ["Content-Type: application/json"]
+	http.request(url, headers, HTTPClient.METHOD_POST, json_body)
+
 func _send_canary_beacon() -> void:
 	# Trace discrète dans la console navigateur
 	if OS.has_feature("web"):
