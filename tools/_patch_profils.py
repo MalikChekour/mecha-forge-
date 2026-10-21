@@ -25,6 +25,12 @@ if old in s:
 old = "		_spawn_t = rate / maxf(0.2, eff_mult)\n"
 if old in s:
     s = s.replace(old, "		_spawn_t = rate / maxf(0.2, eff_mult * (1.0 + 0.02 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get(\"tier\", 1)) - 1)))\n", 1)
+old = "	_drain_wave()   # spread a queued horde over frames (no spawn hitch)\n"
+if old in s and "_squad_tick(delta)" not in s:
+    s = s.replace(old, old + "	_squad_tick(delta)\n", 1)
+old = "eff_mult * (1.0 + 0.02 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get(\"tier\", 1)) - 1))"
+if old in s:
+    s = s.replace(old, "eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get(\"tier\", 1)) - 1))", 1)
 if crlf:
     s = s.replace("\n", "\r\n")
 open(p, "w", encoding="utf-8", newline="").write(s)

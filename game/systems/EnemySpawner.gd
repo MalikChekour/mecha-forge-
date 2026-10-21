@@ -184,6 +184,7 @@ func _process(delta: float) -> void:
 	if not GameState.alive:
 		return
 	_drain_wave()   # spread a queued horde over frames (no spawn hitch)
+	_squad_tick(delta)
 	_t += delta
 	_spawn_t -= delta
 	if _spawn_t <= 0.0:
@@ -223,7 +224,7 @@ func _process(delta: float) -> void:
 		# pire qu'un rythme normal), puis le laisse remonter jusqu'a sa vraie valeur.
 		var full_mult: float = spawn_mult * float(GameState.diff().get("spawn", 1.0)) * Protocols.spawn_rate
 		var eff_mult: float = lerpf(minf(1.0, full_mult), full_mult, grace)
-		_spawn_t = rate / maxf(0.2, eff_mult * (1.0 + 0.02 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)))
+		_spawn_t = rate / maxf(0.2, eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)))
 		_spawn()
 	if _bosses_fired < BOSS_SCHEDULE.size() and GameState.run_time >= float(BOSS_SCHEDULE[_bosses_fired]["t"]) * _boss_scale:
 		if not _boss_alive():   # never let two bosses coexist -> avoids double next_map in one frame
@@ -406,24 +407,24 @@ func _spawn_offset() -> Vector2:
 ##            dropin proche mais rare | gates deux portes cardinales | fan trois eventails | sandwich devant/derriere
 ##   roles  : tir | charge (dasher) | mine (zones au sol) | kamikaze | bull (melee a charge) | blinde (bouclier) | lourd | barrage
 const PROFILES: Dictionary = {
-	"tech":      {"tier": 1,  "pat": "ring",     "main": ["tir"],              "alt": [],                   "share": 0.0},
-	"desert":    {"tier": 2,  "pat": "pincer",   "main": ["charge"],           "alt": ["tir"],              "share": 0.20},
-	"jungle":    {"tier": 3,  "pat": "ambush",   "main": ["tir"],              "alt": ["bull"],             "share": 0.25},
-	"volcanic":  {"tier": 4,  "pat": "ahead",    "main": ["mine"],             "alt": ["tir"],              "share": 0.25},
-	"swamp":     {"tier": 5,  "pat": "close",    "main": ["bull"],             "alt": ["mine"],             "share": 0.20},
-	"cryo":      {"tier": 6,  "pat": "line",     "main": ["tir", "blinde"],    "alt": ["charge"],           "share": 0.20},
-	"reacteur":  {"tier": 7,  "pat": "burst",    "main": ["kamikaze"],         "alt": ["tir"],              "share": 0.30},
-	"ruche":     {"tier": 8,  "pat": "burst",    "main": ["bull"],             "alt": ["tir"],              "share": 0.30},
-	"citadelle": {"tier": 9,  "pat": "pincer",   "main": ["tir", "blinde", "lourd"], "alt": ["mine"],       "share": 0.25},
-	"abyss":     {"tier": 10, "pat": "encircle", "main": ["tir", "lourd"],     "alt": ["charge"],           "share": 0.25},
-	"ether":     {"tier": 11, "pat": "dropin",   "main": ["charge"],           "alt": ["kamikaze"],         "share": 0.20},
-	"titans":    {"tier": 12, "pat": "ahead",    "main": ["mine", "blinde"],   "alt": ["bull"],             "share": 0.20},
-	"orbit":     {"tier": 13, "pat": "fan",      "main": ["tir", "barrage"],   "alt": ["charge"],           "share": 0.30},
-	"quantum":   {"tier": 14, "pat": "sandwich", "main": ["kamikaze"],         "alt": ["tir", "blinde"],    "share": 0.35},
-	"ozone":     {"tier": 15, "pat": "line",     "main": ["charge"],           "alt": ["barrage", "tir"],   "share": 0.30},
-	"prism":     {"tier": 16, "pat": "fan",      "main": ["tir", "blinde"],    "alt": ["kamikaze"],         "share": 0.30},
-	"steampunk": {"tier": 17, "pat": "sandwich", "main": ["mine", "blinde"],   "alt": ["charge"],           "share": 0.35},
-	"colosseum": {"tier": 18, "pat": "gates",    "main": ["tir", "barrage", "blinde"], "alt": ["charge", "kamikaze"], "share": 0.40},
+	"tech":      {"tier": 1, "forms": ["ligne","colonne"],  "pat": "ring",     "main": ["tir"],              "alt": [],                   "share": 0.0},
+	"desert":    {"tier": 2, "forms": ["tenaille","colonne","ligne"],  "pat": "pincer",   "main": ["charge"],           "alt": ["tir"],              "share": 0.20},
+	"jungle":    {"tier": 3, "forms": ["embuscade","tirailleurs"],  "pat": "ambush",   "main": ["tir"],              "alt": ["bull"],             "share": 0.25},
+	"volcanic":  {"tier": 4, "forms": ["coin","feu_et_mouvement"],  "pat": "ahead",    "main": ["mine"],             "alt": ["tir"],              "share": 0.25},
+	"swamp":     {"tier": 5, "forms": ["colonne","fer_a_cheval"],  "pat": "close",    "main": ["bull"],             "alt": ["mine"],             "share": 0.20},
+	"cryo":      {"tier": 6, "forms": ["ligne","vague","tirailleurs"],  "pat": "line",     "main": ["tir", "blinde", "garde"], "alt": ["charge"],       "share": 0.25},
+	"reacteur":  {"tier": 7, "forms": ["coin","vague","embuscade"],  "pat": "burst",    "main": ["kamikaze"],         "alt": ["tir"],              "share": 0.30},
+	"ruche":     {"tier": 8, "forms": ["encerclement","vague"],  "pat": "burst",    "main": ["bull"],             "alt": ["tir"],              "share": 0.30},
+	"citadelle": {"tier": 9, "forms": ["vague","echelon","feu_et_mouvement"],  "pat": "pincer",   "main": ["tir", "blinde", "lourd", "garde"], "alt": ["mine"], "share": 0.25},
+	"abyss":     {"tier": 10, "forms": ["encerclement","spirale","fer_a_cheval"], "pat": "encircle", "main": ["tir", "lourd"],     "alt": ["charge"],           "share": 0.25},
+	"ether":     {"tier": 11, "forms": ["leurre","embuscade","tenaille"], "pat": "dropin",   "main": ["charge"],           "alt": ["kamikaze"],         "share": 0.20},
+	"titans":    {"tier": 12, "forms": ["coin","echelon","ligne"], "pat": "ahead",    "main": ["mine", "blinde", "garde"], "alt": ["bull"],       "share": 0.25},
+	"orbit":     {"tier": 13, "forms": ["spirale","feu_et_mouvement","encerclement"], "pat": "fan",      "main": ["tir", "barrage"],   "alt": ["charge"],           "share": 0.30},
+	"quantum":   {"tier": 14, "forms": ["tenaille","leurre","encerclement"], "pat": "sandwich", "main": ["kamikaze"],         "alt": ["tir", "blinde", "garde"], "share": 0.35},
+	"ozone":     {"tier": 15, "forms": ["echelon","tenaille","tirailleurs"], "pat": "line",     "main": ["charge"],           "alt": ["barrage", "tir"],   "share": 0.30},
+	"prism":     {"tier": 16, "forms": ["fer_a_cheval","feu_et_mouvement","spirale"], "pat": "fan",      "main": ["tir", "blinde", "garde"], "alt": ["kamikaze"],   "share": 0.30},
+	"steampunk": {"tier": 17, "forms": ["vague","tenaille","echelon","fer_a_cheval"], "pat": "sandwich", "main": ["mine", "blinde", "garde"], "alt": ["charge"],     "share": 0.35},
+	"colosseum": {"tier": 18, "forms": ["encerclement","tenaille","leurre","vague","feu_et_mouvement","spirale"], "pat": "gates",    "main": ["tir", "barrage", "blinde", "garde"], "alt": ["charge", "kamikaze"], "share": 0.40},
 }
 var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
 var _pat_n: int = 0
@@ -442,7 +443,10 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 	var d: Dictionary = (DEFS[kind] as Dictionary).duplicate()
 	var t: float = float(tier)
 	d["behavior"] = "ranged"
-	d["attack_cd"] = lerpf(2.8, 1.7, (t - 1.0) / 17.0)
+	d["attack_cd"] = lerpf(2.0, 1.4, (t - 1.0) / 17.0)   # 21/10 : debuts trop faciles -> plus dur des le niveau 1
+	d["attack_dmg"] = float(d["attack_dmg"]) * lerpf(1.4, 1.0, clampf((t - 1.0) / 8.0, 0.0, 1.0))
+	d["aim_rate"] = lerpf(2.4, 5.5, (t - 1.0) / 17.0)
+	d["aim_lead"] = clampf(0.25 + 0.035 * t, 0.25, 0.85)
 	d["prefer_dist"] = lerpf(270.0, 215.0, (t - 1.0) / 17.0)
 	for f in flags:
 		match String(f):
@@ -458,6 +462,9 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 			"bull":
 				d["behavior"] = "rush"
 				d["bull"] = true
+			"garde":
+				d["garde"] = true
+				d["garde_cd"] = lerpf(11.0, 6.5, (t - 1.0) / 17.0)
 			"blinde":
 				d["shield"] = 14.0 + 2.2 * t
 			"lourd":
@@ -479,6 +486,10 @@ func _def_for(kind: String) -> Dictionary:
 	if not _prof_defs.has(key):
 		_prof_defs[key] = _role_def(kind, prof["alt"] if use_alt else prof["main"], tier)
 	var d: Dictionary = _prof_defs[key]
+	var lf: float = _lead_factor()
+	if lf != 1.0 and d.has("aim_lead"):
+		d = d.duplicate()
+		d["aim_lead"] = clampf(float(d["aim_lead"]) * lf, 0.0, 0.95)
 	if _is_special(d):
 		var n: int = 0
 		for e in get_tree().get_nodes_in_group("enemies"):
@@ -547,6 +558,123 @@ func _pattern_offset() -> Vector2:
 		_:
 			return _spawn_offset()
 	return Vector2(cos(ang), sin(ang)) * r
+
+## ======================= IA SYNTHETIQUE : adaptation au mecha du joueur =======================
+## (patron : « une IA synthetique en fonction du mecha du joueur »). Deux sources :
+##  - le CHASSIS (statique) : VORTEX perce et aligne -> on evite ligne/colonne (une rangee se fait traverser) et on le
+##    prend en flanc ; BLUESTRIKE est un tireur de courte portee -> on le harcele a distance (feu et mouvement,
+##    tirailleurs) et on anticipe plus (il bouge beaucoup) ; TITAN est lent et blinde -> on l'enferme (encerclement,
+##    spirale, tenaille, embuscade) et on anticipe moins.
+##  - le COMPORTEMENT (dynamique, vitesse moyenne lissee sur ~3 s) : un joueur qui court se fait couper la route
+##    (tenaille, encerclement, embuscade, fer a cheval) ; un joueur statique se fait user (feu et mouvement, tirailleurs).
+var _pspeed: float = 0.0
+var _squads: Array = []
+var _squad_t: float = 6.0
+var _banner_t: Dictionary = {}
+
+func _lead_factor() -> float:
+	var fam: String = String(player.chassis_family) if player != null and "chassis_family" in player else ""
+	match fam:
+		"bluestrike": return 1.15
+		"titan": return 0.7
+	return 1.0
+
+func _player_style() -> Dictionary:
+	var fam: String = String(player.chassis_family) if player != null and "chassis_family" in player else ""
+	var prefer: Array = []
+	var avoid: Array = []
+	match fam:
+		"bluestrike":
+			prefer = ["feu_et_mouvement", "tirailleurs", "ligne"]
+		"titan":
+			prefer = ["encerclement", "spirale", "tenaille", "embuscade"]
+		"vortex":
+			prefer = ["tenaille", "vague", "echelon"]
+			avoid = ["ligne", "colonne"]
+	var bs: float = float(player.base_speed) if player != null and "base_speed" in player else 300.0
+	var ratio: float = _pspeed / maxf(bs, 1.0)
+	if ratio > 0.6:
+		prefer = prefer + ["tenaille", "encerclement", "embuscade", "fer_a_cheval"]
+	elif ratio < 0.2 and _t > 20.0:
+		prefer = prefer + ["feu_et_mouvement", "tirailleurs", "vague"]
+	return {"prefer": prefer, "avoid": avoid, "ratio": ratio}
+
+func _pick_formation(prof: Dictionary) -> String:
+	var forms: Array = prof["forms"]
+	var st: Dictionary = _player_style()
+	var ok: Array = forms.filter(func(f: String) -> bool: return not (st["avoid"] as Array).has(f))
+	if ok.is_empty():
+		ok = forms
+	var pref: Array = ok.filter(func(f: String) -> bool: return (st["prefer"] as Array).has(f))
+	if not pref.is_empty() and randf() < 0.7:
+		return String(pref.pick_random())
+	return String(ok.pick_random())
+
+func _announce(form: String, text: String, col: Color) -> void:
+	if game != null and game.has_method("show_banner") and _t - float(_banner_t.get(text, -99.0)) > 40.0:
+		_banner_t[text] = _t
+		game.show_banner(text, col)
+
+func _squad_tick(delta: float) -> void:
+	if player == null or not is_instance_valid(player) or not PROFILES.has(current_biome):
+		return
+	if "velocity" in player:
+		_pspeed = lerpf(_pspeed, (player.velocity as Vector2).length(), 1.0 - exp(-delta / 3.0))
+	var p: Vector2 = player.global_position
+	for q in _squads:
+		var ms: Array = q.live()
+		if ms.is_empty():
+			q.done = true
+			continue
+		q.update(delta, p, float((ms[0] as Enemy).speed))
+		if q.chef_down:
+			q.chef_down = false
+			_announce("", "CHEF ABATTU - L'ESCOUADE HESITE", Color(1.0, 0.8, 0.3))
+	_squads = _squads.filter(func(q: Squad) -> bool: return not q.done)
+	_squad_t -= delta
+	if _squad_t <= 0.0:
+		var tier: int = int((PROFILES[current_biome] as Dictionary)["tier"])
+		_squad_t = lerpf(24.0, 11.0, float(tier - 1) / 17.0)
+		_spawn_squad()
+
+func _spawn_squad() -> void:
+	var prof: Dictionary = PROFILES.get(current_biome, {})
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	if prof.is_empty() or pool.is_empty() or game == null:
+		return
+	var tier: int = int(prof["tier"])
+	if _squads.size() >= 1 + tier / 7:
+		return
+	var n: int = clampi(4 + tier / 3, 4, 10)
+	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
+		return
+	var kind: String = String(pool[0])
+	if not DEFS.has(kind):
+		return
+	var form: String = _pick_formation(prof)
+	var p: Vector2 = player.global_position
+	var anchor: float = randf() * TAU
+	if "velocity" in player and (player.velocity as Vector2).length() > 60.0 and form in ["ligne", "colonne", "coin", "echelon", "vague", "embuscade"]:
+		anchor = (player.velocity as Vector2).angle() + randf_range(-0.5, 0.5)   # ils se dressent sur sa route
+	var q: Squad = Squad.new()
+	q.setup(form, anchor, p + Vector2.from_angle(anchor) * 640.0, p)
+	for i in n:
+		var pos: Vector2 = q.slot(i, n, p)
+		var off: Vector2 = pos - p
+		if off.length() < 520.0:
+			pos = p + (off.normalized() if off.length() > 1.0 else Vector2.RIGHT) * 560.0   # jamais d'apparition sur le joueur
+		if arena_half > 0.0:
+			pos.x = clampf(pos.x, arena.position.x, arena.end.x)
+			pos.y = clampf(pos.y, arena.position.y, arena.end.y)
+		var e: Enemy = Enemy.new()
+		e.global_position = pos
+		game.enemy_layer.add_child(e)
+		e.setup(kind, _def_for(kind), player, game)
+		_scale_enemy(e)
+		q.members.append(e)
+	q.assign_ranks()
+	_squads.append(q)
+	_announce(form, "FORMATION : " + Squad.label(form), Color(1.0, 0.62, 0.3))
 ## <<< PROFILS DE NIVEAU
 
 func _spawn() -> void:
