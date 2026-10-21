@@ -1314,7 +1314,12 @@ func _physics_process(delta: float) -> void:
 				if dist > MINE_RANGE + 20.0:
 					desired_vel = dir * speed * _speed_mult
 				else:
-					desired_vel = Vector2.ZERO
+					# 21/10 (« les ennemis ont perdu leur mobilite ») : le mineur ne reste plus fige entre deux mines, il contourne le joueur
+					_strafe_timer -= delta
+					if _strafe_timer <= 0.0:
+						_strafe_dir *= -1.0
+						_strafe_timer = randf_range(1.2, 2.6)
+					desired_vel = Vector2(-dir.y, dir.x) * _strafe_dir * speed * _speed_mult * 0.65
 					_mine_cd -= delta
 					if _mine_cd <= 0.0 and game != null and game.has_method("spawn_ground_zone"):
 						_mine_cd = MINE_COOLDOWN

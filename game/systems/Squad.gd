@@ -59,7 +59,7 @@ func setup(f: String, anchor: float, centre: Vector2, p: Vector2) -> void:
 	_p0 = p
 	_ax = (centre - p).normalized()
 	_u = -_ax
-	life = 45.0 if ADVANCE_FORMS.has(f) else (30.0 if f in ["feu_et_mouvement", "tirailleurs"] else 40.0)
+	life = 26.0 if ADVANCE_FORMS.has(f) else (24.0 if f in ["feu_et_mouvement", "tirailleurs"] else 28.0)   # 21/10 : un guidage d'OUVERTURE, pas une laisse
 
 ## HIERARCHIE (patron : « comme dans une armee ») : 1 chef de meute (or, coriace, plus grand, butin), 2 lieutenants des
 ## 7 membres (bleu-glace, un peu plus resistants), le reste = soldats. Chef tue -> l'escouade hesite ~2,5 s (ordres brouilles)
@@ -154,11 +154,11 @@ func slot(i: int, n: int, p: Vector2) -> Vector2:
 		"tenaille":
 			var s2: float = 1.0 if i % 2 == 0 else -1.0
 			var ap: Vector2 = Vector2(-_ax.y, _ax.x)
-			var r: float = lerpf(520.0, 250.0, clampf(t / 11.0, 0.0, 1.0))
+			var r: float = lerpf(520.0, 250.0, clampf(t / 8.0, 0.0, 1.0))
 			return p + _ax * (140.0 + float(i / 2) * 70.0) + ap * s2 * r
 		"encerclement":
 			var a: float = base + t * 0.12 + f * (TAU - GAP)
-			return p + Vector2.from_angle(a) * maxf(300.0, lerpf(620.0, 300.0, t / 16.0))
+			return p + Vector2.from_angle(a) * maxf(300.0, lerpf(620.0, 300.0, t / 12.0))
 		"spirale":
 			var a2: float = base + t * 0.35 + f * (TAU - GAP)
 			return p + Vector2.from_angle(a2) * maxf(330.0, 470.0 + 140.0 * sin(t * 0.5))
@@ -200,29 +200,29 @@ func update(delta: float, p: Vector2, mspeed: float) -> void:
 	_u = to / maxf(d, 1.0)
 	if ADVANCE_FORMS.has(form):
 		if state == "advance":
-			c += _u * mspeed * 0.6 * delta
+			c += _u * mspeed * 0.95 * delta
 			if d < _engage_r():
 				state = "engage"
 		else:
-			c += _u * mspeed * 0.25 * delta
+			c += _u * mspeed * 0.5 * delta
 	elif state == "advance":
 		match form:
 			"embuscade":
-				if d < 360.0 or t > 14.0:
+				if d < 420.0 or t > 8.0:
 					state = "engage"
 			"leurre":
 				if _decoy == null:
 					_decoy = ms[0]
-				if t > 7.0 or not is_instance_valid(_decoy) or not _decoy.alive:
+				if t > 5.0 or not is_instance_valid(_decoy) or not _decoy.alive:
 					state = "engage"
 			"tenaille":
-				if t > 11.0: state = "engage"
+				if t > 8.0: state = "engage"
 			"encerclement":
-				if t > 16.0: state = "engage"
+				if t > 12.0: state = "engage"
 			"spirale":
-				if t > 22.0: state = "engage"
+				if t > 16.0: state = "engage"
 			"fer_a_cheval":
-				if t > 10.0: state = "engage"
+				if t > 8.0: state = "engage"
 	for i in n:
 		var m: Variant = ms[i]
 		m.form_pos = slot(i, n, p)
@@ -231,5 +231,5 @@ func update(delta: float, p: Vector2, mspeed: float) -> void:
 		if form == "leurre" and m == _decoy:
 			w = 0.0
 		elif state == "engage":
-			w = 0.0 if m.behavior in ["dasher", "kamikaze", "rush", "miner"] else 0.35
+			w = 0.0 if m.behavior in ["dasher", "kamikaze", "rush", "miner"] else 0.1
 		m.form_w = w * (0.3 if disorder > 0.0 else 1.0)
