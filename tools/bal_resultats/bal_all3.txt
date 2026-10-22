@@ -1,0 +1,251 @@
+BAL chapitre 1 (tech) 900 s, x6
+BAL t= 60 niv= 7 pv=134/137 ennemis=  9 kills= 103 vivant=true (mur 11 s) vit_joueur=376 vit_ennemis_moy=160
+BAL t=120 niv=10 pv=132/137 ennemis= 11 kills= 241 vivant=true (mur 21 s) vit_joueur=376 vit_ennemis_moy=165
+BAL t=180 niv=12 pv=132/137 ennemis= 14 kills= 402 vivant=true (mur 31 s) vit_joueur=376 vit_ennemis_moy=166
+BAL t=240 niv=13 pv=113/137 ennemis= 72 kills= 588 vivant=true (mur 41 s) vit_joueur=376 vit_ennemis_moy=166
+BAL t=300 niv=14 pv=137/137 ennemis= 79 kills= 801 vivant=true (mur 52 s) vit_joueur=376 vit_ennemis_moy=167
+BAL t=361 niv=15 pv=133/137 ennemis= 49 kills=1070 vivant=true (mur 62 s) vit_joueur=376 vit_ennemis_moy=171
+BAL t=421 niv=15 pv=129/137 ennemis= 85 kills=1270 vivant=true (mur 75 s) vit_joueur=376 vit_ennemis_moy=173
+BAL t=481 niv=16 pv= 66/137 ennemis= 74 kills=1535 vivant=true (mur 86 s) vit_joueur=376 vit_ennemis_moy=178
+BAL t=542 niv=16 pv= 78/137 ennemis=107 kills=1753 vivant=true (mur 97 s) vit_joueur=376 vit_ennemis_moy=179
+BAL t=602 niv=17 pv=120/137 ennemis=142 kills=1987 vivant=true (mur 111 s) vit_joueur=376 vit_ennemis_moy=179
+BAL t=663 niv=17 pv=137/137 ennemis=140 kills=2212 vivant=true (mur 125 s) vit_joueur=376 vit_ennemis_moy=179
+BAL t=724 niv=17 pv=137/137 ennemis=124 kills=2443 vivant=true (mur 139 s) vit_joueur=376 vit_ennemis_moy=182
+BAL t=784 niv=18 pv=119/137 ennemis= 93 kills=2692 vivant=true (mur 152 s) vit_joueur=376 vit_ennemis_moy=184
+BAL t=844 niv=18 pv=114/137 ennemis=162 kills=2882 vivant=true (mur 169 s) vit_joueur=376 vit_ennemis_moy=185
+BAL t=900 niv=18 pv= 84/137 ennemis=167 kills=3104 vivant=true (mur 183 s) vit_joueur=376 vit_ennemis_moy=187
+BAL chapitre 4 (volcanic) 900 s, x6
+BAL t= 60 niv= 6 pv=137/137 ennemis= 12 kills=  99 vivant=true (mur 11 s) vit_joueur=410 vit_ennemis_moy=189
+BAL t=120 niv= 8 pv=119/137 ennemis=  8 kills= 249 vivant=true (mur 21 s) vit_joueur=410 vit_ennemis_moy=192
+BAL t=180 niv=10 pv=133/137 ennemis= 10 kills= 414 vivant=true (mur 31 s) vit_joueur=410 vit_ennemis_moy=193
+BAL t=240 niv=11 pv=137/137 ennemis= 80 kills= 609 vivant=true (mur 41 s) vit_joueur=410 vit_ennemis_moy=196
+BAL t=300 niv=12 pv=137/137 ennemis= 62 kills= 875 vivant=true (mur 51 s) vit_joueur=410 vit_ennemis_moy=198
+BAL t=360 niv=13 pv=137/137 ennemis= 72 kills=1140 vivant=true (mur 61 s) vit_joueur=410 vit_ennemis_moy=201
+BAL t=421 niv=13 pv=128/137 ennemis= 99 kills=1429 vivant=true (mur 72 s) vit_joueur=410 vit_ennemis_moy=206
+BAL t=481 niv=14 pv=130/137 ennemis= 72 kills=1686 vivant=true (mur 83 s) vit_joueur=410 vit_ennemis_moy=208
+BAL t=541 niv=14 pv=137/137 ennemis=111 kills=1947 vivant=true (mur 95 s) vit_joueur=410 vit_ennemis_moy=207
+BAL t=601 niv=15 pv=137/137 ennemis=117 kills=2235 vivant=true (mur 107 s) vit_joueur=410 vit_ennemis_moy=209
+BAL t=661 niv=15 pv=137/137 ennemis= 74 kills=2556 vivant=true (mur 119 s) vit_joueur=410 vit_ennemis_moy=212
+BAL t=722 niv=16 pv=129/137 ennemis=100 kills=2821 vivant=true (mur 130 s) vit_joueur=410 vit_ennemis_moy=214
+BAL t=782 niv=16 pv=132/137 ennemis= 74 kills=3128 vivant=true (mur 141 s) vit_joueur=410 vit_ennemis_moy=218
+BAL t=842 niv=16 pv=137/137 ennemis=114 kills=3404 vivant=true (mur 153 s) vit_joueur=410 vit_ennemis_moy=218
+BAL t=900 niv=16 pv=137/137 ennemis=110 kills=3672 vivant=true (mur 165 s) vit_joueur=410 vit_ennemis_moy=219
+BAL chapitre 7 (reacteur) 900 s, x6
+BAL t= 60 niv= 6 pv=134/162 ennemis= 11 kills= 109 vivant=true (mur 11 s) vit_joueur=396 vit_ennemis_moy=167
+BAL t=120 niv= 9 pv=162/162 ennemis= 12 kills= 269 vivant=true (mur 21 s) vit_joueur=396 vit_ennemis_moy=170
+BAL t=180 niv=10 pv=157/162 ennemis= 14 kills= 449 vivant=true (mur 31 s) vit_joueur=396 vit_ennemis_moy=172
+BAL t=240 niv=11 pv=162/162 ennemis= 81 kills= 655 vivant=true (mur 41 s) vit_joueur=396 vit_ennemis_moy=174
+BAL t=300 niv=12 pv=150/162 ennemis= 45 kills= 941 vivant=true (mur 51 s) vit_joueur=396 vit_ennemis_moy=177
+BAL t=360 niv=13 pv=162/162 ennemis= 38 kills=1239 vivant=true (mur 62 s) vit_joueur=396 vit_ennemis_moy=179
+BAL t=420 niv=14 pv=158/162 ennemis= 60 kills=1571 vivant=true (mur 72 s) vit_joueur=396 vit_ennemis_moy=180
+BAL t=480 niv=14 pv=153/162 ennemis= 81 kills=1906 vivant=true (mur 82 s) vit_joueur=396 vit_ennemis_moy=182
+BAL t=541 niv=15 pv=162/162 ennemis= 91 kills=2272 vivant=true (mur 92 s) vit_joueur=396 vit_ennemis_moy=184
+BAL t=601 niv=15 pv=162/162 ennemis= 78 kills=2643 vivant=true (mur 103 s) vit_joueur=396 vit_ennemis_moy=185
+BAL t=661 niv=16 pv=152/162 ennemis= 59 kills=3038 vivant=true (mur 113 s) vit_joueur=396 vit_ennemis_moy=187
+BAL t=721 niv=16 pv=154/162 ennemis= 77 kills=3376 vivant=true (mur 123 s) vit_joueur=396 vit_ennemis_moy=190
+BAL t=781 niv=17 pv=162/162 ennemis= 62 kills=3779 vivant=true (mur 134 s) vit_joueur=396 vit_ennemis_moy=195
+BAL t=842 niv=17 pv=154/162 ennemis=105 kills=4160 vivant=true (mur 144 s) vit_joueur=396 vit_ennemis_moy=194
+BAL t=900 niv=17 pv=162/162 ennemis= 86 kills=4543 vivant=true (mur 155 s) vit_joueur=396 vit_ennemis_moy=194
+BAL chapitre 10 (abyss) 900 s, x6
+BAL t= 60 niv= 7 pv=137/137 ennemis= 18 kills= 155 vivant=true (mur 11 s) vit_joueur=376 vit_ennemis_moy=197
+BAL t=120 niv= 9 pv=137/137 ennemis= 34 kills= 350 vivant=true (mur 21 s) vit_joueur=376 vit_ennemis_moy=202
+BAL t=180 niv=11 pv=131/137 ennemis= 26 kills= 623 vivant=true (mur 31 s) vit_joueur=376 vit_ennemis_moy=203
+BAL t=240 niv=13 pv=137/137 ennemis=114 kills= 887 vivant=true (mur 42 s) vit_joueur=376 vit_ennemis_moy=204
+BAL t=301 niv=14 pv=124/137 ennemis=133 kills=1054 vivant=true (mur 54 s) vit_joueur=376 vit_ennemis_moy=206
+BAL t=361 niv=15 pv=126/137 ennemis=123 kills=1281 vivant=true (mur 67 s) vit_joueur=376 vit_ennemis_moy=208
+BAL t=422 niv=15 pv=104/137 ennemis=109 kills=1470 vivant=true (mur 81 s) vit_joueur=376 vit_ennemis_moy=212
+BAL t=483 niv=16 pv=125/137 ennemis= 93 kills=1696 vivant=true (mur 93 s) vit_joueur=376 vit_ennemis_moy=215
+BAL t=543 niv=16 pv=126/137 ennemis=144 kills=1879 vivant=true (mur 108 s) vit_joueur=376 vit_ennemis_moy=216
+BAL t=603 niv=17 pv=123/137 ennemis=129 kills=2168 vivant=true (mur 124 s) vit_joueur=376 vit_ennemis_moy=218
+BAL t=663 niv=17 pv=137/137 ennemis=140 kills=2381 vivant=true (mur 137 s) vit_joueur=376 vit_ennemis_moy=220
+BAL t=724 niv=17 pv=125/137 ennemis= 80 kills=2687 vivant=true (mur 149 s) vit_joueur=376 vit_ennemis_moy=224
+BAL t=784 niv=18 pv=123/137 ennemis= 76 kills=2960 vivant=true (mur 161 s) vit_joueur=376 vit_ennemis_moy=225
+BAL t=844 niv=18 pv=125/137 ennemis=166 kills=3156 vivant=true (mur 178 s) vit_joueur=376 vit_ennemis_moy=226
+BAL t=900 niv=18 pv=137/137 ennemis=193 kills=3339 vivant=true (mur 195 s) vit_joueur=376 vit_ennemis_moy=229
+BAL chapitre 13 (orbit) 900 s, x6
+BAL t= 60 niv= 8 pv=123/137 ennemis= 45 kills= 131 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=162
+BAL t=120 niv=11 pv=133/137 ennemis= 48 kills= 368 vivant=true (mur 21 s) vit_joueur=336 vit_ennemis_moy=163
+BAL t=180 niv=13 pv=116/137 ennemis= 51 kills= 621 vivant=true (mur 31 s) vit_joueur=336 vit_ennemis_moy=165
+BAL t=241 niv=14 pv= 72/137 ennemis= 73 kills= 878 vivant=true (mur 42 s) vit_joueur=336 vit_ennemis_moy=166
+BAL t=302 niv=15 pv=137/137 ennemis= 97 kills=1107 vivant=true (mur 53 s) vit_joueur=336 vit_ennemis_moy=168
+BAL t=362 niv=15 pv=137/137 ennemis=119 kills=1303 vivant=true (mur 64 s) vit_joueur=336 vit_ennemis_moy=170
+BAL t=422 niv=16 pv=134/137 ennemis=143 kills=1477 vivant=true (mur 79 s) vit_joueur=336 vit_ennemis_moy=171
+BAL t=482 niv=16 pv=137/137 ennemis=116 kills=1695 vivant=true (mur 97 s) vit_joueur=336 vit_ennemis_moy=174
+BAL t=543 niv=17 pv= 70/137 ennemis=165 kills=1884 vivant=true (mur 114 s) vit_joueur=336 vit_ennemis_moy=175
+BAL t=604 niv=17 pv= 68/137 ennemis=139 kills=2151 vivant=true (mur 129 s) vit_joueur=336 vit_ennemis_moy=178
+BAL t=634 niv=17 pv=  0/137 ennemis=108 kills=2261 vivant=false (mur 137 s) vit_joueur=336 vit_ennemis_moy=180
+BAL chapitre 16 (prism) 900 s, x6
+BAL t= 60 niv= 9 pv=143/187 ennemis= 25 kills= 188 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=189
+BAL t=120 niv=12 pv=160/212 ennemis= 30 kills= 460 vivant=true (mur 21 s) vit_joueur=336 vit_ennemis_moy=193
+BAL t=180 niv=13 pv=168/212 ennemis= 92 kills= 637 vivant=true (mur 32 s) vit_joueur=336 vit_ennemis_moy=192
+BAL t=240 niv=14 pv=207/212 ennemis= 99 kills= 827 vivant=true (mur 46 s) vit_joueur=336 vit_ennemis_moy=194
+BAL t=301 niv=14 pv= 59/212 ennemis=195 kills= 950 vivant=true (mur 63 s) vit_joueur=336 vit_ennemis_moy=196
+BAL t=361 niv=15 pv=212/212 ennemis=107 kills=1224 vivant=true (mur 81 s) vit_joueur=336 vit_ennemis_moy=198
+BAL t=421 niv=16 pv=237/237 ennemis= 65 kills=1469 vivant=true (mur 95 s) vit_joueur=336 vit_ennemis_moy=201
+BAL t=481 niv=16 pv= 85/237 ennemis=118 kills=1626 vivant=true (mur 111 s) vit_joueur=336 vit_ennemis_moy=203
+BAL t=541 niv=16 pv=130/237 ennemis=172 kills=1817 vivant=true (mur 131 s) vit_joueur=336 vit_ennemis_moy=205
+BAL t=602 niv=17 pv=112/237 ennemis=205 kills=2016 vivant=true (mur 156 s) vit_joueur=336 vit_ennemis_moy=207
+BAL t=662 niv=17 pv=149/237 ennemis=201 kills=2250 vivant=true (mur 175 s) vit_joueur=336 vit_ennemis_moy=209
+BAL t=722 niv=18 pv=237/237 ennemis= 78 kills=2591 vivant=true (mur 194 s) vit_joueur=336 vit_ennemis_moy=215
+BAL t=783 niv=18 pv=198/237 ennemis=143 kills=2780 vivant=true (mur 211 s) vit_joueur=336 vit_ennemis_moy=214
+BAL t=844 niv=18 pv=202/237 ennemis=160 kills=2999 vivant=true (mur 230 s) vit_joueur=336 vit_ennemis_moy=216
+BAL t=901 niv=18 pv=221/237 ennemis=174 kills=3239 vivant=true (mur 248 s) vit_joueur=336 vit_ennemis_moy=218
+BAL chapitre 2 (desert) 900 s, x6
+BAL t= 60 niv= 7 pv=123/137 ennemis=  9 kills= 141 vivant=true (mur 11 s) vit_joueur=376 vit_ennemis_moy=232
+BAL t=120 niv= 9 pv=133/137 ennemis=  9 kills= 336 vivant=true (mur 21 s) vit_joueur=376 vit_ennemis_moy=237
+BAL t=180 niv=11 pv=137/137 ennemis= 16 kills= 554 vivant=true (mur 31 s) vit_joueur=376 vit_ennemis_moy=240
+BAL t=240 niv=12 pv=134/137 ennemis= 72 kills= 811 vivant=true (mur 41 s) vit_joueur=376 vit_ennemis_moy=240
+BAL t=300 niv=13 pv=122/137 ennemis= 63 kills=1103 vivant=true (mur 51 s) vit_joueur=376 vit_ennemis_moy=246
+BAL t=360 niv=13 pv=133/137 ennemis= 56 kills=1434 vivant=true (mur 61 s) vit_joueur=376 vit_ennemis_moy=247
+BAL t=420 niv=14 pv=137/137 ennemis= 67 kills=1692 vivant=true (mur 72 s) vit_joueur=376 vit_ennemis_moy=250
+BAL t=480 niv=14 pv=130/137 ennemis= 99 kills=1942 vivant=true (mur 83 s) vit_joueur=376 vit_ennemis_moy=254
+BAL t=540 niv=15 pv=137/137 ennemis= 77 kills=2193 vivant=true (mur 94 s) vit_joueur=421 vit_ennemis_moy=256
+BAL t=600 niv=15 pv=116/137 ennemis=168 kills=2383 vivant=true (mur 105 s) vit_joueur=421 vit_ennemis_moy=256
+BAL t=661 niv=15 pv=128/137 ennemis=110 kills=2682 vivant=true (mur 118 s) vit_joueur=421 vit_ennemis_moy=259
+BAL t=721 niv=16 pv=137/137 ennemis=143 kills=2885 vivant=true (mur 130 s) vit_joueur=421 vit_ennemis_moy=261
+BAL t=782 niv=16 pv=130/137 ennemis= 93 kills=3119 vivant=true (mur 143 s) vit_joueur=421 vit_ennemis_moy=267
+BAL t=842 niv=16 pv=128/137 ennemis=118 kills=3344 vivant=true (mur 155 s) vit_joueur=421 vit_ennemis_moy=268
+BAL t=901 niv=16 pv=137/137 ennemis=178 kills=3523 vivant=true (mur 169 s) vit_joueur=421 vit_ennemis_moy=269
+BAL chapitre 5 (swamp) 900 s, x6
+BAL t= 60 niv= 5 pv=137/137 ennemis= 12 kills=  99 vivant=true (mur 11 s) vit_joueur=396 vit_ennemis_moy=163
+BAL t=120 niv= 8 pv=126/137 ennemis= 42 kills= 216 vivant=true (mur 21 s) vit_joueur=396 vit_ennemis_moy=165
+BAL t=180 niv= 9 pv=137/137 ennemis= 43 kills= 381 vivant=true (mur 31 s) vit_joueur=396 vit_ennemis_moy=167
+BAL t=241 niv=10 pv=133/137 ennemis=118 kills= 540 vivant=true (mur 41 s) vit_joueur=396 vit_ennemis_moy=169
+BAL t=301 niv=11 pv=134/137 ennemis=117 kills= 743 vivant=true (mur 53 s) vit_joueur=396 vit_ennemis_moy=170
+BAL t=361 niv=12 pv=112/137 ennemis=118 kills= 919 vivant=true (mur 64 s) vit_joueur=396 vit_ennemis_moy=171
+BAL t=421 niv=13 pv=106/137 ennemis=144 kills=1073 vivant=true (mur 76 s) vit_joueur=396 vit_ennemis_moy=174
+BAL t=482 niv=13 pv=127/137 ennemis=146 kills=1237 vivant=true (mur 90 s) vit_joueur=396 vit_ennemis_moy=176
+BAL t=542 niv=13 pv= 97/137 ennemis=148 kills=1426 vivant=true (mur 105 s) vit_joueur=396 vit_ennemis_moy=178
+BAL t=603 niv=14 pv=119/137 ennemis=194 kills=1601 vivant=true (mur 122 s) vit_joueur=396 vit_ennemis_moy=179
+BAL t=648 niv=14 pv=  0/137 ennemis=189 kills=1720 vivant=false (mur 133 s) vit_joueur=396 vit_ennemis_moy=180
+BAL chapitre 8 (ruche) 900 s, x6
+BAL t= 60 niv= 6 pv=133/137 ennemis=  9 kills= 111 vivant=true (mur 11 s) vit_joueur=396 vit_ennemis_moy=156
+BAL t=120 niv= 8 pv=133/137 ennemis= 20 kills= 257 vivant=true (mur 21 s) vit_joueur=396 vit_ennemis_moy=159
+BAL t=180 niv=10 pv=136/137 ennemis= 27 kills= 435 vivant=true (mur 31 s) vit_joueur=396 vit_ennemis_moy=161
+BAL t=240 niv=11 pv=137/137 ennemis= 83 kills= 611 vivant=true (mur 41 s) vit_joueur=396 vit_ennemis_moy=162
+BAL t=301 niv=11 pv= 70/137 ennemis=175 kills= 723 vivant=true (mur 53 s) vit_joueur=396 vit_ennemis_moy=163
+BAL t=361 niv=12 pv= 41/137 ennemis=180 kills= 884 vivant=true (mur 67 s) vit_joueur=396 vit_ennemis_moy=165
+BAL t=387 niv=12 pv=  0/137 ennemis=168 kills= 935 vivant=false (mur 73 s) vit_joueur=396 vit_ennemis_moy=165
+BAL chapitre 11 (ether) 900 s, x6
+BAL t= 61 niv= 5 pv= 77/137 ennemis= 60 kills=  69 vivant=true (mur 11 s) vit_joueur=396 vit_ennemis_moy=168
+BAL t=121 niv= 8 pv=127/137 ennemis= 48 kills= 235 vivant=true (mur 21 s) vit_joueur=396 vit_ennemis_moy=170
+BAL t=181 niv= 9 pv= 68/137 ennemis= 53 kills= 419 vivant=true (mur 31 s) vit_joueur=396 vit_ennemis_moy=172
+BAL t=241 niv=11 pv=100/137 ennemis=126 kills= 567 vivant=true (mur 42 s) vit_joueur=396 vit_ennemis_moy=173
+BAL t=302 niv=11 pv= 57/137 ennemis=209 kills= 669 vivant=true (mur 56 s) vit_joueur=396 vit_ennemis_moy=175
+BAL t=363 niv=12 pv= 56/137 ennemis=216 kills= 838 vivant=true (mur 74 s) vit_joueur=396 vit_ennemis_moy=176
+BAL t=423 niv=12 pv=119/137 ennemis=195 kills=1033 vivant=true (mur 90 s) vit_joueur=396 vit_ennemis_moy=178
+BAL t=483 niv=13 pv=113/137 ennemis=200 kills=1148 vivant=true (mur 108 s) vit_joueur=396 vit_ennemis_moy=179
+BAL t=544 niv=13 pv=110/137 ennemis=216 kills=1255 vivant=true (mur 129 s) vit_joueur=396 vit_ennemis_moy=181
+BAL t=604 niv=13 pv=137/137 ennemis=210 kills=1386 vivant=true (mur 149 s) vit_joueur=396 vit_ennemis_moy=183
+BAL t=664 niv=14 pv= 34/137 ennemis=220 kills=1476 vivant=true (mur 171 s) vit_joueur=396 vit_ennemis_moy=184
+BAL t=695 niv=14 pv=  0/137 ennemis=215 kills=1514 vivant=false (mur 182 s) vit_joueur=396 vit_ennemis_moy=185
+BAL chapitre 14 (quantum) 900 s, x6
+BAL t= 60 niv= 4 pv= 72/162 ennemis= 71 kills=  32 vivant=true (mur 11 s) vit_joueur=410 vit_ennemis_moy=196
+BAL t=120 niv= 7 pv= 45/162 ennemis= 45 kills= 190 vivant=true (mur 21 s) vit_joueur=459 vit_ennemis_moy=199
+BAL t=180 niv= 9 pv=116/162 ennemis= 72 kills= 317 vivant=true (mur 31 s) vit_joueur=514 vit_ennemis_moy=201
+BAL t=240 niv=10 pv=151/162 ennemis=127 kills= 466 vivant=true (mur 43 s) vit_joueur=514 vit_ennemis_moy=202
+BAL t=301 niv=11 pv=148/162 ennemis=167 kills= 633 vivant=true (mur 55 s) vit_joueur=576 vit_ennemis_moy=205
+BAL t=362 niv=12 pv=162/162 ennemis=107 kills= 877 vivant=true (mur 70 s) vit_joueur=576 vit_ennemis_moy=208
+BAL t=386 niv=12 pv=  0/162 ennemis=123 kills= 937 vivant=false (mur 75 s) vit_joueur=576 vit_ennemis_moy=209
+BAL chapitre 17 (steampunk) 900 s, x6
+BAL t= 60 niv= 9 pv= 87/137 ennemis= 21 kills= 206 vivant=true (mur 11 s) vit_joueur=497 vit_ennemis_moy=160
+BAL t=120 niv=12 pv=137/137 ennemis= 48 kills= 479 vivant=true (mur 21 s) vit_joueur=497 vit_ennemis_moy=163
+BAL t=180 niv=14 pv=137/137 ennemis= 58 kills= 764 vivant=true (mur 31 s) vit_joueur=497 vit_ennemis_moy=166
+BAL t=241 niv=15 pv=125/137 ennemis= 96 kills=1026 vivant=true (mur 42 s) vit_joueur=497 vit_ennemis_moy=166
+BAL t=301 niv=15 pv=128/137 ennemis=107 kills=1299 vivant=true (mur 53 s) vit_joueur=497 vit_ennemis_moy=168
+BAL t=362 niv=16 pv=114/137 ennemis=138 kills=1505 vivant=true (mur 65 s) vit_joueur=497 vit_ennemis_moy=170
+BAL t=422 niv=16 pv=137/137 ennemis= 91 kills=1762 vivant=true (mur 77 s) vit_joueur=497 vit_ennemis_moy=173
+BAL t=482 niv=17 pv=137/137 ennemis= 91 kills=1984 vivant=true (mur 92 s) vit_joueur=497 vit_ennemis_moy=175
+BAL t=542 niv=17 pv=137/137 ennemis= 97 kills=2245 vivant=true (mur 107 s) vit_joueur=497 vit_ennemis_moy=176
+BAL t=603 niv=17 pv=117/137 ennemis=144 kills=2485 vivant=true (mur 120 s) vit_joueur=497 vit_ennemis_moy=177
+BAL t=663 niv=18 pv=105/137 ennemis=181 kills=2713 vivant=true (mur 134 s) vit_joueur=557 vit_ennemis_moy=178
+BAL t=723 niv=18 pv=129/137 ennemis= 99 kills=3058 vivant=true (mur 149 s) vit_joueur=557 vit_ennemis_moy=181
+BAL t=784 niv=18 pv=137/137 ennemis=111 kills=3299 vivant=true (mur 164 s) vit_joueur=557 vit_ennemis_moy=182
+BAL t=844 niv=19 pv=115/137 ennemis=130 kills=3561 vivant=true (mur 179 s) vit_joueur=557 vit_ennemis_moy=185
+BAL t=901 niv=19 pv=117/137 ennemis=168 kills=3792 vivant=true (mur 195 s) vit_joueur=557 vit_ennemis_moy=186
+BAL chapitre 3 (jungle) 900 s, x6
+BAL t= 60 niv= 6 pv=137/137 ennemis= 12 kills=  85 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=167
+BAL t=120 niv= 8 pv=136/137 ennemis= 10 kills= 214 vivant=true (mur 21 s) vit_joueur=336 vit_ennemis_moy=172
+BAL t=180 niv= 9 pv=137/137 ennemis= 15 kills= 354 vivant=true (mur 31 s) vit_joueur=336 vit_ennemis_moy=173
+BAL t=240 niv=10 pv=130/137 ennemis= 76 kills= 517 vivant=true (mur 41 s) vit_joueur=336 vit_ennemis_moy=174
+BAL t=301 niv=11 pv=110/137 ennemis= 90 kills= 699 vivant=true (mur 52 s) vit_joueur=336 vit_ennemis_moy=177
+BAL t=361 niv=12 pv=117/137 ennemis=104 kills= 899 vivant=true (mur 63 s) vit_joueur=336 vit_ennemis_moy=177
+BAL t=421 niv=13 pv=158/162 ennemis= 84 kills=1112 vivant=true (mur 76 s) vit_joueur=336 vit_ennemis_moy=181
+BAL t=481 niv=14 pv=120/162 ennemis= 93 kills=1296 vivant=true (mur 89 s) vit_joueur=336 vit_ennemis_moy=185
+BAL t=542 niv=15 pv=162/162 ennemis=118 kills=1517 vivant=true (mur 103 s) vit_joueur=336 vit_ennemis_moy=185
+BAL t=602 niv=15 pv=162/162 ennemis=170 kills=1719 vivant=true (mur 119 s) vit_joueur=336 vit_ennemis_moy=186
+BAL t=663 niv=16 pv=162/162 ennemis=141 kills=1975 vivant=true (mur 136 s) vit_joueur=336 vit_ennemis_moy=188
+BAL t=723 niv=16 pv=162/162 ennemis=165 kills=2176 vivant=true (mur 152 s) vit_joueur=336 vit_ennemis_moy=189
+BAL t=784 niv=17 pv=162/162 ennemis= 88 kills=2436 vivant=true (mur 170 s) vit_joueur=336 vit_ennemis_moy=194
+BAL t=844 niv=17 pv=111/162 ennemis=137 kills=2656 vivant=true (mur 185 s) vit_joueur=336 vit_ennemis_moy=194
+BAL t=900 niv=17 pv=136/162 ennemis=153 kills=2883 vivant=true (mur 202 s) vit_joueur=336 vit_ennemis_moy=195
+BAL chapitre 6 (cryo) 900 s, x6
+BAL t= 60 niv= 5 pv=137/137 ennemis= 26 kills=  86 vivant=true (mur 11 s) vit_joueur=410 vit_ennemis_moy=197
+BAL t=120 niv= 8 pv=137/137 ennemis= 27 kills= 237 vivant=true (mur 21 s) vit_joueur=410 vit_ennemis_moy=200
+BAL t=180 niv= 9 pv=121/137 ennemis= 40 kills= 382 vivant=true (mur 31 s) vit_joueur=410 vit_ennemis_moy=203
+BAL t=241 niv=11 pv=137/137 ennemis=100 kills= 548 vivant=true (mur 41 s) vit_joueur=410 vit_ennemis_moy=205
+BAL t=301 niv=11 pv=133/137 ennemis=107 kills= 737 vivant=true (mur 52 s) vit_joueur=410 vit_ennemis_moy=207
+BAL t=361 niv=12 pv=110/137 ennemis= 91 kills= 937 vivant=true (mur 65 s) vit_joueur=410 vit_ennemis_moy=209
+BAL t=422 niv=13 pv= 69/137 ennemis=103 kills=1128 vivant=true (mur 78 s) vit_joueur=410 vit_ennemis_moy=212
+BAL t=482 niv=13 pv= 77/137 ennemis= 87 kills=1317 vivant=true (mur 92 s) vit_joueur=410 vit_ennemis_moy=215
+BAL t=543 niv=14 pv=137/137 ennemis=114 kills=1506 vivant=true (mur 107 s) vit_joueur=410 vit_ennemis_moy=215
+BAL t=603 niv=14 pv=130/137 ennemis=184 kills=1680 vivant=true (mur 126 s) vit_joueur=410 vit_ennemis_moy=217
+BAL t=663 niv=15 pv= 68/137 ennemis=166 kills=1893 vivant=true (mur 145 s) vit_joueur=410 vit_ennemis_moy=220
+BAL t=724 niv=15 pv=120/137 ennemis=188 kills=2060 vivant=true (mur 164 s) vit_joueur=410 vit_ennemis_moy=223
+BAL t=785 niv=16 pv= 90/137 ennemis=132 kills=2237 vivant=true (mur 185 s) vit_joueur=410 vit_ennemis_moy=227
+BAL t=845 niv=16 pv=137/137 ennemis=204 kills=2382 vivant=true (mur 206 s) vit_joueur=410 vit_ennemis_moy=227
+BAL t=901 niv=16 pv=137/137 ennemis=215 kills=2530 vivant=true (mur 224 s) vit_joueur=410 vit_ennemis_moy=230
+BAL chapitre 9 (citadelle) 900 s, x6
+BAL t= 60 niv= 7 pv=124/137 ennemis= 31 kills= 153 vivant=true (mur 11 s) vit_joueur=444 vit_ennemis_moy=160
+BAL t=120 niv= 9 pv=137/137 ennemis= 50 kills= 355 vivant=true (mur 21 s) vit_joueur=444 vit_ennemis_moy=162
+BAL t=180 niv=11 pv=129/137 ennemis= 54 kills= 553 vivant=true (mur 32 s) vit_joueur=444 vit_ennemis_moy=164
+BAL t=241 niv=11 pv=137/137 ennemis= 74 kills= 744 vivant=true (mur 43 s) vit_joueur=444 vit_ennemis_moy=166
+BAL t=301 niv=12 pv=137/137 ennemis=157 kills= 887 vivant=true (mur 54 s) vit_joueur=497 vit_ennemis_moy=168
+BAL t=361 niv=13 pv=130/137 ennemis=154 kills=1069 vivant=true (mur 68 s) vit_joueur=497 vit_ennemis_moy=170
+BAL t=421 niv=14 pv=132/137 ennemis=136 kills=1264 vivant=true (mur 83 s) vit_joueur=497 vit_ennemis_moy=172
+BAL t=482 niv=14 pv=135/137 ennemis=192 kills=1396 vivant=true (mur 101 s) vit_joueur=497 vit_ennemis_moy=173
+BAL t=543 niv=15 pv=129/137 ennemis=220 kills=1525 vivant=true (mur 119 s) vit_joueur=497 vit_ennemis_moy=174
+BAL t=603 niv=15 pv=125/137 ennemis=220 kills=1677 vivant=true (mur 138 s) vit_joueur=497 vit_ennemis_moy=176
+BAL t=664 niv=15 pv=134/137 ennemis=198 kills=1821 vivant=true (mur 159 s) vit_joueur=497 vit_ennemis_moy=179
+BAL t=724 niv=16 pv=135/137 ennemis=172 kills=1964 vivant=true (mur 180 s) vit_joueur=497 vit_ennemis_moy=181
+BAL t=785 niv=16 pv=109/137 ennemis=172 kills=2113 vivant=true (mur 200 s) vit_joueur=497 vit_ennemis_moy=184
+BAL t=845 niv=16 pv=119/137 ennemis=220 kills=2215 vivant=true (mur 218 s) vit_joueur=497 vit_ennemis_moy=184
+BAL t=901 niv=16 pv=120/137 ennemis=215 kills=2326 vivant=true (mur 236 s) vit_joueur=497 vit_ennemis_moy=186
+BAL chapitre 12 (titans) 900 s, x6
+BAL t= 60 niv= 6 pv=162/162 ennemis= 37 kills= 137 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=157
+BAL t=120 niv= 9 pv=145/162 ennemis= 36 kills= 370 vivant=true (mur 21 s) vit_joueur=336 vit_ennemis_moy=158
+BAL t=180 niv=10 pv=106/162 ennemis= 44 kills= 559 vivant=true (mur 32 s) vit_joueur=336 vit_ennemis_moy=162
+BAL t=240 niv=11 pv=144/162 ennemis= 98 kills= 735 vivant=true (mur 44 s) vit_joueur=336 vit_ennemis_moy=163
+BAL t=301 niv=12 pv=162/162 ennemis=136 kills= 933 vivant=true (mur 57 s) vit_joueur=336 vit_ennemis_moy=164
+BAL t=361 niv=13 pv=151/162 ennemis=110 kills=1165 vivant=true (mur 70 s) vit_joueur=336 vit_ennemis_moy=166
+BAL t=422 niv=13 pv=162/162 ennemis= 57 kills=1406 vivant=true (mur 83 s) vit_joueur=336 vit_ennemis_moy=169
+BAL t=482 niv=14 pv=159/162 ennemis=101 kills=1581 vivant=true (mur 96 s) vit_joueur=336 vit_ennemis_moy=171
+BAL t=542 niv=14 pv=162/162 ennemis=148 kills=1770 vivant=true (mur 111 s) vit_joueur=336 vit_ennemis_moy=172
+BAL t=603 niv=15 pv=162/162 ennemis=113 kills=2074 vivant=true (mur 127 s) vit_joueur=336 vit_ennemis_moy=174
+BAL t=663 niv=15 pv=153/162 ennemis=176 kills=2260 vivant=true (mur 141 s) vit_joueur=336 vit_ennemis_moy=175
+BAL t=724 niv=15 pv=155/162 ennemis= 93 kills=2577 vivant=true (mur 157 s) vit_joueur=336 vit_ennemis_moy=178
+BAL t=784 niv=16 pv=162/162 ennemis=112 kills=2789 vivant=true (mur 173 s) vit_joueur=336 vit_ennemis_moy=181
+BAL t=844 niv=16 pv=137/162 ennemis=153 kills=2997 vivant=true (mur 191 s) vit_joueur=336 vit_ennemis_moy=183
+BAL t=900 niv=16 pv=127/162 ennemis=174 kills=3251 vivant=true (mur 205 s) vit_joueur=336 vit_ennemis_moy=182
+BAL chapitre 15 (ozone) 900 s, x6
+BAL t= 60 niv= 4 pv= 43/137 ennemis= 84 kills=  59 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=167
+BAL t=120 niv= 9 pv=124/137 ennemis= 36 kills= 298 vivant=true (mur 21 s) vit_joueur=336 vit_ennemis_moy=170
+BAL t=180 niv=10 pv=137/137 ennemis= 55 kills= 479 vivant=true (mur 31 s) vit_joueur=336 vit_ennemis_moy=173
+BAL t=241 niv=11 pv=137/137 ennemis=111 kills= 679 vivant=true (mur 42 s) vit_joueur=336 vit_ennemis_moy=174
+BAL t=301 niv=12 pv=111/137 ennemis=133 kills= 875 vivant=true (mur 54 s) vit_joueur=336 vit_ennemis_moy=176
+BAL t=362 niv=12 pv= 24/137 ennemis=178 kills=1024 vivant=true (mur 67 s) vit_joueur=336 vit_ennemis_moy=177
+BAL t=412 niv=13 pv=  0/137 ennemis=197 kills=1155 vivant=false (mur 80 s) vit_joueur=336 vit_ennemis_moy=178
+BAL chapitre 18 (colosseum) 900 s, x6
+BAL t= 60 niv= 6 pv= 52/137 ennemis= 27 kills=  90 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=197
+BAL t=120 niv= 7 pv=116/137 ennemis= 85 kills= 181 vivant=true (mur 22 s) vit_joueur=336 vit_ennemis_moy=198
+BAL t=181 niv= 9 pv=131/137 ennemis=148 kills= 297 vivant=true (mur 37 s) vit_joueur=336 vit_ennemis_moy=200
+BAL t=241 niv=10 pv=111/137 ennemis=153 kills= 499 vivant=true (mur 55 s) vit_joueur=336 vit_ennemis_moy=202
+BAL t=302 niv=11 pv=105/137 ennemis=218 kills= 617 vivant=true (mur 75 s) vit_joueur=336 vit_ennemis_moy=204
+BAL t=363 niv=12 pv= 61/137 ennemis=162 kills= 847 vivant=true (mur 98 s) vit_joueur=336 vit_ennemis_moy=206
+BAL t=423 niv=13 pv=137/137 ennemis=215 kills= 963 vivant=true (mur 121 s) vit_joueur=336 vit_ennemis_moy=208
+BAL t=484 niv=13 pv=137/137 ennemis=208 kills=1063 vivant=true (mur 145 s) vit_joueur=336 vit_ennemis_moy=210
+BAL t=545 niv=14 pv= 80/137 ennemis=199 kills=1211 vivant=true (mur 169 s) vit_joueur=336 vit_ennemis_moy=213
+BAL t=605 niv=14 pv= 33/137 ennemis=217 kills=1344 vivant=true (mur 192 s) vit_joueur=336 vit_ennemis_moy=216
+BAL t=666 niv=15 pv= 92/137 ennemis=191 kills=1502 vivant=true (mur 219 s) vit_joueur=336 vit_ennemis_moy=218
+BAL t=727 niv=15 pv= 72/137 ennemis=154 kills=1718 vivant=true (mur 242 s) vit_joueur=336 vit_ennemis_moy=223
+BAL t=758 niv=16 pv=  0/137 ennemis=214 kills=1771 vivant=false (mur 254 s) vit_joueur=336 vit_ennemis_moy=223

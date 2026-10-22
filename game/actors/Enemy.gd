@@ -55,6 +55,7 @@ const _DIR_NAMES: Array = ["right", "front_right", "front", "front_left", "left"
 const _DIR_DEG: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0, "left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0}
 # >>> IA22 vars (21/10 : signatures de tir par niveau, esquive, ordre du chef)
 var zigzag: float = 0.0            # 0..1 : oscillation laterale de l'approche (Runner/Flyer de survivor-td)
+var _tier_tint: Variant = null     # teinte de hierarchie (Mark 2 / inter / mini / boss), restauree apres une garde
 var protecteur: bool = false       # projette un bouclier de zone sur ses allies (Shielder de survivor-td)
 var _prot_t: float = 0.0           # >0 : protege par un allie (-40 % de degats)
 var _prot_cd: float = 0.0
@@ -605,6 +606,9 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		_hp_fill.z_index = 6
 		add_child(_hp_fill)
 
+	if def.has("tint"):
+		_tier_tint = def["tint"]
+		_spr.self_modulate = def["tint"]          # hierarchie Mark 2 / intermediaire / mini-boss / boss
 	if protecteur:
 		_spr.self_modulate = Color(0.6, 1.25, 1.05)   # teal : reconnaissable, a tuer en premier
 	if garde:
@@ -1549,10 +1553,10 @@ func _physics_process(delta: float) -> void:
 							if _mat != null and _mat.shader != null:
 								_mat.set_shader_parameter("warn", 0.0)
 							_fire_heavy(_aim_dir(dir))
-					elif _atk_cd <= 0.0 and dist < prefer_dist + 120.0:
+					elif _atk_cd <= 0.0 and dist < prefer_dist + 120.0 and Enemy._fire_ok(2.0, rank):
 						_charging = true
 						_charge_t = HEAVY_CHARGE[_palier]
-				elif _atk_cd <= 0.0 and dist < prefer_dist + 100.0 and _aim_ready():
+				elif _atk_cd <= 0.0 and dist < prefer_dist + 100.0 and _aim_ready() and Enemy._fire_ok(_shot_cost(), rank):
 					_atk_cd = attack_cd * ARME_CADENCE[_palier]
 					_tire_dispatch(_aim_dir(dir))
 					
@@ -1759,6 +1763,31 @@ const _STYLES: Dictionary = {
 	"orbe":     {"col": Color(1.0, 0.3, 0.25), "charge": 0.45},
 }
 
+## BUDGET DE TIR GLOBAL (22/10, banc d'equilibre : des tireurs en foule tuaient le bot en 25-50 s aux niveaux 6, 9, 10, 12, 14, et
+## chaque balle coute du rendu) : un seau a jetons partage par TOUS les ennemis. Debit `fire_rate` jetons/s (regle par le
+## spawner selon niveau et temps), reserve 2 s. Un tir coute 1 (simple), 2 (rafale/eventail/lourd), 3 (anneau). Le feu entrant
+## est donc BORNE quelle que soit la foule ; rang >= 2 (mini-boss, boss) exempte. Un tir refuse est simplement retarde.
+static var fire_rate: float = 6.0
+static var _tok: float = 8.0
+static var _tok_f: int = 0
+static func _fire_ok(cost: float, rk: int) -> bool:
+	if rk >= 2:
+		return true
+	var f: int = Engine.get_physics_frames()
+	if f != Enemy._tok_f:
+		Enemy._tok = minf(Enemy.fire_rate * 2.0, Enemy._tok + Enemy.fire_rate * float(f - Enemy._tok_f) / 60.0)
+		Enemy._tok_f = f
+	if Enemy._tok < cost:
+		return false
+	Enemy._tok -= cost
+	return true
+
+func _shot_cost() -> float:
+	match tir_style:
+		"anneau": return 3.0
+		"rafale", "eventail": return 2.0
+	return 1.0
+
 ## budget d'effets de bouche : 6 par image au plus (au-dela, le tir part mais sans flamme)
 static var _fx_frame: int = -1
 static var _fx_n: int = 0
@@ -1797,9 +1826,9 @@ func _style_fire(dir: Vector2) -> void:
 			for i in 5:
 				game.spawn_enemy_bolt(muzzle, dir.rotated(-0.5 + 0.25 * float(i)), d * 0.5, col, 0.9, 270.0, false, 0.0)
 		"sniper":
-			game.spawn_enemy_bolt(muzzle, dir, d * 2.4, col, 0.7, 780.0, false, 0.0)
+			game.spawn_enemy_bolt(muzzle, dir, d * 1.8, col, 0.7, 780.0, false, 0.0)
 		"guide":
-			game.spawn_enemy_bolt(muzzle, dir, d * 1.3, col, 1.2, 230.0, true, 2.2)
+			game.spawn_enemy_bolt(muzzle, dir, d * 1.0, col, 1.2, 230.0, true, 1.2)
 		"anneau":
 			var nr: int = 10 if get_tree().get_nodes_in_group("enemies").size() < 90 else 6   # en foule : anneau allege (rendu)
 			for i in nr:
@@ -1807,7 +1836,7 @@ func _style_fire(dir: Vector2) -> void:
 			if game.has_method("spawn_vfx"):
 				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.5, col)
 		"orbe":
-			game.spawn_enemy_bolt(muzzle, dir, d * 2.0, col, 2.1, 175.0, true, 0.0)
+			game.spawn_enemy_bolt(muzzle, dir, d * 1.6, col, 2.1, 175.0, true, 0.0)
 	if tir_style != "anneau" and game.has_method("spawn_vfx") and Enemy._fx_ok():
 		game.spawn_vfx("fire_blast", muzzle, dir.angle(), 0.45, col)
 	play("attack", true)
@@ -1933,6 +1962,8 @@ func _garde_tick(delta: float, player_valid: bool) -> void:
 		_garde_on()
 
 func _garde_base_tint() -> Color:
+	if _tier_tint != null:
+		return _tier_tint
 	if grade == "chef":
 		return Color(1.0, 0.72, 0.28)
 	if grade == "lieutenant":

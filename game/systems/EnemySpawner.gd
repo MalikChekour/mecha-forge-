@@ -444,7 +444,7 @@ func _phase() -> Dictionary:
 			k = i
 	return PHASES[k]
 func _phase_rate() -> float:
-	return float(_phase()["rate"])
+	return float(_phase()["rate"]) * (0.6 if _boss_up() else 1.0)
 var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
 var _pat_n: int = 0
 var _anchor: float = 0.0
@@ -461,6 +461,10 @@ func _is_special(d: Dictionary) -> bool:
 func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 	var d: Dictionary = (DEFS[kind] as Dictionary).duplicate()
 	var t: float = float(tier)
+	# VITESSE (22/10, patron : « la vitesse doit etre recalculee mecha joueur vs ennemi ») : ratio 0,50 au niveau 1 -> 0,53 au niveau 18 (banc : 0,64 = rushes mortels aux niveaux 10-16 en moins de 90 s ; la vitesse est le reglage le plus sensible)
+	# du joueur de REFERENCE (336 px/s, ameliorations exclues : elles restent un avantage). Facteurs de role plus bas. _scale_enemy
+	# ajoute <= +25 % avec le temps puis plafonne a 80 % de la vitesse reelle du joueur.
+	d["speed"] = 336.0 * (0.50 + 0.002 * (t - 1.0))
 	d["behavior"] = "ranged"
 	d["attack_cd"] = lerpf(2.0, 1.4, (t - 1.0) / 17.0)   # 21/10 : debuts trop faciles -> plus dur des le niveau 1
 	d["attack_dmg"] = float(d["attack_dmg"]) * lerpf(1.4, 1.0, clampf((t - 1.0) / 8.0, 0.0, 1.0))
@@ -472,11 +476,12 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 			"charge":
 				d["behavior"] = "dasher"
 			"mine":
+				d["speed"] = float(d["speed"]) * 0.85
 				d["behavior"] = "miner"
-				d["attack_dmg"] = float(d["attack_dmg"]) * 1.6
+				d["attack_dmg"] = float(d["attack_dmg"]) * 1.25   # banc : 1,6 tuait le bot en 19 s au niveau 17
 			"kamikaze":
 				d["behavior"] = "kamikaze"
-				d["attack_dmg"] = 9.0 + 0.9 * t
+				d["attack_dmg"] = 8.0 + 0.4 * t
 				d["hp"] = float(d["hp"]) * 0.6
 			"bull":
 				d["behavior"] = "rush"
@@ -495,8 +500,9 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 				d["garde"] = true
 				d["garde_cd"] = lerpf(11.0, 6.5, (t - 1.0) / 17.0)
 			"blinde":
-				d["shield"] = 14.0 + 2.2 * t
+				d["shield"] = 8.0 + 1.2 * t   # banc 22/10 : 14+2.2t rendait le niveau 9 intuable (77 ennemis vivants a 63 s)
 			"lourd":
+				d["speed"] = float(d["speed"]) * 0.9
 				d["heavy"] = true
 				d["attack_cd"] = float(d["attack_cd"]) * 1.25
 			"barrage":
@@ -510,11 +516,30 @@ func _def_for(kind: String) -> Dictionary:
 	if prof.is_empty() or not DEFS.has(kind) or not kind.begins_with("mech"):
 		return DEFS[kind] if DEFS.has(kind) else {}
 	var tier: int = int(prof["tier"])
+	if randf() < _mk2_share():
+		var dm: Dictionary = _tier_def("mk2")
+		if not dm.is_empty():
+			return dm
 	var use_alt: bool = not (prof["alt"] as Array).is_empty() and randf() < minf((float(prof["share"]) + 0.004 * float(tier)) * float(_phase()["share"]), 0.65)
 	var key: String = "%s|%d|%d" % [current_biome, tier, 1 if use_alt else 0]
 	if not _prof_defs.has(key):
 		_prof_defs[key] = _role_def(kind, prof["alt"] if use_alt else prof["main"], tier)
 	var d: Dictionary = _prof_defs[key]
+	# MONTEE EN CHARGE (banc 22/10 : niveaux 6/9/10/12/14 mortels en 25-50 s, le bot n'avait pas le temps de monter en niveau) :
+	# les ajouts de rang (bouclier, garde, PV) arrivent progressivement sur les 2 premieres minutes.
+	var t0: float = GameState.run_time
+	if t0 < 120.0:
+		var ease: float = clampf(t0 / 120.0, 0.25, 1.0)
+		d = d.duplicate()
+		if d.has("shield"):
+			d["shield"] = float(d["shield"]) * ease
+		if t0 < 45.0:
+			d.erase("garde")
+		if t0 < 120.0:
+			d.erase("protecteur")
+		d["hp"] = float(d["hp"]) * lerpf(0.75, 1.0, ease)
+	if t0 < 60.0 and _is_special(d):
+		d = _role_def(kind, ["tir"], tier)   # banc : 25 % de morts en < 65 s aux niveaux 9/16/18 : pas de charge/kamikaze/mine avant 1:00
 	var lf: float = _lead_factor()
 	if lf != 1.0 and d.has("aim_lead"):
 		d = d.duplicate()
@@ -524,7 +549,7 @@ func _def_for(kind: String) -> Dictionary:
 		for e in get_tree().get_nodes_in_group("enemies"):
 			if e is Enemy and (e as Enemy).behavior in ["dasher", "kamikaze", "miner"]:
 				n += 1
-		if n >= _special_cap(tier):
+		if n >= mini(_special_cap(tier), 2 + int(t0 / 30.0)):
 			return _role_def(kind, ["tir"], tier)   # plafond atteint : tireur banal, jamais un mur de charges
 	return d
 
@@ -598,7 +623,7 @@ func _pattern_offset() -> Vector2:
 ##    (tenaille, encerclement, embuscade, fer a cheval) ; un joueur statique se fait user (feu et mouvement, tirailleurs).
 var _pspeed: float = 0.0
 var _squads: Array = []
-var _squad_t: float = 6.0
+var _squad_t: float = 40.0   # premiere escouade a 40 s (banc : escouade + roles speciaux des les premieres secondes = morts precoces)
 var _banner_t: Dictionary = {}
 
 func _lead_factor() -> float:
@@ -650,12 +675,14 @@ func _squad_tick(delta: float) -> void:
 	if "velocity" in player:
 		_pspeed = lerpf(_pspeed, (player.velocity as Vector2).length(), 1.0 - exp(-delta / 3.0))
 	var p: Vector2 = player.global_position
+	Enemy.fire_rate = clampf(3.5 + 0.30 * float(int((PROFILES[current_biome] as Dictionary)["tier"])) + GameState.run_time / 100.0, 3.5, 14.0) * clampf(GameState.run_time / 60.0, 0.6, 1.0)   # budget de tir global (cf. Enemy._fire_ok)
 	var ph: Dictionary = _phase()
 	var pi: int = PHASES.find(ph)
 	if pi != _phase_idx:
 		if _phase_idx >= 0:
 			_announce("", "PHASE : " + String(ph["label"]), Color(1.0, 0.45, 0.3))
 		_phase_idx = pi
+	_tier_tick(delta)
 	for q in _squads:
 		var ms: Array = q.live()
 		if ms.is_empty():
@@ -690,15 +717,16 @@ func _maybe_elite(e: Enemy) -> void:
 	e._spr.self_modulate = Color(1.5, 0.7, 1.4)
 	e._spr.scale *= 1.1
 
-func _spawn_squad() -> void:
+func _spawn_squad(force: bool = false) -> void:
 	var prof: Dictionary = PROFILES.get(current_biome, {})
 	var pool: Array = BIOME_POOL.get(current_biome, [])
 	if prof.is_empty() or pool.is_empty() or game == null:
 		return
 	var tier: int = int(prof["tier"])
-	if _squads.size() >= 1 + tier / 7:
+	if _squads.size() >= 1 + tier / 7 and not force:
 		return
 	var n: int = clampi(4 + tier / 3, 4, 10)
+	n = maxi(3, int(round(float(n) * clampf(0.5 + GameState.run_time / 240.0, 0.5, 1.0))))   # escouades plus petites en debut de partie
 	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
 		return
 	var kind: String = String(pool[0])
@@ -728,6 +756,105 @@ func _spawn_squad() -> void:
 	q.assign_ranks()
 	_squads.append(q)
 	_announce(form, "FORMATION : " + Squad.label(form), Color(1.0, 0.62, 0.3))
+
+## ======================= HIERARCHIE D'ENNEMIS PAR NIVEAU (22/10, patron : « integrer les Mark 2, intermediaires, mini-boss, boss ») =======================
+## Meme modele 3D que l'ennemi de base du niveau (pas de nouvelle modelisation) ; ce qui change : taille, PV, teinte, armement, defenses.
+##   mk2   : variante renforcee, melee au flux normal des 2 min a ~35 % des apparitions (bouclier actif + blinde)
+##   inter : intermediaire (rang 1), 1 toutes les ~80 s des 2 min 30 (2 max vivants), lourd + blinde + garde
+##   mini  : mini-boss (rang 2) a 5:00 et 10:00, salve en barrage + blinde + garde + esquive
+##   boss  : boss de fin de niveau (rang 4, `final`) a 15:00 : sa mort = VICTOIRE ; invoque une escouade toutes les ~22 s ;
+##           les apparitions normales ralentissent (x0,6) tant qu'il vit (survivor-td : pause des spawns pendant un boss)
+const TIERS: Dictionary = {
+	"mk2":   {"flags": ["blinde", "garde"],                          "hp": 2.2,  "dmg": 1.25, "size": 1.15, "radius": 1.1,  "rank": 0, "tint": Color(1.5, 0.85, 0.65), "label": "MARK 2"},
+	"inter": {"flags": ["lourd", "blinde", "garde"],                 "hp": 6.0,  "dmg": 1.5,  "size": 1.45, "radius": 1.35, "rank": 1, "tint": Color(1.6, 0.55, 0.5),  "label": "INTERMEDIAIRE"},
+	"mini":  {"flags": ["barrage", "blinde", "garde", "esquive"],    "hp": 12.0, "dmg": 1.5,  "size": 1.8,  "radius": 1.7,  "rank": 2, "tint": Color(1.7, 0.4, 0.9),   "label": "MINI-BOSS"},
+	"boss":  {"flags": ["barrage", "lourd", "blinde", "garde", "esquive"], "hp": 18.0, "dmg": 1.6, "size": 2.3, "radius": 2.1, "rank": 4, "tint": Color(1.8, 0.35, 0.3), "label": "BOSS"},
+}
+var _boss_ref: Variant = null
+var _tier_last: Dictionary = {"inter": 120.0, "summon": 0.0}
+var _tier_fired: Dictionary = {}
+
+func _tier_def(tier_name: String) -> Dictionary:
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	var prof: Dictionary = PROFILES.get(current_biome, {})
+	if pool.is_empty() or prof.is_empty() or not DEFS.has(String(pool[0])):
+		return {}
+	var key: String = "T|%s|%s" % [current_biome, tier_name]
+	if _prof_defs.has(key):
+		return _prof_defs[key]
+	var tp: Dictionary = TIERS[tier_name]
+	var tier: int = int(prof["tier"])
+	var d: Dictionary = _role_def(String(pool[0]), (prof["main"] as Array) + (tp["flags"] as Array), tier)
+	d["name"] = "%s %s" % [String(DEFS[String(pool[0])]["name"]), String(tp["label"])]
+	d["hp"] = float(d["hp"]) * float(tp["hp"])
+	d["dmg"] = float(d["dmg"]) * float(tp["dmg"])
+	d["attack_dmg"] = float(d["attack_dmg"]) * float(tp["dmg"])
+	d["size"] = float(d["size"]) * float(tp["size"])
+	d["radius"] = float(d["radius"]) * float(tp["radius"])
+	d["rank"] = int(tp["rank"])
+	d["tint"] = tp["tint"]
+	d["speed"] = float(d["speed"]) * (0.9 if int(tp["rank"]) >= 2 else 1.0)
+	if tier_name == "boss":
+		d["ogive"] = true
+		d["final"] = not GameState.endless
+		d["behavior"] = "ranged"
+		d["prefer_dist"] = 300.0
+	_prof_defs[key] = d
+	return d
+
+func _spawn_tier(tier_name: String) -> Enemy:
+	var d: Dictionary = _tier_def(tier_name)
+	if d.is_empty() or player == null or not is_instance_valid(player) or game == null:
+		return null
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	var e: Enemy = Enemy.new()
+	var ang: float = randf() * TAU
+	e.global_position = player.global_position + Vector2.from_angle(ang) * 700.0
+	if arena_half > 0.0:
+		e.global_position.x = clampf(e.global_position.x, arena.position.x, arena.end.x)
+		e.global_position.y = clampf(e.global_position.y, arena.position.y, arena.end.y)
+	game.enemy_layer.add_child(e)
+	e.setup(String(pool[0]) + "_" + tier_name, d, player, game)
+	_scale_enemy(e)
+	var tp: Dictionary = TIERS[tier_name]
+	if game.has_method("spawn_vfx"):
+		game.spawn_vfx("shockwave", e.global_position, 0.0, 1.5 + float(tp["size"]), tp["tint"])
+	_announce("", "!  %s  !" % String(tp["label"]), tp["tint"])
+	Audio.sfx("boss", 0.1)
+	if tier_name == "boss":
+		_boss_ref = e
+		Audio.music("boss")
+	return e
+
+func _live_tier(rank_min: int) -> int:
+	var n: int = 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e is Enemy and (e as Enemy).alive and int((e as Enemy).rank) >= rank_min and (e as Enemy).kind.contains("_"):
+			n += 1
+	return n
+
+func _boss_up() -> bool:
+	return _boss_ref != null and is_instance_valid(_boss_ref) and _boss_ref.alive
+
+## Echeancier de la hierarchie (appele par _squad_tick, apres les phases)
+func _tier_tick(_delta: float) -> void:
+	var t: float = GameState.run_time
+	if t >= 150.0 and t - float(_tier_last["inter"]) >= 80.0 and not _boss_up() and _live_tier(1) < 2:
+		_tier_last["inter"] = t
+		_spawn_tier("inter")
+	for slot in [300.0, 600.0]:
+		if t >= slot and not _tier_fired.has(slot) and not _boss_up():
+			_tier_fired[slot] = true
+			_spawn_tier("mini")
+	if t >= 900.0 and not _tier_fired.has(900.0):
+		_tier_fired[900.0] = true
+		_spawn_tier("boss")
+	if _boss_up() and t - float(_tier_last["summon"]) >= 22.0:
+		_tier_last["summon"] = t
+		_spawn_squad(true)
+
+func _mk2_share() -> float:
+	return clampf((GameState.run_time - 120.0) / 300.0, 0.0, 1.0) * 0.35
 ## <<< PROFILS DE NIVEAU
 
 func _spawn() -> void:
@@ -788,13 +915,15 @@ func _scale_enemy(e: Enemy) -> void:
 	# (dasher) et le coefficient individuel (+/-15 %) s'ajoutent par-dessus : brefs, pas permanents.
 	if player != null and "base_speed" in player:
 		e.speed = minf(e.speed, float(player.base_speed) * 0.80)
-	var hp_scale: float = (1.0 + GameState.run_time * 0.0020) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * Protocols.enemy_hp
+	# 22/10 (banc d'equilibre) : la difficulte doit MONTER avec le niveau (chapitre) : +4 % de PV et +3 % de degats par rang de niveau
+	var tier_n: float = float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)
+	var hp_scale: float = (1.0 + 0.04 * tier_n) * (1.0 + GameState.run_time * 0.0020) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * Protocols.enemy_hp
 	e.hp *= hp_scale
 	e.hp_max = e.hp
 	if e.shield_max > 0.0:               # shields scale with HP too, else late-game shields are trivial
 		e.shield_max *= hp_scale
 		e.shield = e.shield_max
-	var dmg_scale: float = (1.0 + GameState.run_time * 0.0008) * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * Protocols.enemy_dmg
+	var dmg_scale: float = (1.0 + GameState.run_time * 0.0008)   # PAS de degats par niveau : banc 22/10, des coups de 15-24 PV tuaient en 20-60 s ; le niveau durcit par PV, nombre et complexite * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * Protocols.enemy_dmg
 	e.contact_dmg *= dmg_scale
 	e.attack_dmg *= dmg_scale             # ranged bolts scale too (else late-game shooters are harmless)
 
