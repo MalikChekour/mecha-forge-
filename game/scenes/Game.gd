@@ -42,7 +42,7 @@ const CHAPTERS: Array = [
 	{"name": "L'Usine",                 "sub": "Le Reveil",                   "biome": "tech",      "diff": 0, "gate": 1000},
 	{"name": "Terres Arides",           "sub": "La Traversee",                "biome": "desert",    "diff": 1, "gate": 2500},
 	{"name": "La Ruine Verte",          "sub": "L'Enlisement",                "biome": "jungle",    "diff": 1, "gate": 5000},
-	{"name": "Le Coeur des Ressources", "sub": "Le Coeur Ardent",             "biome": "volcanic",  "diff": 2, "gate": 9000},
+	{"name": "Le Coeur des Ressources", "sub": "Atelier d'Assemblage",         "biome": "volcanic",  "diff": 2, "gate": 9000},
 	{"name": "La Cite Dechue",          "sub": "Le Souverain",                "biome": "swamp",     "diff": 3, "gate": 15000},
 	# 03/10, suite demandee par le patron (plan "15 maps") : 4 chapitres bonus post-campagne, tous
 	# a la difficulte MAX (pas de palier au-dela de VETERAN) - verifie INOFFENSIF avant d'ajouter :
@@ -61,7 +61,7 @@ const CHAPTERS: Array = [
 	{"name": "Station Géométrique Quantique", "sub": "La Matrice Pure", "biome": "quantum",   "diff": 3, "gate": 70000},
 	{"name": "Faille d'Ozone (Orage)",  "sub": "L'Orage Perpétuel",          "biome": "ozone",     "diff": 3, "gate": 76000},
 	{"name": "Grotte Prismatique",      "sub": "Les Grottes Réfringentes",    "biome": "prism",     "diff": 3, "gate": 82000},
-	{"name": "Le Bastion Vapeur",       "sub": "Bastion Stellaire",           "biome": "steampunk", "diff": 3, "gate": 88000},
+	{"name": "Le Bastion Galactique",   "sub": "Défense Planétaire",          "biome": "steampunk", "diff": 3, "gate": 88000},
 	{"name": "Le Colisée Virtuel",      "sub": "L'Épreuve Finale",            "biome": "colosseum", "diff": 3, "gate": 95000},
 ]
 var _chapter: int = 1   # chapitre campagne en cours (1-based)
@@ -87,7 +87,7 @@ const BIOME_MODS: Dictionary = {
 	"quantum":   {"label": "STATION GÉOMÉTRIQUE QUANTIQUE  —  matrice de données & réfractions"},
 	"ozone":     {"label": "FAILLE D'OZONE (ORAGE)  —  orage ionique perpétuel"},
 	"prism":     {"label": "GROTTE PRISMATIQUE  —  cavernes de quartz réflectif"},
-	"steampunk": {"label": "BASTION VAPEUR  —  usine victorienne d'airain & de laiton"},
+	"steampunk": {"label": "BASTION GALACTIQUE  —  citadelle planétaire & défense orbitale"},
 	"colosseum": {"label": "COLISÉE VIRTUEL  —  arène tactique de calibrage militaire"},
 }
 ## Flavour lines for the per-map intro/outro cutscenes (see _map_intro / _map_outro). One short
@@ -112,7 +112,7 @@ const CUT_LINES: Dictionary = {
 	"quantum":   {"in": "Les serveurs d'obsidienne vibrent de code pur. La matrice calcule votre fin.", "out": "Les algorithmes s'éteignent. Les données sont purgées."},
 	"ozone":     {"in": "La foudre déchire le ciel sans fin. L'air sent l'ozone et le plasma brûlé.", "out": "L'orage s'éloigne. La terre ionisée fume encore."},
 	"prism":     {"in": "Les cristaux démultiplient chaque reflet et chaque tir. La lumière est une arme.", "out": "Les géodes scintillent doucement dans le calme retrouvé."},
-	"steampunk": {"in": "Le grondement des pistons résonne dans la vapeur brûlante. L'industrie ne dort jamais.", "out": "Les cheminées cessent de fumer. La machinerie est vaincue."},
+	"steampunk": {"in": "La citadelle planétaire veille sur l'horizon. La forteresse repousse l'assaut.", "out": "Le bastion est sécurisé. La défense planétaire a triomphé."},
 	"colosseum": {"in": "Les projecteurs de l'arène s'allument. L'épreuve suprême commence.", "out": "Victoire écrasante. Le protocole d'exercice est validé."},
 }
 ## 04/10, trou signale par le patron : la derive d'une map a l'autre a l'interieur d'un chapitre
@@ -1212,7 +1212,7 @@ func _biome_label(b: String) -> String:
 		"tech": return "Secteur Industriel"
 		"desert": return "Désert Toxique"
 		"jungle": return "Ruines Végétales"
-		"volcanic": return "Forge Magmatique"
+		"volcanic": return "Forge et Construction"
 		"swamp": return "Cité Engloutie"
 		"cryo": return "Cryo-Laboratoire"
 		"reacteur": return "Cœur Réacteur"
@@ -1225,7 +1225,7 @@ func _biome_label(b: String) -> String:
 		"quantum": return "Station Géométrique Quantique"
 		"ozone": return "Faille d'Ozone (Orage)"
 		"prism": return "Grotte Prismatique"
-		"steampunk": return "Bastion Vapeur"
+		"steampunk": return "Bastion Galactique"
 		"colosseum": return "Colisée Virtuel"
 		_: return b.capitalize()
 
