@@ -415,15 +415,15 @@ const PROFILES: Dictionary = {
 	"cryo":      {"tier": 6, "forms": ["ligne","vague","tirailleurs"],  "pat": "line",     "main": ["sniper", "blinde", "garde"], "alt": ["charge"],       "share": 0.25},
 	"reacteur":  {"tier": 7, "forms": ["coin","vague","embuscade"],  "pat": "burst",    "main": ["kamikaze", "esquive"],         "alt": ["anneau"],              "share": 0.30},
 	"ruche":     {"tier": 8, "forms": ["encerclement","vague"],  "pat": "burst",    "main": ["bull", "esquive"],             "alt": ["rafale", "garde"],              "share": 0.30},
-	"citadelle": {"tier": 9, "forms": ["vague","echelon","feu_et_mouvement"],  "pat": "pincer",   "main": ["tir", "blinde", "lourd", "garde"], "alt": ["mine"], "share": 0.25},
+	"citadelle": {"tier": 9, "forms": ["vague","echelon","feu_et_mouvement"],  "pat": "pincer",   "main": ["tir", "blinde", "lourd", "garde"], "alt": ["tir", "protecteur"], "share": 0.25},
 	"abyss":     {"tier": 10, "forms": ["encerclement","spirale","fer_a_cheval"], "pat": "encircle", "main": ["guide", "garde"],     "alt": ["charge", "esquive"],           "share": 0.25},
 	"ether":     {"tier": 11, "forms": ["leurre","embuscade","tenaille"], "pat": "dropin",   "main": ["charge", "esquive"],           "alt": ["kamikaze"],         "share": 0.20},
-	"titans":    {"tier": 12, "forms": ["coin","echelon","ligne"], "pat": "ahead",    "main": ["mine", "blinde", "garde"], "alt": ["orbe"],       "share": 0.25},
+	"titans":    {"tier": 12, "forms": ["coin","echelon","ligne"], "pat": "ahead",    "main": ["mine", "blinde", "garde"], "alt": ["orbe", "protecteur"],       "share": 0.25},
 	"orbit":     {"tier": 13, "forms": ["spirale","feu_et_mouvement","encerclement"], "pat": "fan",      "main": ["tir", "barrage", "esquive"],   "alt": ["charge"],           "share": 0.30},
 	"quantum":   {"tier": 14, "forms": ["tenaille","leurre","encerclement"], "pat": "sandwich", "main": ["kamikaze", "esquive"],         "alt": ["sniper", "blinde", "garde"], "share": 0.35},
 	"ozone":     {"tier": 15, "forms": ["echelon","tenaille","tirailleurs"], "pat": "line",     "main": ["charge", "esquive"],           "alt": ["rafale", "garde"],   "share": 0.30},
-	"prism":     {"tier": 16, "forms": ["fer_a_cheval","feu_et_mouvement","spirale"], "pat": "fan",      "main": ["eventail", "blinde", "garde"], "alt": ["kamikaze"],   "share": 0.30},
-	"steampunk": {"tier": 17, "forms": ["vague","tenaille","echelon","fer_a_cheval"], "pat": "sandwich", "main": ["mine", "blinde", "garde"], "alt": ["orbe", "esquive"],     "share": 0.35},
+	"prism":     {"tier": 16, "forms": ["fer_a_cheval","feu_et_mouvement","spirale"], "pat": "fan",      "main": ["eventail", "blinde", "garde"], "alt": ["tir", "protecteur"],   "share": 0.30},
+	"steampunk": {"tier": 17, "forms": ["vague","tenaille","echelon","fer_a_cheval"], "pat": "sandwich", "main": ["mine", "blinde", "garde"], "alt": ["tir", "protecteur"],     "share": 0.35},
 	"colosseum": {"tier": 18, "forms": ["encerclement","tenaille","leurre","vague","feu_et_mouvement","spirale"], "pat": "gates",    "main": ["anneau", "blinde", "garde"], "alt": ["charge", "kamikaze", "rafale"], "share": 0.40},
 }
 var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
@@ -462,10 +462,16 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 			"bull":
 				d["behavior"] = "rush"
 				d["bull"] = true
+				d["zigzag"] = 0.4   # approche en lacets (Runner de survivor-td) : moins previsible qu'une ligne droite
 			"rafale", "eventail", "sniper", "guide", "anneau", "orbe":
 				d["tir_style"] = String(f)
 			"esquive":
 				d["esquive"] = true
+			"zigzag":
+				d["zigzag"] = 0.4
+			"protecteur":
+				d["protecteur"] = true
+				d["tint_proteur"] = true
 			"garde":
 				d["garde"] = true
 				d["garde_cd"] = lerpf(11.0, 6.5, (t - 1.0) / 17.0)
@@ -641,6 +647,24 @@ func _squad_tick(delta: float) -> void:
 		_squad_t = lerpf(24.0, 11.0, float(tier - 1) / 17.0)
 		_spawn_squad()
 
+## ELITE ALEATOIRE (survivor-td §8.2 : 5 % + 0,5 %/min) : un ennemi isole sur ~20 devient elite (or-rose, 3x PV, 1,6x degats, +10 %
+## de vitesse sous le plafond de 80 % du joueur) et laisse un butin. Les escouades ont deja leurs grades.
+func _maybe_elite(e: Enemy) -> void:
+	if not PROFILES.has(current_biome) or not e.kind.begins_with("mech") or e.grade != "":
+		return
+	var minutes: float = GameState.run_time / 60.0
+	if randf() >= minf(0.05 + 0.005 * minutes, 0.25):
+		return
+	e.grade = "elite"
+	e.hp *= 3.0
+	e.hp_max = e.hp
+	e.contact_dmg *= 1.6
+	e.attack_dmg *= 1.6
+	e.speed = minf(e.speed * 1.1, float(player.base_speed) * 0.8) if "base_speed" in player else e.speed
+	e.drops_bonus = true
+	e._spr.self_modulate = Color(1.5, 0.7, 1.4)
+	e._spr.scale *= 1.1
+
 func _spawn_squad() -> void:
 	var prof: Dictionary = PROFILES.get(current_biome, {})
 	var pool: Array = BIOME_POOL.get(current_biome, [])
@@ -700,6 +724,7 @@ func _spawn() -> void:
 	game.enemy_layer.add_child(e)
 	e.setup(kind, _def_for(kind), player, game)
 	_scale_enemy(e)
+	_maybe_elite(e)
 
 ## Spawn one enemy at a fixed world point (beacon structures use this). Respects the enemy cap and
 ## the arena bounds, and scales the enemy like any normal spawn.

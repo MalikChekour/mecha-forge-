@@ -160,6 +160,30 @@ func _ready() -> void:
 	g.enemy_layer.add_child(sh)
 	sh.setup("mech09", sp._role_def("mech09", ["tir", "garde"], 9), pl, g)
 	_check(sh._garde_dome != null and sh._garde_dome.position.y < -5.0, "bouclier centre sur le corps (decalage %.0f px au-dessus de l'origine)" % -sh._garde_dome.position.y)
+	# protecteur : marque ses allies proches (-40 %), zigzag sur les melee, LOD des lointains
+	var pr: Enemy = Enemy.new()
+	pr.global_position = Vector2(500, 0)
+	g.enemy_layer.add_child(pr)
+	pr.setup("mech09", sp._role_def("mech09", ["tir", "protecteur"], 9), pl, g)
+	var al: Enemy = Enemy.new()
+	al.global_position = Vector2(560, 0)
+	g.enemy_layer.add_child(al)
+	al.setup("mech09", sp._role_def("mech09", ["tir"], 9), pl, g)
+	pr._enemies_frame = -1   # le test ne fait pas avancer les images physiques : on invalide le cache a la main
+	pr._protecteur_tick(0.6)
+	_check(pr.protecteur and al._prot_t > 0.0, "protecteur : allie proche marque (%.1f s)" % al._prot_t)
+	var hpa: float = al.hp
+	al.take_damage(10.0)
+	_check(absf((hpa - al.hp) - 6.0) < 0.05, "protecteur : degats reduits de 40 %% (%.2f au lieu de 10)" % (hpa - al.hp))
+	_check(float(sp._role_def("mech09", ["bull"], 9).get("zigzag", 0.0)) > 0.0, "bull : approche en lacets (zigzag)")
+	var far: Enemy = Enemy.new()
+	far.global_position = Vector2(2000, 0)
+	g.enemy_layer.add_child(far)
+	far.setup("mech09", sp._role_def("mech09", ["tir"], 9), pl, g)
+	var skipped: int = 0
+	for i in 9:
+		if far._lod_far(1.0 / 30.0): skipped += 1
+	_check(skipped == 6, "LOD : ennemi lointain mis a jour 1 image sur 3 (%d/9 sautees)" % skipped)
 	var ae: Enemy = Enemy.new()
 	ae.global_position = Vector2(400, 0)
 	g.enemy_layer.add_child(ae)

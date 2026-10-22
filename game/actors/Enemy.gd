@@ -54,6 +54,11 @@ var grade: String = ""             # "" soldat | "lieutenant" | "chef"
 const _DIR_NAMES: Array = ["right", "front_right", "front", "front_left", "left", "back_left", "back", "back_right"]
 const _DIR_DEG: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0, "left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0}
 # >>> IA22 vars (21/10 : signatures de tir par niveau, esquive, ordre du chef)
+var zigzag: float = 0.0            # 0..1 : oscillation laterale de l'approche (Runner/Flyer de survivor-td)
+var protecteur: bool = false       # projette un bouclier de zone sur ses allies (Shielder de survivor-td)
+var _prot_t: float = 0.0           # >0 : protege par un allie (-40 % de degats)
+var _prot_cd: float = 0.0
+var _lod_n: int = 0
 var tir_style: String = ""         # "" tir de palier | rafale | eventail | sniper | guide | anneau | orbe
 var esquive: bool = false
 var _esq_cd: float = 2.0
@@ -412,6 +417,9 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	garde = bool(def.get("garde", false))
 	garde_cd = float(def.get("garde_cd", 9.0))
 	tir_style = String(def.get("tir_style", ""))
+	zigzag = float(def.get("zigzag", 0.0))
+	protecteur = bool(def.get("protecteur", false))
+	_prot_cd = randf_range(0.0, 0.5)
 	esquive = bool(def.get("esquive", false))
 	_esq_cd = randf_range(1.0, 3.0)
 	_garde_cd_t = randf_range(2.0, 6.0)
@@ -597,6 +605,8 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		_hp_fill.z_index = 6
 		add_child(_hp_fill)
 
+	if protecteur:
+		_spr.self_modulate = Color(0.6, 1.25, 1.05)   # teal : reconnaissable, a tuer en premier
 	if garde:
 		_garde_dome = GardeDome.new()
 		_garde_dome.radius = _body_radius * 1.55
@@ -1097,6 +1107,12 @@ func _physics_process(delta: float) -> void:
 		_atk_cd = 0.0
 	if rank >= 3:
 		_check_boss_phase()
+	if player_valid and rank < 3 and _lod_far(delta):
+		return
+	if _prot_t > 0.0:
+		_prot_t -= delta
+	if protecteur:
+		_protecteur_tick(delta)
 	if garde:
 		_garde_tick(delta, player_valid)
 	if tir_style != "" or esquive:
@@ -1509,6 +1525,8 @@ func _physics_process(delta: float) -> void:
 			
 				_allies = proches
 				_sep_vec = separation
+			if zigzag > 0.0 and dist > 200.0 and behavior == "rush" and _bull_state != 2:
+				desired_vel += Vector2(-dir.y, dir.x) * sin(float(Time.get_ticks_msec()) * 0.005 + _wander_phase) * speed * zigzag
 			if form_w > 0.0 and _bull_state != 2 and _phase != _PH_DASH_ACTIVE and not _kamikaze_arming:
 				var to_slot: Vector2 = form_pos - global_position
 				var sl: float = to_slot.length()
@@ -1865,6 +1883,30 @@ func _style_tick(delta: float, player_valid: bool) -> void:
 						game.spawn_vfx("fire_blast", global_position - _esq_dir * 18.0, _esq_dir.angle() + PI, 0.35, Color(0.4, 0.8, 1.0))
 					break
 
+## LOD de distance (leçon opensurvivor « enemy targeting throttle ») : au-dela de ~560 px (hors ecran) un ennemi ne
+## reflechit qu'1 image sur 3 et poursuit sa course sur sa vitesse acquise entre-temps. Les boss ne sont pas concernes.
+func _lod_far(delta: float) -> bool:
+	if global_position.distance_squared_to(player.global_position) < 313600.0:
+		return false
+	_lod_n += 1
+	if _lod_n % 3 == 0:
+		return false
+	global_position += velocity * delta * field_slow
+	return true
+
+## PROTECTEUR (Shielder de survivor-td) : toutes les 0,5 s, marque ses allies a <= 220 px (bouclier de zone -40 % de degats,
+## ~0,8 s de remanence) et pulse un anneau pour qu'on le reconnaisse : le tuer en premier retire la protection.
+func _protecteur_tick(delta: float) -> void:
+	_prot_cd -= delta
+	if _prot_cd > 0.0:
+		return
+	_prot_cd = 0.5
+	for e in _shared_enemies():
+		if e != self and e is Enemy and (e as Enemy).alive and global_position.distance_squared_to((e as Node2D).global_position) < 48400.0:
+			(e as Enemy)._prot_t = 0.8
+	if game != null and game.has_method("spawn_vfx") and Enemy._fx_ok() and int(Time.get_ticks_msec() / 500) % 3 == 0:
+		game.spawn_vfx("aaa_shockwave", global_position + _visual_offset(), 0.0, 1.1, Color(0.4, 1.0, 0.85))
+
 func _garde_on() -> void:
 	_garde_t = 2.2
 	_garde_cd_t = garde_cd + 2.2
@@ -1965,6 +2007,8 @@ func take_damage(amount: float, source_chassis: String = "", weapon_id: String =
 			_brisure_pips.z_index = 6
 			add_child(_brisure_pips)
 		_brisure_pips.count = _brisure_stacks
+	if _prot_t > 0.0:
+		amount *= 0.6             # bouclier de zone d'un protecteur allie
 	if grade != "chef" and chef_ref != null and is_instance_valid(chef_ref) and chef_ref.alive \
 			and global_position.distance_squared_to((chef_ref as Node2D).global_position) < 144400.0:
 		amount *= 0.75            # « ordre de defense » : tant que le chef est a portee de voix (~380 px)
