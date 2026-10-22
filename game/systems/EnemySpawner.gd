@@ -224,7 +224,7 @@ func _process(delta: float) -> void:
 		# pire qu'un rythme normal), puis le laisse remonter jusqu'a sa vraie valeur.
 		var full_mult: float = spawn_mult * float(GameState.diff().get("spawn", 1.0)) * Protocols.spawn_rate
 		var eff_mult: float = lerpf(minf(1.0, full_mult), full_mult, grace)
-		_spawn_t = rate / maxf(0.2, eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)))
+		_spawn_t = rate / maxf(0.2, eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)) * _phase_rate())
 		_spawn()
 	if _bosses_fired < BOSS_SCHEDULE.size() and GameState.run_time >= float(BOSS_SCHEDULE[_bosses_fired]["t"]) * _boss_scale:
 		if not _boss_alive():   # never let two bosses coexist -> avoids double next_map in one frame
@@ -426,6 +426,25 @@ const PROFILES: Dictionary = {
 	"steampunk": {"tier": 17, "forms": ["vague","tenaille","echelon","fer_a_cheval"], "pat": "sandwich", "main": ["mine", "blinde", "garde"], "alt": ["tir", "protecteur"],     "share": 0.35},
 	"colosseum": {"tier": 18, "forms": ["encerclement","tenaille","leurre","vague","feu_et_mouvement","spirale"], "pat": "gates",    "main": ["anneau", "blinde", "garde"], "alt": ["charge", "kamikaze", "rafale"], "share": 0.40},
 }
+## PHASES DE NIVEAU (lecons opensurvivor « wave_profiles » + survivor-td « enemyPool par minute ») : 4 phases annoncees par un
+## bandeau, qui ajustent la part du role secondaire, la cadence d'apparition et la chance d'elite. Debut a 60 % de la part
+## nominale (avant : constante), fin a 150 % : un niveau monte en pression au lieu de rester plat.
+const PHASES: Array = [
+	{"t": 0.0,   "label": "PRISE DE CONTACT",     "share": 0.6, "rate": 1.00, "elite": 1.0},
+	{"t": 60.0,  "label": "PRESSION MONTANTE",    "share": 0.9, "rate": 1.05, "elite": 1.2},
+	{"t": 180.0, "label": "MENACE D'ELITE",       "share": 1.2, "rate": 1.15, "elite": 1.6},
+	{"t": 360.0, "label": "COTE D'ALERTE",        "share": 1.5, "rate": 1.30, "elite": 2.0},
+]
+var _phase_idx: int = -1
+func _phase() -> Dictionary:
+	var t: float = GameState.run_time
+	var k: int = 0
+	for i in PHASES.size():
+		if t >= float(PHASES[i]["t"]):
+			k = i
+	return PHASES[k]
+func _phase_rate() -> float:
+	return float(_phase()["rate"])
 var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
 var _pat_n: int = 0
 var _anchor: float = 0.0
@@ -491,7 +510,7 @@ func _def_for(kind: String) -> Dictionary:
 	if prof.is_empty() or not DEFS.has(kind) or not kind.begins_with("mech"):
 		return DEFS[kind] if DEFS.has(kind) else {}
 	var tier: int = int(prof["tier"])
-	var use_alt: bool = not (prof["alt"] as Array).is_empty() and randf() < float(prof["share"]) + 0.004 * float(tier)
+	var use_alt: bool = not (prof["alt"] as Array).is_empty() and randf() < minf((float(prof["share"]) + 0.004 * float(tier)) * float(_phase()["share"]), 0.65)
 	var key: String = "%s|%d|%d" % [current_biome, tier, 1 if use_alt else 0]
 	if not _prof_defs.has(key):
 		_prof_defs[key] = _role_def(kind, prof["alt"] if use_alt else prof["main"], tier)
@@ -631,6 +650,12 @@ func _squad_tick(delta: float) -> void:
 	if "velocity" in player:
 		_pspeed = lerpf(_pspeed, (player.velocity as Vector2).length(), 1.0 - exp(-delta / 3.0))
 	var p: Vector2 = player.global_position
+	var ph: Dictionary = _phase()
+	var pi: int = PHASES.find(ph)
+	if pi != _phase_idx:
+		if _phase_idx >= 0:
+			_announce("", "PHASE : " + String(ph["label"]), Color(1.0, 0.45, 0.3))
+		_phase_idx = pi
 	for q in _squads:
 		var ms: Array = q.live()
 		if ms.is_empty():
@@ -653,10 +678,10 @@ func _maybe_elite(e: Enemy) -> void:
 	if not PROFILES.has(current_biome) or not e.kind.begins_with("mech") or e.grade != "":
 		return
 	var minutes: float = GameState.run_time / 60.0
-	if randf() >= minf(0.05 + 0.005 * minutes, 0.25):
+	if randf() >= minf((0.05 + 0.005 * minutes) * float(_phase()["elite"]), 0.3):
 		return
 	e.grade = "elite"
-	e.hp *= 3.0
+	e.hp *= minf(2.0 + 0.5 * minutes, 5.0)   # opensurvivor : l'elite devient plus coriace avec le temps
 	e.hp_max = e.hp
 	e.contact_dmg *= 1.6
 	e.attack_dmg *= 1.6
@@ -763,13 +788,13 @@ func _scale_enemy(e: Enemy) -> void:
 	# (dasher) et le coefficient individuel (+/-15 %) s'ajoutent par-dessus : brefs, pas permanents.
 	if player != null and "base_speed" in player:
 		e.speed = minf(e.speed, float(player.base_speed) * 0.80)
-	var hp_scale: float = (1.0 + GameState.run_time * 0.0011) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * Protocols.enemy_hp
+	var hp_scale: float = (1.0 + GameState.run_time * 0.0020) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * Protocols.enemy_hp
 	e.hp *= hp_scale
 	e.hp_max = e.hp
 	if e.shield_max > 0.0:               # shields scale with HP too, else late-game shields are trivial
 		e.shield_max *= hp_scale
 		e.shield = e.shield_max
-	var dmg_scale: float = (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * Protocols.enemy_dmg
+	var dmg_scale: float = (1.0 + GameState.run_time * 0.0008) * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * Protocols.enemy_dmg
 	e.contact_dmg *= dmg_scale
 	e.attack_dmg *= dmg_scale             # ranged bolts scale too (else late-game shooters are harmless)
 

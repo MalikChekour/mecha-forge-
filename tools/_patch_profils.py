@@ -31,6 +31,9 @@ if old in s and "_squad_tick(delta)" not in s:
 old = "eff_mult * (1.0 + 0.02 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get(\"tier\", 1)) - 1))"
 if old in s:
     s = s.replace(old, "eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get(\"tier\", 1)) - 1))", 1)
+marker = "eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get(\"tier\", 1)) - 1))"
+if marker in s and "* _phase_rate()" not in s:
+    s = s.replace(marker, marker + " * _phase_rate()", 1)
 if crlf:
     s = s.replace("\n", "\r\n")
 open(p, "w", encoding="utf-8", newline="").write(s)
