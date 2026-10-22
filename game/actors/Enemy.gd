@@ -56,6 +56,7 @@ const _DIR_DEG: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, 
 # >>> IA22 vars (21/10 : signatures de tir par niveau, esquive, ordre du chef)
 var zigzag: float = 0.0            # 0..1 : oscillation laterale de l'approche (Runner/Flyer de survivor-td)
 var _tier_tint: Variant = null     # teinte de hierarchie (Mark 2 / inter / mini / boss), restauree apres une garde
+var zone_shift: bool = true        # false : sa mort ne fait PAS changer de zone (boss 1/2 de la hierarchie par niveau)
 var protecteur: bool = false       # projette un bouclier de zone sur ses allies (Shielder de survivor-td)
 var _prot_t: float = 0.0           # >0 : protege par un allie (-40 % de degats)
 var _prot_cd: float = 0.0
@@ -420,6 +421,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	tir_style = String(def.get("tir_style", ""))
 	zigzag = float(def.get("zigzag", 0.0))
 	protecteur = bool(def.get("protecteur", false))
+	zone_shift = bool(def.get("zone_shift", true))
 	_prot_cd = randf_range(0.0, 0.5)
 	esquive = bool(def.get("esquive", false))
 	_esq_cd = randf_range(1.0, 3.0)
@@ -2144,7 +2146,7 @@ func _die() -> void:
 			game.endless_boss_down()
 		else:
 			Events.run_won.emit()   # the endboss is down -> victory
-	elif rank >= 3 and game != null and game.has_method("next_map"):
+	elif rank >= 3 and zone_shift and game != null and game.has_method("next_map"):
 		game.next_map()         # a major threat cleared -> shift to a new, harder zone
 	if _anims.has("die"):
 		play("die", true)

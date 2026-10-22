@@ -369,7 +369,9 @@ const TIERS: Dictionary = {
 	"mk2":   {"flags": ["blinde", "garde"],                          "hp": 2.2,  "dmg": 1.25, "size": 1.15, "radius": 1.1,  "rank": 0, "tint": Color(1.5, 0.85, 0.65), "label": "MARK 2"},
 	"inter": {"flags": ["lourd", "blinde", "garde"],                 "hp": 6.0,  "dmg": 1.5,  "size": 1.45, "radius": 1.35, "rank": 1, "tint": Color(1.6, 0.55, 0.5),  "label": "INTERMEDIAIRE"},
 	"mini":  {"flags": ["barrage", "blinde", "garde", "esquive"],    "hp": 12.0, "dmg": 1.5,  "size": 1.8,  "radius": 1.7,  "rank": 2, "tint": Color(1.7, 0.4, 0.9),   "label": "MINI-BOSS"},
-	"boss":  {"flags": ["barrage", "lourd", "blinde", "garde", "esquive"], "hp": 18.0, "dmg": 1.6, "size": 2.3, "radius": 2.1, "rank": 4, "tint": Color(1.8, 0.35, 0.3), "label": "BOSS"},
+	"boss1": {"flags": ["barrage", "blinde", "garde"],       "hp": 10.0, "dmg": 1.4, "size": 2.0, "radius": 1.9, "rank": 3, "tint": Color(1.8, 0.5, 0.35), "label": "BOSS", "zone_shift": false},
+	"boss2": {"flags": ["barrage", "lourd", "blinde", "garde"], "hp": 14.0, "dmg": 1.5, "size": 2.15, "radius": 2.0, "rank": 3, "tint": Color(1.8, 0.4, 0.3), "label": "BOSS", "zone_shift": false},
+	"boss":  {"flags": ["barrage", "lourd", "blinde", "garde"], "hp": 18.0, "dmg": 1.6, "size": 2.3, "radius": 2.1, "rank": 4, "tint": Color(1.8, 0.35, 0.3), "label": "BOSS"},
 }
 var _boss_ref: Variant = null
 var _tier_last: Dictionary = {"inter": 120.0, "summon": 0.0}
@@ -395,9 +397,10 @@ func _tier_def(tier_name: String) -> Dictionary:
 	d["rank"] = int(tp["rank"])
 	d["tint"] = tp["tint"]
 	d["speed"] = float(d["speed"]) * (0.9 if int(tp["rank"]) >= 2 else 1.0)
-	if tier_name == "boss":
+	d["zone_shift"] = bool(tp.get("zone_shift", true))
+	if tier_name.begins_with("boss"):
 		d["ogive"] = true
-		d["final"] = not GameState.endless
+		d["final"] = (tier_name == "boss") and not GameState.endless
 		d["behavior"] = "ranged"
 		d["prefer_dist"] = 300.0
 	_prof_defs[key] = d
@@ -422,7 +425,7 @@ func _spawn_tier(tier_name: String) -> Enemy:
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 1.5 + float(tp["size"]), tp["tint"])
 	_announce("", "!  %s  !" % String(tp["label"]), tp["tint"])
 	Audio.sfx("boss", 0.1)
-	if tier_name == "boss":
+	if tier_name.begins_with("boss"):
 		_boss_ref = e
 		Audio.music("boss")
 	return e
@@ -437,23 +440,36 @@ func _live_tier(rank_min: int) -> int:
 func _boss_up() -> bool:
 	return _boss_ref != null and is_instance_valid(_boss_ref) and _boss_ref.alive
 
+## ORDRE D'APPARITION (22/10, patron : « l'ordre d'apparition » ; base de reference : docs/SURVIVOR_IO_PLAYBOOK.md §5, timeline
+## d'evenements scriptee, boss 5/10/15 min, mini-boss/elite entre, la pietaille « devient blindee » apres un boss) :
+##   0:00  ennemi de BASE (continu)            1:30  MARK 2 introduits (part croissante)      2:00  INTERMEDIAIRE (puis ~1 / 90 s, 2 max)
+##   3:00  MINI-BOSS (puis 8:00, 12:00)        5:00  BOSS 1 (la base devient surtout MARK 2)  10:00 BOSS 2 (Mark 2 dominant)
+##   15:00 BOSS FINAL (victoire) ; invocations d'escouade toutes les 22 s pendant un boss, apparitions x0,6.
+const TIER_EVENTS: Array = [
+	{"t": 180.0, "tier": "mini"}, {"t": 300.0, "tier": "boss1"}, {"t": 480.0, "tier": "mini"},
+	{"t": 600.0, "tier": "boss2"}, {"t": 720.0, "tier": "mini"}, {"t": 900.0, "tier": "boss"},
+]
 ## Echeancier de la hierarchie (appele par _squad_tick, apres les phases)
 func _tier_tick(_delta: float) -> void:
 	var t: float = GameState.run_time
-	if t >= 150.0 and t - float(_tier_last["inter"]) >= 80.0 and not _boss_up() and _live_tier(1) < 2:
+	if t >= 120.0 and t - float(_tier_last["inter"]) >= 90.0 and not _boss_up() and _live_tier(1) < 2:
 		_tier_last["inter"] = t
 		_spawn_tier("inter")
-	for slot in [300.0, 600.0]:
-		if t >= slot and not _tier_fired.has(slot) and not _boss_up():
-			_tier_fired[slot] = true
-			_spawn_tier("mini")
-	if t >= 900.0 and not _tier_fired.has(900.0):
-		_tier_fired[900.0] = true
-		_spawn_tier("boss")
+	for ev in TIER_EVENTS:
+		var et: float = float(ev["t"])
+		if t >= et and not _tier_fired.has(et) and not _boss_up():
+			_tier_fired[et] = true
+			_spawn_tier(String(ev["tier"]))
 	if _boss_up() and t - float(_tier_last["summon"]) >= 22.0:
 		_tier_last["summon"] = t
 		_spawn_squad(true)
 
+## MARK 2 : part des apparitions de base. Introduits des 1:30, puis « swap de base » apres le boss 1 (5:00) et le boss 2 (10:00).
 func _mk2_share() -> float:
-	return clampf((GameState.run_time - 120.0) / 300.0, 0.0, 1.0) * 0.35
+	var t: float = GameState.run_time
+	if t >= 600.0:
+		return 0.8
+	if t >= 300.0:
+		return 0.6
+	return clampf((t - 90.0) / 210.0, 0.0, 1.0) * 0.35
 ## <<< PROFILS DE NIVEAU
