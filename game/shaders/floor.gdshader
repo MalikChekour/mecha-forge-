@@ -90,24 +90,23 @@ void fragment() {
         col += vec3(0.05, 0.12, 0.15) * sheen * 0.5;
         
     } else {
-        // BIOME 3: VOLCANIC
-        float low = fbm(world * 0.005);
-        float high = vnoise(world * 0.05);
-        col = mix(vec3(0.01, 0.01, 0.02), vec3(0.05, 0.04, 0.04), low);
-        col *= mix(0.8, 1.2, high);
-        float r1 = ridged(world * 0.008);
-        float r2 = ridged(world * 0.008 + vec2(10.0, 10.0));
-        float vein = smoothstep(0.72, 0.90, r1) + smoothstep(0.78, 0.94, r2);
-        float pulse = pow(sin(TIME * 1.5 + low * 10.0) * 0.5 + 0.5, 1.5);
-        vec3 lava_col = mix(vec3(0.9, 0.25, 0.02), vec3(1.0, 0.65, 0.12), pulse);
-        col = mix(col, lava_col, clamp(vein, 0.0, 1.0) * (1.0 + pulse * 0.6));
-        // ROUND embers (per-cell dot via radial falloff, never square)
-        vec2 ec = world * 0.02 + vec2(TIME * 0.4, 0.0);
+        // BIOME 3: FORGE ET CONSTRUCTION (ex-volcanic, no magma)
+        float low = fbm(world * 0.004);
+        float high = vnoise(world * 0.06);
+        col = mix(vec3(0.06, 0.07, 0.09), vec3(0.14, 0.16, 0.20), low);
+        col *= mix(0.9, 1.1, high);
+        float r1 = ridged(world * 0.007);
+        float r2 = ridged(world * 0.007 + vec2(15.0, 15.0));
+        float seam = smoothstep(0.82, 0.94, r1) + smoothstep(0.84, 0.96, r2);
+        float pulse = pow(sin(TIME * 2.0 + low * 8.0) * 0.5 + 0.5, 2.0);
+        vec3 energy_col = mix(vec3(0.1, 0.5, 0.85), vec3(0.2, 0.8, 1.0), pulse);
+        col = mix(col, energy_col, clamp(seam, 0.0, 1.0) * (0.55 + pulse * 0.35));
+        vec2 ec = world * 0.015;
         vec2 cid = floor(ec);
         vec2 cf = fract(ec) - 0.5;
         float eh = hash12(cid);
-        float ember = step(0.986, eh) * smoothstep(0.32, 0.0, length(cf)) * (0.5 + 0.5 * sin(TIME * 7.0 + eh * 40.0));
-        col += vec3(1.0, 0.45, 0.12) * ember * 0.7;
+        float marker = step(0.985, eh) * smoothstep(0.3, 0.0, length(cf));
+        col += vec3(0.9, 0.7, 0.1) * marker * 0.5;
     }
 
 	// SOFT RADIAL VIGNETTE

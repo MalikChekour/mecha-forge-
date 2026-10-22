@@ -70,7 +70,7 @@ const BIOME_MODS: Dictionary = {
 	"tech":      {"label": "SECTEUR TECH"},
 	"earth":     {"label": "FRICHE"},
 	"spaceship": {"label": "GRAVITE FAIBLE  —  tout va plus vite", "player_speed_mult": 1.15, "enemy_speed_mult": 1.12, "player_proj_speed": 1.3},
-	"volcanic":  {"label": "VOLCAN  —  eruptions de lave", "hazard": "lava"},
+	"volcanic":  {"label": "FORGE & CONSTRUCTION  —  banc d'assemblage & soudure robotisée", "hazard": "press"},
 	"desert":    {"label": "DESERT  —  ennemis enrages (+18% vit.)", "enemy_speed_mult": 1.18},
 	"ice":       {"label": "GLACE  —  sol glissant", "enemy_speed_mult": 0.8, "player_inertia": 0.82},
 	"jungle":    {"label": "JUNGLE  —  nuees denses (+35%)", "enemy_spawn_mult": 1.35},
@@ -96,7 +96,7 @@ const CUT_LINES: Dictionary = {
 	"tech":      {"in": "La cite-machine est tombee. Quelque chose bouge encore dans les neons.", "out": "Le silence revient sur les tours mortes."},
 	"earth":     {"in": "La nature a repris la ruine. Les charognards aussi.", "out": "La friche respire de nouveau."},
 	"spaceship": {"in": "Gravite defaillante. L'epave derive, et elle n'est pas vide.", "out": "L'epave se tait. Cap sur les etoiles."},
-	"volcanic":  {"in": "La fournaise ne pardonne pas. Eux non plus.", "out": "Les flammes retombent. Tu tiens encore debout."},
+	"volcanic":  {"in": "Les chaînes de montage grondent. Les automates d'assemblage sont en surcharge.", "out": "L'atelier retrouve son calme. Les machines se réalignent."},
 	"desert":    {"in": "Rien ne survit ici, sauf ce qui te chasse.", "out": "La tempete est passee. Toi aussi."},
 	"ice":       {"in": "Le gel ralentit tout. Ne baisse pas ta garde.", "out": "Le blizzard s'apaise. Ton coeur brule encore."},
 	"jungle":    {"in": "La jungle grouille. Ils sont partout.", "out": "La canopee s'illumine, paisible enfin."},
@@ -124,7 +124,7 @@ const MAP_PHASE_NAMES: Dictionary = {
 	"tech":      ["Hall d'Assemblage", "Fonderie des Pistons", "Quai de Chargement"],
 	"desert":    ["Dunes de Silice", "Mer de Verre", "Cratère Solaire"],
 	"jungle":    ["Lisière Envahie", "Canopée Profonde", "Cœur Végétal"],
-	"volcanic":  ["Failles de Lave", "Haut Fourneau", "Cœur de Magma"],
+	"volcanic":  ["Hall de Découpe Laser", "Ligne d'Assemblage des Châssis", "Banc d'Essai & Blindage"],
 	"swamp":     ["Quartiers Noyés", "Ponts Submergés", "Centre Inondé"],
 	"cryo":      ["Cryo-Voute", "Serres Gelees", "Lac de Permafrost"],
 	"reacteur":  ["Bassins Toxiques", "Salle des Turbines", "Noyau Fissure"],
@@ -1989,25 +1989,25 @@ func hit_stop(dur: float) -> void:
 	Engine.time_scale = 1.0
 	_hitstop = false
 
-# Volcanic biome ground hazard: a telegraphed lava eruption that hurts the player if
-# they linger in it. Telegraphs (red ring grows) then bursts.
+# Forge & Construction ground hazard: a telegraphed hydraulic stamping press shockwave
+# (cyan & gold industrial alert with metal sparks, no magma).
 func _spawn_lava_hazard() -> void:
 	var ang: float = randf() * TAU
 	var pos: Vector2 = player.global_position + Vector2(cos(ang), sin(ang)) * randf_range(110.0, 430.0)
 	var R: float = 96.0
 	var warn: Sprite2D = Sprite2D.new()
-	warn.texture = Tex.ring(Color(1.0, 0.32, 0.1), 128)
+	warn.texture = Tex.ring(Color(0.2, 0.85, 1.0), 128)
 	warn.material = _add_mat()
 	warn.position = pos
 	warn.scale = Vector2.ONE * (R * 2.0 / 128.0)
-	warn.modulate = Color(1.0, 0.4, 0.1, 0.0)
+	warn.modulate = Color(0.2, 0.85, 1.0, 0.0)
 	fx_layer.add_child(warn)
 	var tw: Tween = create_tween()
 	tw.tween_property(warn, "modulate:a", 0.85, 0.7)   # telegraph window
 	tw.tween_callback(func() -> void:
-		_flash_sprite(pos, Color(1.0, 0.6, 0.2), R * 2.4, 0.22)
-		_ring(pos, Color(1.0, 0.5, 0.15), R * 0.5, R * 1.7, 0.32)
-		_debris(pos, Color(1.0, 0.5, 0.2), 14, 0.5, 150.0, 380.0)
+		_flash_sprite(pos, Color(0.3, 0.85, 1.0), R * 2.4, 0.22)
+		_ring(pos, Color(1.0, 0.85, 0.2), R * 0.5, R * 1.7, 0.32)
+		_debris(pos, Color(0.8, 0.85, 0.95), 14, 0.5, 150.0, 380.0)
 		Events.screen_shake.emit(4.0)
 		if GameState.alive and player != null and player.global_position.distance_to(pos) < R:
 			if player.has_method("take_damage"):
@@ -3101,7 +3101,7 @@ func _process(delta: float) -> void:
 			elif _ph != _map_phase_shown:
 				_map_phase_shown = _ph
 				show_banner("ZONE : " + String(MAP_PHASE_NAMES[_scatter.biome][_ph]), Color(0.75, 0.9, 1.0))
-		if _hazard == "lava" and player != null:
+		if (_hazard == "lava" or _hazard == "press") and player != null:
 			_hazard_t -= delta
 			if _hazard_t <= 0.0:
 				_hazard_t = randf_range(1.1, 1.9)

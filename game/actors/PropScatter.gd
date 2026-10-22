@@ -262,6 +262,8 @@ const DECOR: Dictionary = {
 	"volcanic_cheminee_fonderie": {"f": "volcanic_terrain_cheminee_fonderie", "hp": 260.0, "sz": 190.0, "nature": true, "block": 0.40},
 	"volcanic_pont_roulant":      {"f": "volcanic_terrain_pont_roulant", "hp": 280.0, "sz": 215.0, "nature": true, "block": 0.42},
 	"volcanic_bordure_basalte":   {"f": "volcanic_bordure_basalte", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
+	"volcanic_robot_constructeur":{"f": "g_cyber_reactor", "hp": 220.0, "sz": 180.0, "destruct": true, "glow": "cyan",
+	                               "builder_bot": true, "builder_r": 220.0, "builder_heal": 4.0},
 
 	# ===== Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) =====
 	"swamp_tourelle_dca":         {"f": "swamp_tourelle_dca_toit", "hp": 180.0, "sz": 170.0, "destruct": true, "glow": "orange",
@@ -555,18 +557,19 @@ const INFO: Dictionary = {
 	"jungle_colonne_racines": ["Colonne envahie", "Vestige de béton armé étranglé par de massives racines végétales : obstacle solide.", "green"],
 	"jungle_statue_mecha": ["Statue de mecha envahie", "Carcasse d'un titan antique figée sous la végétation tropicale : couverture lourde.", "green"],
 	"jungle_mur_vegetal": ["Mur végétal", "Frontière impénétrable de jungle dense et de ruines enchevêtrées.", "green"],
-	# ===== Bible des niveaux — Niveau 4 (volcanic) =====
-	"volcanic_mortier_scories": ["Mortier à scories", "Tire des obus de lave en cloche qui laissent une flaque de magma brûlante pendant 5 s.", "orange"],
-	"volcanic_event_magma": ["Évent de magma", "Éruption volcanique périodique : jaillissement de lave qui enflamme le sol pendant 3 s.", "orange"],
-	"volcanic_lingotiere": ["Lingotière de fonderie", "Détruisez-la : XP, ferraille, soin ou compétence (lueur dorée = compétence garantie).", "gold"],
-	"volcanic_marteau_pilon": ["Marteau-pilon géant", "Frappe lourde toutes les 7 s : onde de choc écrasante qui repousse et inflige de lourds dégâts.", "orange"],
-	"volcanic_creuset_basculant": ["Creuset basculant", "Bascule périodiquement et déverse une ligne de métal en fusion incandescente.", "orange"],
-	"volcanic_bassin_trempe": ["Bassin de trempe", "RESTEZ 1 s dedans : éteint les brûlures et réduit de 50 % les dégâts de feu pendant 8 s.", "cyan"],
-	"volcanic_electroaimant": ["Électroaimant de ferrailleur", "Approchez-vous : attire puissamment tous les pickups et gemmes dans un rayon de 450 u.", "cyan"],
-	"volcanic_soufflerie_braises": ["Soufflerie à braises", "Rafale brûlante périodique : repousse violemment et applique une brûlure pendant 4 s.", "orange"],
-	"volcanic_cheminee_fonderie": ["Cheminée de fonderie", "Cheminée en briques noircies et scories : obstacle solide bloquant tirs et déplacements.", "orange"],
-	"volcanic_pont_roulant": ["Pont roulant effondré", "Poutrelle d'acier torsadée et chaînes pendantes : couverture lourde de fonderie.", "orange"],
-	"volcanic_bordure_basalte": ["Paroi de basalte", "Muraille infranchissable de colonnes de basalte noir et de veines de lave.", "orange"],
+	# ===== Bible des niveaux — Niveau 4 (volcanic / Forge & Construction) =====
+	"volcanic_mortier_scories": ["Lance-rivets lourd", "Tire des grappes de rivets industriels à haute vélocité marquant la zone d'impact.", "orange"],
+	"volcanic_event_magma": ["Buse de purge pneumatique", "Décharge cyclique d'air comprimé et de plasma de découpe surchauffé.", "cyan"],
+	"volcanic_lingotiere": ["Conteneur d'alliages", "Détruisez-le : alliages de précision, ferraille, soin ou compétence.", "gold"],
+	"volcanic_marteau_pilon": ["Marteau-pilon d'estampage", "Presse industrielle géante : onde de choc mécanique écrasante repoussant les mechas.", "orange"],
+	"volcanic_creuset_basculant": ["Rampe de découpe laser", "Projette une ligne de découpe laser thermique haute précision sur les tôles de blindage.", "orange"],
+	"volcanic_bassin_trempe": ["Bassin de refroidissement cryogénique", "RESTEZ 1 s dedans : stabilise la température du mecha et restaure 15 % de vos PV.", "cyan"],
+	"volcanic_electroaimant": ["Électroaimant de manutention", "Attire puissamment tous les composants, ferrailles et cristaux dans un rayon de 450 u.", "cyan"],
+	"volcanic_soufflerie_braises": ["Turbine de ventilation lourde", "Souffle pneumatique haute pression repoussant violemment les mechas.", "cyan"],
+	"volcanic_cheminee_fonderie": ["Tour d'assemblage mécatronique", "Structure verticale de guidage et de câblage industriel : obstacle infranchissable.", "orange"],
+	"volcanic_pont_roulant": ["Portique de levage lourd", "Poutre maîtresse et treuil robotique de manutention de châssis : couverture robuste.", "orange"],
+	"volcanic_bordure_basalte": ["Paroi de hangar blindé", "Blindage modulaire d'usine et piliers en acier renforcé délimitant l'atelier.", "cyan"],
+	"volcanic_robot_constructeur": ["Station de montage automatisée", "RESTEZ à proximité : active un faisceau de nanoréparation (+4 PV/s) et repousse les assaillants.", "cyan"],
 	# ===== Bible des niveaux — Niveau 5 (swamp) =====
 	"swamp_tourelle_dca": ["Batterie antiaérienne", "Tire une salve de 4 obus à fusée qui éclatent en anneau de shrapnel dévastateur.", "orange"],
 	"swamp_vanne_crue": ["Vanne de crue", "Libère périodiquement une vague torrentielle sur 400 u qui repousse violemment.", "cyan"],
@@ -907,7 +910,7 @@ const BIOME_DECOR: Dictionary = {
 	              "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_colonne_racines", "jungle_statue_mecha"],
 	"volcanic":  ["volcanic_mortier_scories", "volcanic_event_magma", "volcanic_lingotiere",
 	              "volcanic_marteau_pilon", "volcanic_creuset_basculant", "volcanic_bassin_trempe",
-	              "volcanic_electroaimant", "volcanic_soufflerie_braises", "volcanic_cheminee_fonderie", "volcanic_pont_roulant"],
+	              "volcanic_electroaimant", "volcanic_soufflerie_braises", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "volcanic_robot_constructeur"],
 	"swamp":     ["swamp_tourelle_dca", "swamp_vanne_crue", "swamp_coffre_banque", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_lampadaire_phare", "swamp_barricade_vehicules", "swamp_brouilleur_radio", "swamp_gratte_ciel", "swamp_pont_brise"],
 	"cryo":      ["cryo_canon_azote", "cryo_condenseur_givre", "cryo_caisson_echantillons", "cryo_teleporteur_paire", "cryo_mur_glace_regen", "cryo_cuve_stase", "cryo_serveur_givre",
 	              "plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "brouillard_froid", "radiateur", "pic_de_glace", "borne_thermique", "glace_fragile"],
@@ -968,9 +971,9 @@ const BIOME_MAP_SEGMENTS: Dictionary = {
 		["jungle_mortier_plante", "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_cosse_geante"], # Map 3 - Cœur Végétal
 	],
 	"volcanic": [
-		["volcanic_cheminee_fonderie", "volcanic_event_magma", "volcanic_soufflerie_braises"], # Map 1 - Failles de Lave
-		["volcanic_pont_roulant", "volcanic_creuset_basculant", "volcanic_marteau_pilon"],       # Map 2 - Haut Fourneau
-		["volcanic_mortier_scories", "volcanic_bassin_trempe", "volcanic_electroaimant", "volcanic_lingotiere"], # Map 3 - Cœur de Magma
+		["volcanic_cheminee_fonderie", "volcanic_event_magma", "volcanic_soufflerie_braises"], # Map 1 - Hall de Découpe Laser
+		["volcanic_pont_roulant", "volcanic_creuset_basculant", "volcanic_marteau_pilon", "volcanic_robot_constructeur"], # Map 2 - Ligne d'Assemblage des Châssis
+		["volcanic_mortier_scories", "volcanic_bassin_trempe", "volcanic_electroaimant", "volcanic_lingotiere"], # Map 3 - Banc d'Essai & Blindage
 	],
 	"swamp": [
 		["swamp_gratte_ciel", "swamp_bouee_mine", "swamp_barricade_vehicules"],          # Map 1 - Quartiers Noyés
@@ -1982,6 +1985,11 @@ class Prop extends StaticBody2D:
 	var _bellows_dmg: float = 18.0
 	var _bellows_dir: Vector2 = Vector2.RIGHT
 
+	var _builder_bot: bool = false
+	var _builder_r: float = 220.0
+	var _builder_heal: float = 4.0
+	var _builder_pulse_t: float = 0.0
+
 	# ===== Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) =====
 	var _flak_turret: bool = false
 	var _flak_cd: float = 5.0
@@ -2611,6 +2619,10 @@ class Prop extends StaticBody2D:
 			_bellows_r = float(def.get("bellows_r", 170.0))
 			_bellows_dmg = float(def.get("bellows_dmg", 18.0))
 			_bellows_dir = Vector2.LEFT if flip else Vector2.RIGHT
+		_builder_bot = bool(def.get("builder_bot", false))
+		if _builder_bot:
+			_builder_r = float(def.get("builder_r", 220.0))
+			_builder_heal = float(def.get("builder_heal", 4.0))
 
 		# ===== Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) =====
 		_flak_turret = bool(def.get("flak_turret", false))
@@ -3472,12 +3484,10 @@ class Prop extends StaticBody2D:
 			if _vent_t <= 0.0:
 				_vent_t = _vent_cd
 				if game != null and game.has_method("spawn_ground_zone"):
-					game.spawn_ground_zone(global_position, _vent_r, _vent_tell, _vent_dmg, Color(1.0, 0.35, 0.1), kind)
-					if game.has_method("spawn_signature_vfx"):
-						game.spawn_signature_vfx("volcanic_fx_obus_lave", global_position, 0.0, 1.15, 0.5, Color(1.0, 0.45, 0.15))
-					elif game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 1.6, Color(1.0, 0.5, 0.1))
-					Audio.sfx("explosion", 0.1)
+					game.spawn_ground_zone(global_position, _vent_r, _vent_tell, _vent_dmg, Color(0.2, 0.85, 1.0), kind)
+					if game.has_method("spawn_vfx"):
+						game.spawn_vfx("shockwave", global_position, 0.0, 1.6, Color(0.3, 0.85, 1.0))
+					Audio.sfx("w_plasma", 0.08)
 
 		# Marteau-pilon géant : frappe écrasante et onde de choc
 		if _power_hammer and dist < 1300.0:
@@ -3485,15 +3495,15 @@ class Prop extends StaticBody2D:
 			if _hammer_t <= 0.0:
 				_hammer_t = _hammer_cd
 				if game != null and game.has_method("spawn_ground_zone"):
-					game.spawn_ground_zone(global_position, _hammer_r, _hammer_tell, _hammer_dmg, Color(1.0, 0.55, 0.1), kind)
+					game.spawn_ground_zone(global_position, _hammer_r, _hammer_tell, _hammer_dmg, Color(1.0, 0.75, 0.2), kind)
 					if game.has_method("spawn_vfx"):
-						game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(1.0, 0.6, 0.2))
+						game.spawn_vfx("shockwave", global_position, 0.0, 2.5, Color(1.0, 0.8, 0.3))
 					Events.screen_shake.emit(5.0)
 					if dist < _hammer_r * 1.5 and dist > 1.0:
 						var away: Vector2 = (_plr.global_position - global_position).normalized()
 						_plr.global_position += away * 65.0
 
-		# Creuset basculant : déverse du métal en fusion en ligne
+		# Rampe de découpe laser : projette une ligne thermique haute précision
 		if _crucible and dist < 1300.0:
 			_crucible_t -= delta
 			if _crucible_t <= 0.0:
@@ -3502,14 +3512,14 @@ class Prop extends StaticBody2D:
 					var half: Vector2 = _crucible_dir * (_crucible_len * 0.5)
 					var z: GroundZone = GroundZone.new()
 					z.radius = 36.0; z.delay = _crucible_tell; z.damage = _crucible_dmg
-					z.color = Color(1.0, 0.45, 0.1)
+					z.color = Color(0.2, 0.85, 1.0)
 					z.shape = "line"; z.line_from = -half; z.line_to = half
 					z.stun_duration = 0.0; z.fx_kind = kind
 					z.game = game; z.player = _plr
 					game.enemy_layer.add_child(z)
 					z.global_position = global_position + half
 
-		# Bassin de trempe : éteint les brûlures et soigne 15 %
+		# Bassin de refroidissement : éteint les surchauffes et soigne 15 %
 		if _quench_pool:
 			if _quench_cd_t > 0.0:
 				_quench_cd_t -= delta
@@ -3520,8 +3530,8 @@ class Prop extends StaticBody2D:
 					game.spawn_vfx("shockwave", global_position, 0.0, 2.0, Color(0.4, 0.85, 1.0))
 				Audio.sfx("powerup", 0.08)
 
-		# Électroaimant de ferrailleur : aspire les pickups proches
-		if _scrap_magnet and dist < _magnet_r:   # 17/10 : ne marchait qu'a < 220 u alors que la pancarte promet 450 u
+		# Électroaimant de manutention : aspire les pickups proches
+		if _scrap_magnet and dist < _magnet_r:
 			var r2_mag: float = _magnet_r * _magnet_r
 			for p in get_tree().get_nodes_in_group("pickups"):
 				if p is Node2D and is_instance_valid(p):
@@ -3529,16 +3539,35 @@ class Prop extends StaticBody2D:
 					if to_p.length_squared() <= r2_mag and to_p.length_squared() > 16.0:
 						(p as Node2D).global_position += to_p.normalized() * 420.0 * delta
 
-		# Soufflerie à braises : rafale brûlante périodique
+		# Turbine de ventilation lourde : souffle pneumatique périodique
 		if _ember_bellows and dist < 1200.0:
 			_bellows_t -= delta
 			if _bellows_t <= 0.0:
 				_bellows_t = _bellows_cd
 				if game != null and game.has_method("spawn_ground_zone"):
 					var b_pos: Vector2 = global_position + _bellows_dir * (_bellows_r * 0.6)
-					game.spawn_ground_zone(b_pos, _bellows_r * 0.5, _bellows_tell, _bellows_dmg, Color(1.0, 0.45, 0.15), kind)
+					game.spawn_ground_zone(b_pos, _bellows_r * 0.5, _bellows_tell, _bellows_dmg, Color(0.3, 0.85, 1.0), kind)
 					if dist < _bellows_r:
 						_plr.global_position += _bellows_dir * 55.0
+
+		# Station de montage automatisée : nanoréparation et répulsion robotique
+		if _builder_bot and dist < 1200.0:
+			if dist < _builder_r and _plr != null:
+				if _plr.has_method("heal"):
+					_plr.heal(_builder_heal * delta)
+			_builder_pulse_t -= delta
+			if _builder_pulse_t <= 0.0:
+				_builder_pulse_t = 3.5
+				var r2_b: float = (_builder_r * 0.9) * (_builder_r * 0.9)
+				for e in _enemies():
+					if e is Node2D:
+						var away: Vector2 = (e as Node2D).global_position - global_position
+						if away.length_squared() <= r2_b and away.length_squared() > 1.0:
+							(e as Node2D).global_position += away.normalized() * 50.0
+							if e.has_method("take_damage"):
+								e.take_damage(16.0)
+				if game != null and game.has_method("spawn_vfx"):
+					game.spawn_vfx("shockwave", global_position, 0.0, 1.8, Color(0.2, 0.85, 1.0))
 
 		# --- Bible des niveaux — Niveau 5 (La Cité Déchue / swamp) ---
 		# Batterie antiaérienne : salve de 4 obus à fusée éclatant en anneau d'éclats
