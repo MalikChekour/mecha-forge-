@@ -1,50 +1,60 @@
-# MISSION ANTIGRAVITY — Équilibrer MECHA-FORGE : montée en puissance du mécha joueur vs ennemis (18 niveaux) + hiérarchie Mark 2 / intermédiaire / mini-boss / boss
+# MISSION ANTIGRAVITY — Équilibrer MECHA-FORGE : mécha joueur vs ennemis, difficulté croissante, hiérarchie d'ennemis
 
-Projet : `C:\Users\Administrator\mecha-forge` (Godot 4.3, jeu dans `game/`). Réponds en FRANÇAIS. Ne colle jamais de clé (`.itch_key`, `.meshy_key`). Commit `443fd0c` = point de départ (état WIP ci-dessous). Retours possibles : tags `v11.96` (dernière version publiée avec phases), `v11.88`.
+Projet : `C:\Users\Administrator\mecha-forge` (Godot 4.3, jeu dans `game/`). Réponds en FRANÇAIS. Ne colle jamais de clé (`.itch_key`, `.meshy_key`). Départ : dernier commit de la branche courante (message « feat(hierarchie): ordre d'apparition scripté… »). Retours possibles : tags `v11.96` (dernière version publiée), `v11.88`.
 
-## ORDRE D'APPARITION DE LA HIÉRARCHIE (tranché le 22/10 d'après `docs/SURVIVOR_IO_PLAYBOOK.md` §5, que le patron pensait connu)
-Timeline scriptée par niveau (`TIER_EVENTS`, `_tier_tick`, `_mk2_share` dans `tools/_profils_block.gd.txt`) : **0:00 ennemi de base** (continu) → **1:30 Mark 2** introduits (0→35 % des apparitions) → **2:00 intermédiaire** (puis 1 / 90 s, 2 max vivants) → **3:00 mini-boss** (puis 8:00 et 12:00) → **5:00 BOSS 1** (rang 3, ne change PAS de zone, la base devient surtout Mark 2 : 60 %) → **10:00 BOSS 2** (Mark 2 : 80 %) → **15:00 BOSS FINAL** (victoire). Pendant un boss : apparitions ×0,6 et une escouade invoquée toutes les 22 s. Mesuré (niv. 1, bot) : mini-boss 3:00 OK ; **boss 1 met ~170 s à tomber (il reste à 55 PV pendant ~80 s : à investiguer — esquive retirée des boss, garde 12 %, portée/kiting ?)**. Si le patron veut un autre ordre, le dire et adapter `TIER_EVENTS`.
+## 1. Objectif (demande du patron)
+Trouver l'équilibre entre **la montée en puissance du mécha du joueur** et **la difficulté croissante des ennemis** sur les **18 niveaux** : de plus en plus dur d'un niveau à l'autre, **jamais impossible**. Les niveaux 1–5 doivent être « normaux » (pas trop faciles). Recalculer aussi **la vitesse mécha joueur vs ennemis**. Intégrer la hiérarchie d'ennemis **base → Mark 2 → intermédiaire → mini-boss → boss**.
 
-## Demande du patron
-« Trouve l'équilibre entre la montée en puissance du mécha du joueur dans le jeu versus les ennemis et la difficulté croissante. La vitesse aussi doit être recalculée, mécha joueur vs ennemi. Intègre aussi les ennemis Mark 2, intermédiaires, mini-boss et boss. » Principe : difficulté croissante d'un niveau à l'autre **mais jamais impossible**. Les 5 premiers niveaux doivent être « normaux » (pas trop faciles), les derniers durs mais jouables.
+## 2. Ordre d'apparition (décidé — source : `docs/SURVIVOR_IO_PLAYBOOK.md` §5, timeline scriptée)
+Pour chaque niveau (déjà codé : `TIER_EVENTS`, `_tier_tick`, `_mk2_share`) :
 
-## L'outil de mesure (NOUVEAU, à utiliser — c'est le cœur de la mission)
-`game/_bal_run.tscn` = le VRAI jeu en headless avec le bot joueur intégré, un chapitre, N secondes de partie accélérées :
+| Temps | Événement |
+|---|---|
+| 0:00 | **Ennemi de base** (continu) |
+| 1:30 | **Mark 2** introduits (0→35 % des apparitions) |
+| 2:00 | **Intermédiaire** (puis 1 / 90 s, 2 vivants max) |
+| 3:00 | **Mini-boss** (puis 8:00 et 12:00) |
+| 5:00 | **Boss 1** (rang 3, ne change pas de zone) — la base devient surtout Mark 2 (60 %) |
+| 10:00 | **Boss 2** — Mark 2 à 80 % |
+| 15:00 | **Boss final** — sa mort = victoire |
+
+Pendant un boss : apparitions ×0,6 et une escouade invoquée toutes les 22 s. Les rangs réutilisent le sprite de l'ennemi du niveau (teinte, taille, PV, armement, défenses différents ; pas de nouveau modèle 3D, **ne pas utiliser Meshy**). Si le patron demande un autre ordre, adapter `TIER_EVENTS`.
+
+## 3. Outil de mesure (à utiliser — c'est le cœur de la mission)
+Le vrai jeu en headless avec le bot joueur intégré, un chapitre, durée accélérée :
 ```
-Godot_v4.3-stable_win64_console.exe --headless --path game res://_bal_run.tscn -- --ch=8 --secs=900 --scale=6
+C:\Users\Administrator\godot_ci\Godot_v4.3-stable_win64_console.exe --headless --path game res://_bal_run.tscn -- --ch=8 --secs=900 --scale=6
 ```
-(`C:\Users\Administrator\godot_ci\Godot_v4.3-stable_win64_console.exe`). ~15 s de mur par minute de partie à ×6 ; la partie s'arrête à la mort du bot. Il affiche toutes les 60 s (20 s après 4:40) : niveau, PV, ennemis vivants, kills, vitesses joueur/ennemis, et les unités de hiérarchie vivantes avec leurs PV (`[mini 424/616][boss 1960/1960]`). Lancer les 18 chapitres en 3 groupes parallèles (voir l'historique : boucles `for c in ...; do ... done > /tmp/bal_N.log &`), puis `python tools/bal_resume.py <fichier>` donne le tableau (fin, niveau, PV min %, ennemis, kills). Résultats historiques de mes 6 séries dans `tools/bal_resultats/bal_all*.txt`.
-⚠️ Le bot est NAÏF (il prend toujours la 1re carte du draft, n'esquive pas) → c'est un **plancher** de puissance : un humain fait mieux. ⚠️ Forte VARIANCE d'une partie à l'autre : faire **≥ 3 passes par niveau** avant de conclure (un seul tirage m'a trompé plusieurs fois).
+Sortie (toutes les 60 s, puis 20 s après 4:40) : niveau, PV, ennemis vivants, kills, vitesses joueur/ennemis, rangs vivants avec PV (`[mini 424/616][boss1 399/509]`). ≈ 15 s de mur par minute de partie ; s'arrête à la mort du bot. Lancer les 18 chapitres en 3 groupes parallèles, puis `python tools/bal_resume.py <fichier>` donne le tableau. Mes séries historiques : `tools/bal_resultats/bal_all*.txt`.
+⚠️ Le bot est **naïf** (1re carte du draft, n'esquive pas) = plancher de puissance. ⚠️ **Forte variance** : faire **≥ 3 passes par niveau** avant de conclure.
 
-## Constats mesurés (bot, méta-progression nulle)
-- Sans correctifs : niveaux 6/9/10/12/14 mortels en 25–50 s (le bot reste niveau 2–4, 7–75 kills, 100+ ennemis vivants → spirale « pas d'XP → pas de puissance »). Les niveaux 1–5 et beaucoup d'autres tenaient 900 s avec 100–200 ennemis et 50–85 % de PV mini → trop faciles et **aucune tendance croissante avec le niveau**.
-- Causes trouvées et traitées : tireurs en foule (budget de tir global), boucliers/garde/protecteur dès t=0, escouades trop grosses au début, dégâts par coup trop forts aux hauts niveaux (mines 24 PV, kamikaze 24, sniper), vitesse ennemie : à 0,64× la vitesse du joueur → rushes mortels niveaux 10–16 en < 90 s (la **vitesse est le réglage le plus sensible**).
-- Reste à régler : **morts précoces aléatoires (≈ 25 % des parties) aux niveaux hauts (9, 10, 12, 13, 15, 16, 18) entre 26 s et 170 s**, alors que d'autres tirages du même niveau survivent 900 s. Dernier correctif en cours (NON mesuré, mon banc a été interrompu) : pas de charge/kamikaze/mine avant 1:00, 1re escouade à 40 s, débit de tir ×0,6→1 sur la 1re minute.
-- Hiérarchie : mini-boss (616 PV niv. 1) tombe en ~20–40 s ✔ ; intermédiaire OK ; **boss final niv. 1 : 1960 PV, ~190 s pour le tuer** (trop tanky : garde+bouclier+esquive) et **boss niv. 7 a tué le bot**. J'ai baissé boss ×40→×18 PV, dégâts ×2,2→×1,6 et mini ×16→×12 (NON re-mesuré).
+## 4. Ce qui est mesuré
+- Au départ : niveaux 6/9/10/12/14 mortels en 25–50 s ; beaucoup d'autres niveaux tenaient 900 s avec 50–85 % de PV mini → trop faciles et **aucune tendance croissante avec le niveau**.
+- Causes traitées : tireurs en foule (budget de tir global), boucliers/garde/protecteur dès t=0, escouades trop grosses au début, dégâts par coup trop forts (mines, kamikaze, sniper), **vitesse ennemie à 0,64× le joueur → rushes mortels niveaux 10–16 en < 90 s** (la vitesse est le réglage le plus sensible ; actuellement 0,50→0,53× du joueur de référence 336 px/s).
+- **Reste ouvert** : ≈ 25 % de **morts précoces aléatoires** (26–170 s) aux niveaux hauts (9, 10, 12, 13, 15, 16, 18). Dernier correctif NON mesuré : pas de charge/kamikaze/mine avant 1:00, 1re escouade à 40 s, débit de tir ×0,6→1 sur la 1re minute.
+- **Boss 1 niveau 1** : tombe en ~170 s (reste à 55 PV pendant ~80 s) → trop long, à investiguer (garde 12 %, kiting hors de portée, invocations…). J'ai retiré l'esquive des boss. **Boss final niveau 7** avait tué le bot (PV/dégâts baissés depuis, non remesuré). Mini-boss ~20–60 s OK, intermédiaires OK.
 
-## État du code (ce qui existe déjà — lire avant de modifier)
-- `game/systems/EnemySpawner.gd` : bloc `>>> PROFILS DE NIVEAU` généré par `tools/_patch_profils.py` depuis **`tools/_profils_block.gd.txt` (modifier le .txt puis relancer le script, sinon écrasé)**. Contient : `PROFILES` (18 niveaux : motif d'apparition, rôles main/alt, formations, `tier`), `PHASES` (4 phases annoncées : part du rôle secondaire, cadence, chance d'élite), `TIERS` (mk2 / inter / mini / boss : multiplicateurs PV, dégâts, taille, rang, teinte, drapeaux), `_tier_tick` (inter toutes les ~80 s dès 2:30, mini à 5:00 et 10:00, **boss final à 15:00 = victoire**, invoque une escouade toutes les 22 s, ralentit les apparitions ×0,6 tant qu'il vit), `_mk2_share` (Mark 2 : 0→35 % des apparitions entre 2:00 et 7:00), `_role_def` (vitesse = 336 × (0,50 + 0,002×(tier−1)), cadence de tir 2,0→1,4 s, dégâts, portée, visée), `_def_for` (montée en charge sur les 2 premières minutes), `_special_cap`, squads (`Squad.gd` : 13 formations, chef/lieutenants), `_scale_enemy` (PV ×(1+0,04×(tier−1))×(1+0,002×t), dégâts ×(1+0,0008×t), **pas de dégâts par niveau**).
-- `game/actors/Enemy.gd` : visée, styles de tir (rafale, éventail, sniper, guidé, anneau, orbe), garde (bouclier actif), esquive, protecteur de zone, zigzag, LOD de distance, séparation échelonnée (perf), **budget de tir global** `Enemy.fire_rate`/`_fire_ok` (seau à jetons, exempte rang ≥ 2), hiérarchie via clé de def `tint`.
-- Joueur : `game/actors/Player.gd` (base_speed = 320 × mécha 1,05 = 336 px/s ; +12 % par carte vitesse ; PV 70 + méta + mécha), XP : `GameState.add_xp` (xp_to_next ×1,35+2 → **exponentiel**, alors que survivor-td utilise 5+3N linéaire ; niveau 17–20 à 15 min), méta plafonnée à ≈ +30 % (`GameState.META`), upgrades dans `Game.gd` (`UPGRADES`, `_apply_upgrade`). `_drive_bot` = bot du banc.
-- Plafonds de sécurité existants à conserver : vitesse ennemie ≤ 80 % de la vitesse réelle du joueur (`_scale_enemy`), ENEMY_CAP 220, brèche de 60° dans l'encerclement.
+## 5. À faire
+1. **Supprimer les morts précoces** : ajouter au banc un **journal des sources de dégâts** (rôle/style de tir/mine/kamikaze/contact) pour identifier QUELLE combinaison tue, au lieu de deviner ; corriger.
+2. **Courbe de difficulté cible** (bot naïf, méta nulle, ≥ 3 passes × 18 niveaux) : **aucune mort avant 3:00** ; survie médiane **décroissante** : niv. 1–3 ≈ 900 s, 4–9 ≈ 600–900 s, 10–15 ≈ 450–700 s, 16–18 ≈ 300–550 s ; un humain (méta + bonnes cartes) doit pouvoir gagner chaque niveau.
+3. **Hiérarchie** : mini-boss 20–60 s à tuer, boss 1/2 ≈ 60–120 s, boss final ≈ 60–120 s pour un bot niveau ~17 ; attaques télégraphiées lisibles. Vérifier en jeu (banc + captures Web) que les rangs sont visuellement distincts (teintes `TIERS`, bandeaux « MARK 2 / INTERMEDIAIRE / MINI-BOSS / BOSS »), que la **victoire** se déclenche à la mort du boss final (`is_final`, `Events.run_won`), que le mode SANS FIN (`GameState.endless`) ne casse pas, que `_boss_up()` ralentit bien les apparitions.
+4. **Courbe de puissance du joueur** : `GameState.add_xp` fait `xp_to_next ×1,35+2` (exponentiel) alors que survivor-td (`github.com/xarlord/survivor-td`, GAME_SPEC.md §6) utilise 5+3N (linéaire) ; PV ennemis +12 %/min. Évaluer si le joueur cale en fin de partie, comparer avec survivor-td et opensurvivor (`Kalaith/opensurvivor`, `game/systems/spawning.py`), proposer **et mesurer** les réglages (courbe d'XP, effet des cartes, `GameState.META` plafonnée ≈ +30 %). **Annoncer au patron tout changement de l'économie de méta.**
+5. **Vitesses** : mesurer le ratio ennemi/joueur (le banc affiche `vit_joueur` / `vit_ennemis_moy` ; le joueur monte à 376–472 px/s avec les cartes), régler par rôle (rush, charge, kamikaze, tireur, mineur, boss), vérifier que la fuite reste possible et que le kiting n'est pas gratuit.
+6. **Performance** (le patron se plaint des saccades en foule) : ne pas dégrader. Le budget de tir global (`Enemy._fire_ok`, `fire_rate`) et la séparation échelonnée sont là pour ça ; coût logique ≈ 18 ms/image à 200 ennemis en headless — ne pas le faire remonter.
 
-## Ce qu'il faut faire
-1. **Finir le calibrage avec le banc** : objectif mesuré sur ≥ 3 passes × 18 niveaux, bot naïf, méta nulle :
-   - **Aucune mort avant 3:00 à aucun niveau** (supprimer les 25 % de morts précoces : trouver QUELLE combinaison tue — ajouter au banc un journal des sources de dégâts : type d'ennemi/rôle, style de tir, mine, kamikaze, contact — au lieu de deviner) ;
-   - **survie médiane décroissante avec le niveau** : niv. 1–3 ≈ 900 s (victoire possible), 4–9 ≈ 600–900 s, 10–15 ≈ 450–700 s, 16–18 ≈ 300–550 s ; un humain (méta + bonnes cartes) doit pouvoir gagner chaque niveau ;
-   - boss final tué en **60–120 s** par un bot de niveau ~17 (niv. 1) et jamais « injuste » (télégraphes lisibles) ; mini-boss 20–60 s ; intermédiaires 10–25 s.
-2. **Courbe de puissance du joueur** : évaluer si `xp_to_next ×1,35+2` (exponentiel) fait caler le niveau du joueur en fin de partie face à des ennemis qui gagnent +12 %/min de PV ; comparer avec survivor-td (`https://github.com/xarlord/survivor-td`, GAME_SPEC.md §6 : 5+3N linéaire, 3 cartes, évolution garantie niveau 5 + catalyseur) et opensurvivor (`Kalaith/opensurvivor`, `game/systems/spawning.py` : profils de vague, PV ×(1+2,3/min), élite ×(2+1/min), débit d'attaque/limiteur de cibles). Proposer + mesurer les réglages : courbe d'XP, taille/effet des cartes, méta (`GameState.META`), éventuellement PV/niveau du mécha. **Ne rien changer à l'économie de la méta sans l'annoncer.**
-3. **Vitesses** (demande explicite) : mesurer le ratio vitesse ennemi/joueur (joueur de référence 336 px/s ; le banc affiche `vit_joueur`/`vit_ennemis_moy`, le joueur monte à 376–472 avec les cartes). Règle actuelle : 0,50→0,53 du joueur de référence ; 0,64 s'est révélé mortel. Chercher le meilleur compromis par rôle (rush/charge/kamikaze/tireur/mineur/boss), vérifier que la fuite reste possible et que le kiting n'est pas gratuit à 100 % de vitesse joueur.
-4. **Hiérarchie Mark 2 / inter / mini / boss** : vérifier en jeu (banc + captures Web) que chaque rang est visuellement distinct (teintes dans `TIERS`, taille, bandeaux « MARK 2 / INTERMEDIAIRE / MINI-BOSS / BOSS »), que la victoire se déclenche bien à la mort du boss final (`is_final`, `Events.run_won`), que le mode SANS FIN (`GameState.endless`) ne casse pas (boss non final), et que `_boss_up()` ralentit bien les apparitions. Les ennemis partagent le sprite du niveau (pas de nouveau modèle 3D, ne PAS utiliser Meshy).
-5. **Performance** (le patron se plaint des saccades en foule) : ne pas dégrader — le budget de tir global et la séparation échelonnée sont là pour ça ; mesurer le coût logique à 200 ennemis (~18 ms/image en headless avant les derniers ajouts) et ne pas le faire remonter.
+## 6. Où est le code
+- `game/systems/EnemySpawner.gd` — bloc `>>> PROFILS DE NIVEAU` **généré** par `tools/_patch_profils.py` depuis **`tools/_profils_block.gd.txt` : modifier le .txt puis relancer le script, sinon l'édition est écrasée**. Contient `PROFILES` (18 niveaux : motif d'apparition, rôles, formations, `tier`), `PHASES`, `TIERS` + `TIER_EVENTS`, `_role_def` (vitesse, cadence, dégâts), `_def_for` (montée en charge 2 premières minutes), `_scale_enemy` (PV ×(1+0,04×(tier−1))×(1+0,002×t), dégâts ×(1+0,0008×t), pas de dégâts par niveau).
+- `game/systems/Squad.gd` (13 formations, chef/lieutenants), `game/actors/Enemy.gd` (visée, styles de tir, garde, esquive, protecteur, budget de tir global, LOD).
+- Joueur : `game/actors/Player.gd` (base_speed 320 × mécha 1,05), `game/autoload/GameState.gd` (XP, `META`), `game/scenes/Game.gd` (`UPGRADES`, `_apply_upgrade`, `_drive_bot`).
+- Plafonds de sécurité à conserver : vitesse ennemie ≤ 80 % de celle du joueur, ENEMY_CAP 220, brèche de 60° dans l'encerclement.
 
-## Contraintes
-- Pack Web < 200 Mo (116 Mo actuellement). Tests à garder verts : `_test_escouades`, `_test_profils_niveaux`, `_test_chapters`, `_test_boss_chapitres`, `_test_kill_tracking`, `_test_all_18_chapters_gameplay` (+ en ajouter pour ce que tu crées : budget de tir, montée en charge, hiérarchie, victoire boss).
-- Un commit par étape ; ne pas `git add -A` (dossiers temporaires `web_dbg/`, profils Chrome). Version : `game/project.godot` + 2 lignes `version/name` de `game/export_presets.cfg` (11.96 → 11.97). Nouvelle classe (`class_name`) → `Godot --headless --path game --import` une fois.
-- Publication itch : build Web `--export-release "Web" ../web/index.html` puis `butler push web whimora/mecha-forge:html5 --userversion X` (clé lue depuis `C:\Users\Administrator\.itch_key`, jamais affichée). Le canal met 10–20 min à traiter ; un push est refusé tant que le précédent n'est pas traité. L'upload manuel navigateur ne marche pas (onglet fermé / échec silencieux) : ne pas s'y acharner.
+## 7. Contraintes
+- Pack Web < 200 Mo (116 Mo). Tests à garder verts : `_test_escouades`, `_test_profils_niveaux`, `_test_chapters`, `_test_boss_chapitres`, `_test_kill_tracking`, `_test_all_18_chapters_gameplay` ; en ajouter pour ce que tu crées (budget de tir, montée en charge, calendrier des rangs, victoire boss).
+- Un commit par étape ; pas de `git add -A` (dossiers temporaires `web_dbg/`, profils Chrome). Version : `game/project.godot` + 2 lignes `version/name` de `game/export_presets.cfg` (11.96 → 11.97). Nouvelle `class_name` → `Godot --headless --path game --import` une fois.
+- Publication : build `--export-release "Web" ../web/index.html` puis `butler push web whimora/mecha-forge:html5 --userversion X` (clé lue dans `C:\Users\Administrator\.itch_key`, jamais affichée). Le canal met 10–20 min à traiter et refuse un push tant que le précédent n'est pas traité. L'upload manuel par navigateur échoue : ne pas s'y acharner.
 
-## Livrable
-1. Corrections commitées + tag, build Web, push butler.
-2. **Tableau 18 niveaux** (survie médiane sur ≥ 3 passes, niveau atteint, PV min %, rang de hiérarchie rencontrés, temps pour tuer mini/boss) avant/après.
-3. Liste des réglages modifiés avec la mesure qui les justifie.
-4. Liste honnête de ce qui n'a PAS pu être vérifié (le bot n'est pas un humain ; aucune capture Web des nouveaux rangs n'a été vue par moi).
+## 8. Livrable
+1. Corrections commitées + tag + build Web + push butler.
+2. **Tableau 18 niveaux** avant/après : survie médiane (≥ 3 passes), niveau atteint, PV min %, rangs rencontrés, temps pour tuer mini-boss/boss.
+3. Liste des réglages modifiés, chacun avec la mesure qui le justifie.
+4. Liste honnête de ce qui n'a PAS pu être vérifié (le bot n'est pas un humain ; aucune capture Web des rangs n'a été vue côté Claude).
