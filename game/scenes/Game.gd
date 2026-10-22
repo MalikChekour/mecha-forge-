@@ -42,7 +42,7 @@ const CHAPTERS: Array = [
 	{"name": "L'Usine",                 "sub": "Le Reveil",                   "biome": "tech",      "diff": 0, "gate": 1000},
 	{"name": "Terres Arides",           "sub": "La Traversee",                "biome": "desert",    "diff": 1, "gate": 2500},
 	{"name": "La Ruine Verte",          "sub": "L'Enlisement",                "biome": "jungle",    "diff": 1, "gate": 5000},
-	{"name": "Le Coeur des Ressources", "sub": "Atelier d'Assemblage",         "biome": "volcanic",  "diff": 2, "gate": 9000},
+	{"name": "La Forge",                 "sub": "Atelier & Usinage",           "biome": "volcanic",  "diff": 2, "gate": 9000},
 	{"name": "La Cite Dechue",          "sub": "Le Souverain",                "biome": "swamp",     "diff": 3, "gate": 15000},
 	# 03/10, suite demandee par le patron (plan "15 maps") : 4 chapitres bonus post-campagne, tous
 	# a la difficulte MAX (pas de palier au-dela de VETERAN) - verifie INOFFENSIF avant d'ajouter :

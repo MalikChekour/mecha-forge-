@@ -410,7 +410,7 @@ func _step_slag(delta: float) -> void:
 			_shake(4.5)
 			if plr != null and plr.global_position.distance_to(tgt) <= 58.0:
 				_hurt(dmg * 0.6, tgt)
-			_burst("slag", tgt, 1.1, Color(1.0, 0.55, 0.12))
+			_burst("slag", tgt, 1.1, Color(0.3, 0.85, 1.0))
 			var d2: Vector2 = _d["dir2"]
 			_d["tgt2"] = tgt + d2 * 130.0
 	else:
@@ -423,10 +423,10 @@ func _step_slag(delta: float) -> void:
 			_shake(3.8)
 			if plr != null and plr.global_position.distance_to(t2) <= 64.0:
 				_hurt(dmg * 0.5, t2)
-			# Flaque de magma qui bulle 5 s
-			_after("magma", t2, 92.0, 5.0, dmg * 0.45, 0.0)
-			_burst("slag", t2, 1.4, Color(1.0, 0.48, 0.1))
-			_sig("volcanic_fx_obus_lave", t2, 1.0, Color(1.0, 0.45, 0.15))
+			# Zone d'impact cinétique & étincelles de soudure (zero magma)
+			_after("kinetic", t2, 92.0, 4.0, dmg * 0.45, 0.0)
+			_burst("slag", t2, 1.4, Color(0.3, 0.85, 1.0))
+			_sig("volcanic_fx_obus_lave", t2, 1.0, Color(0.25, 0.8, 1.0))
 			queue_free()
 
 # ------------------------------------------------------------------ 5 CITE DECHUE (FLAK)
@@ -861,12 +861,12 @@ func _draw_slag() -> void:
 		_shadow(tp, 32.0 + 42.0 * u, 15.0 + 21.0 * u, 0.32 + 0.48 * u)
 	else:
 		_shadow(to_local(global_position + Vector2(0.0, 40.0)), 24.0, 11.0, 0.38)
-	_smoke_trail(Color(0.16, 0.13, 0.12), 28.0, 64.0, 0.58)
+	_smoke_trail(Color(0.25, 0.35, 0.45), 24.0, 48.0, 0.45)
 
 func _glow_slag(g: Node2D) -> void:
-	_glow_trail(g, "ts_flare", Color(1.0, 0.55, 0.15), 44.0, 0.75)
+	_glow_trail(g, "ts_flare", Color(0.25, 0.85, 1.0), 44.0, 0.75)
 	var pulse: float = 1.0 + 0.07 * sin(t * 32.0)
-	_spr(g, "ts_slag_head", Vector2.ZERO, Vector2.ONE * 108.0 * pulse, t * 3.5, Color.WHITE)
+	_spr(g, "ts_slag_head", Vector2.ZERO, Vector2.ONE * 96.0 * pulse, t * 3.5, Color(0.35, 0.9, 1.0))
 
 # ---------------------------------------------------------------- DESSIN 5 CITE DECHUE
 func _draw_flak() -> void:
@@ -1051,8 +1051,9 @@ class TurretAfter extends Node2D:
 	func _draw() -> void:
 		var f: float = _fade()
 		match kind:
-			"magma":
-				_decal("ts_slag_decal", 1.25, 0.95 * f)
+			"magma", "kinetic":
+				_decal("ts_frost_decal", 1.1, 0.65 * f)
+				_steam(Color(0.35, 0.55, 0.75), f * 0.35, 6, 24.0)
 			"acid":
 				_decal("ts_acid_decal", 1.2, 0.9 * f)
 				_steam(Color(0.78, 0.95, 0.4), f * 0.5, 7, 34.0)
@@ -1086,19 +1087,16 @@ class TurretAfter extends Node2D:
 		var f: float = _fade()
 		var pulse: float = 0.8 + 0.2 * sin(t * 5.0 + _seed)
 		match kind:
-			"magma":
-				var sz: float = r * 2.5
-				g.draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)
-				g.draw_texture_rect(TurretShot._T("ts_slag_glow"), Rect2(-sz * 0.5, -sz * 0.5, sz, sz), false, Color(1, 1, 1, f * pulse))
-				g.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-				# bulles de lave qui gonflent puis eclatent en etincelles
+			"magma", "kinetic":
+				var sz: float = r * 2.2
+				TurretShot._spr(g, "ts_ring", Vector2.ZERO, Vector2.ONE * sz, 0.0, Color(0.2, 0.85, 1.0, 0.4 * f * pulse))
 				for i in 6:
-					var ph: float = fmod(t * 1.1 + float(i) * 0.33 + _seed, 1.0)
+					var ph: float = fmod(t * 1.4 + float(i) * 0.33 + _seed, 1.0)
 					var pos: Vector2 = Vector2.RIGHT.rotated(float(i) * 1.15 + _seed) * (r * 0.5)
-					TurretShot._spr(g, "ts_flare", pos + Vector2(0, -ph * 14.0), Vector2.ONE * (12.0 + 32.0 * ph), 0.0, Color(1.0, 0.65, 0.2, (1.0 - ph) * 0.85 * f))
-					if ph > 0.75:
-						var spark_alpha: float = (1.0 - ph) / 0.25 * f
-						TurretShot._spr(g, "ts_flare", pos + Vector2(0, -ph * 14.0), Vector2.ONE * 8.0, 0.0, Color(1.0, 0.95, 0.8, spark_alpha))
+					TurretShot._spr(g, "ts_flare", pos + Vector2(0, -ph * 14.0), Vector2.ONE * (8.0 + 20.0 * ph), 0.0, Color(0.3, 0.85, 1.0, (1.0 - ph) * 0.8 * f))
+					if ph > 0.65:
+						var spark_alpha: float = (1.0 - ph) / 0.35 * f
+						TurretShot._spr(g, "ts_spark", pos + Vector2(0, -ph * 14.0), Vector2.ONE * 10.0, float(i) * 1.2, Color(1.0, 0.9, 0.5, spark_alpha))
 			"acid":
 				var sz2: float = r * 2.4
 				g.draw_set_transform(Vector2.ZERO, _seed, Vector2.ONE)

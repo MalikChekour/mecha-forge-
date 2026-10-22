@@ -17,7 +17,7 @@ const BIOME_TINT: Dictionary = {
 	"tech":      Color(0.72, 0.83, 1.00),
 	"earth":     Color(1.00, 0.83, 0.58),
 	"spaceship": Color(0.87, 0.91, 0.99),
-	"volcanic":  Color(1.00, 0.60, 0.46),
+	"volcanic":  Color(0.82, 0.94, 1.05),
 	"desert":    Color(1.00, 0.86, 0.56),
 	"ice":       Color(0.80, 0.93, 1.00),
 	"jungle":    Color(0.70, 0.94, 0.62),
