@@ -1462,7 +1462,7 @@ func grant_skill() -> void:
 	Audio.sfx("levelup")
 	show_banner("COMPETENCE : %s" % String(_SKILL_NAME.get(id, id)), Palette.BONUS)
 
-func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false, homing: float = 0.0) -> void:
+func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false, homing: float = 0.0, style_tag: String = "bolt") -> void:
 	var b: EnemyProjectile
 	if _enemy_bolts_made - _enemy_proj_pool.size() >= ENEMY_BOLT_CAP:
 		return
@@ -1477,6 +1477,7 @@ func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Col
 	b.size = bolt_size
 	b.missile = is_missile               # tirs lourds = missile (sprite ogive + trainee)
 	b.homing = homing                    # > 0 : palier 3 de l'arme ennemie (« TRAQUEUR »)
+	b.style_tag = style_tag
 	b.setup(pos, dir, dmg, bolt_speed)
 
 func recycle_enemy_bolt(b: EnemyProjectile) -> void:

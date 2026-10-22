@@ -23,6 +23,7 @@ const OVERDRIVE_COOLDOWN: float = 16.0
 var overdrive_cd: float = 0.0
 var alive: bool = true
 var score: int = 0            # run score (kills weighted by rank x difficulty) -> leaderboard/grade
+var death_cause: String = ""  # source qui a porte le coup fatal (banc d'equilibre)
 
 # --- DIFFICULTY (chosen at run start) : scales foes + rewards + score weight ---
 const DIFFICULTY: Array = [
@@ -329,6 +330,7 @@ func reset() -> void:
 	overdrive_time = 0.0
 	overdrive_cd = 0.0
 	alive = true
+	death_cause = ""
 	score = 0
 	difficulty = SaveManager.get_difficulty()   # default from last choice; run-start menu can override
 	endless = bool(SaveManager.setting("endless", false))
@@ -360,7 +362,13 @@ func add_xp(amount: int) -> void:
 	while xp >= xp_to_next:
 		xp -= xp_to_next
 		level += 1
-		xp_to_next = int(round(xp_to_next * 1.35)) + 2
+		# 22/10 (leçons survivor-td / opensurvivor) : au lieu de x1.35 exponentiel qui bloque le joueur
+		# a 15 min (niveau 17-18 bloqué car il faut 2000-3000 XP/niveau face a des PV qui montent de +12%/min),
+		# une courbe progressive permet de continuer a debloquer des ameliorations jusqu'au boss (lvl 22-26).
+		if level < 6:
+			xp_to_next = 5 + (level - 1) * 7
+		else:
+			xp_to_next = 33 + int(round(pow(float(level - 5), 1.38) * 6.5))
 		Events.level_up.emit(level)
 
 func add_scrap(amount: int) -> void:

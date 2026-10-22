@@ -30,7 +30,7 @@ class StubGame extends Node:
 class DummyPlayer extends Node2D:
 	var field_slow: float = 1.0
 	var dmg_total: float = 0.0
-	func take_damage(amount: float, _pos: Vector2 = Vector2.ZERO) -> void:
+	func take_damage(amount: float, _pos: Vector2 = Vector2.ZERO, _tag: String = "") -> void:
 		dmg_total += amount
 
 ## Game.gd n'a pas de class_name -> acces aux const via le script preload, comme _test_decor_cryo.gd.

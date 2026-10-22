@@ -27,7 +27,7 @@ class DummyPlayer extends Node2D:
 	var last_dmg: float = 0.0
 	var stun_calls: int = 0
 	var last_stun: float = 0.0
-	func take_damage(amount: float, _pos: Vector2 = Vector2.ZERO) -> void:
+	func take_damage(amount: float, _pos: Vector2 = Vector2.ZERO, _tag: String = "") -> void:
 		dmg_calls += 1; last_dmg = amount
 	func stun(duration: float) -> void:
 		stun_calls += 1; last_stun = duration

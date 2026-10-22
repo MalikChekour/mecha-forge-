@@ -21,7 +21,7 @@ class DummyPlayer extends Node2D:
 	var velocity: Vector2 = Vector2.ZERO
 	var field_slow: float = 1.0
 	var taken: float = 0.0
-	func take_damage(a: float, _src: Vector2 = Vector2.ZERO) -> void:
+	func take_damage(a: float, _src: Vector2 = Vector2.ZERO, _tag: String = "") -> void:
 		taken += a
 
 var _fail: int = 0

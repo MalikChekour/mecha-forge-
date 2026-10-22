@@ -220,7 +220,7 @@ func _explode() -> void:
 			_:
 				hit = ppos.distance_to(global_position) <= radius
 		if hit:
-			player.take_damage(damage, global_position)
+			player.take_damage(damage, global_position, "zone:" + (fx_kind if fx_kind != "" else "sol"))
 			if stun_duration > 0.0 and player.has_method("stun"):
 				player.stun(stun_duration)
 	

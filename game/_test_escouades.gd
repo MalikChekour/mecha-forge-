@@ -11,7 +11,7 @@ class StubGame extends Node:
 	func _ready() -> void:
 		add_child(enemy_layer)
 		add_child(projectile_layer)
-	func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, _c = Color.WHITE, _s = 1.0, _v = 300.0, _m = false, _h = 0.0) -> void:
+	func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, _c = Color.WHITE, _s = 1.0, _v = 300.0, _m = false, _h = 0.0, _tag: String = "") -> void:
 		bolts.append([pos, dir])
 	func spawn_vfx(_k, _p, _r = 0.0, _s = 1.0, _c = Color.WHITE) -> void: pass
 	func shield_ripple(_p, _r, _c) -> void: pass

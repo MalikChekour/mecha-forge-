@@ -483,7 +483,7 @@ const DECOR: Dictionary = {
 	"steampunk_bordure_mur_briques_fonte": {"f": "steampunk_bordure_mur_briques_fonte", "hp": 420.0, "sz": 240.0, "nature": true, "block": 0.50},
 
 	# ===== NIVEAU 18 : COLOSSEUM =====
-	"colosseum_tourelle_simulation":     {"f": "colosseum_tourelle_simulation", "hp": 230.0, "sz": 165.0, "destruct": true, "glow": "cyan", "shoot": 470.0, "shoot_cd": 2.0, "shoot_dmg": 20.0, "aim": 135.0, "arc": 40.0, "muzzle": [-60.0, 70.0]},
+	"colosseum_tourelle_simulation":     {"f": "colosseum_tourelle_simulation", "hp": 230.0, "sz": 165.0, "destruct": true, "glow": "cyan", "shoot": 470.0, "shoot_cd": 3.2, "shoot_dmg": 12.0, "aim": 135.0, "arc": 40.0, "muzzle": [-60.0, 70.0]},
 	"colosseum_emetteur_barre_exercice": {"f": "colosseum_emetteur_barre_exercice", "hp": 210.0, "sz": 160.0, "destruct": true, "glow": "cyan", "rot_laser": true},
 	"colosseum_butin_module_test":       {"f": "colosseum_butin_module_test", "hp": 55.0, "sz": 130.0, "destruct": true, "skill": 0.60, "glow": "cyan"},
 	"colosseum_inter_pod_overdrive":     {"f": "colosseum_inter_pod_overdrive", "hp": 190.0, "sz": 160.0, "destruct": true, "glow": "cyan", "dwell": true, "dwell_time": 1.2, "dwell_r": 160.0, "buff": "overdrive", "buff_dur": 10.0},
@@ -4521,7 +4521,7 @@ class Prop extends StaticBody2D:
 		if _plr != null and is_instance_valid(_plr) and _plr.has_method("take_damage"):
 			var pp: Vector2 = _plr.global_position
 			if Geometry2D.get_closest_point_to_segment(pp, a, b).distance_to(pp) <= BEAM_HALF_W + 22.0:
-				_plr.take_damage(_beam_dmg, global_position)
+				_plr.take_damage(_beam_dmg, global_position, "decor:canon_rayon")
 				Events.screen_shake.emit(7.0)
 
 	## Tourelle canon a rayon : tire automatiquement un rayon energetique a intervalle regulier
@@ -4663,8 +4663,10 @@ class Prop extends StaticBody2D:
 				var pp: Vector2 = _plr.global_position
 				if Geometry2D.get_closest_point_to_segment(pp, a, b).distance_to(pp) <= CANNON_HALF_W + 24.0:
 					_cannon_hit_set[_plr] = true
-					var pdmg: float = _solar_dmg if _solar_mirror else (_welder_dmg * 0.7 if _welder else _shoot_dmg * 1.5)
-					_plr.take_damage(pdmg, global_position)
+					var pdmg: float = _solar_dmg * 0.6 if _solar_mirror else (_welder_dmg * 0.5 if _welder else _shoot_dmg * 0.7)
+					if GameState.run_time < 90.0:
+						pdmg *= clampf(GameState.run_time / 90.0, 0.35, 1.0)
+					_plr.take_damage(pdmg, global_position, "decor:tourelle")
 					Events.screen_shake.emit(6.0)
 					if game != null and game.has_method("impact_fx"):
 						var col: Color = Color(1.0, 0.85, 0.3) if _solar_mirror else (Color(0.3, 0.9, 1.0) if _welder else Color(1.0, 0.4, 0.1))

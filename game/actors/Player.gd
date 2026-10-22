@@ -28,6 +28,8 @@ const ANCHOR_DELAY: float = 0.5
 var hp: float = 100.0
 var max_hp: float = 70.0   # smaller base -> the health bar starts modest and GROWS only via the
 # VITALITE competence (+25/pick), the mech's base hp, gear and meta_hp. Early game is meant to bite.
+var damage_log: Dictionary = {}        # tag source -> total degats infliges (banc d'equilibre)
+var last_damage_source: String = ""    # derniere source ayant touche le joueur
 var damage: float = 12.0
 # passive-driven combat stats (raised by draft cards)
 var crit_chance: float = 0.05
@@ -1619,7 +1621,7 @@ func _update_marker(delta: float) -> void:
 			var f: float = _hurt_t / 0.30
 			mecha.set_tint(BASE_TINT.lerp(Color(2.6, 0.48, 0.40), clampf(f, 0.0, 1.0)))
 
-func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
+func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO, source_tag: String = "") -> void:
 	if guard_t > 0.0:
 		amount *= 0.4
 	if _iframe > 0.0 or not GameState.alive:
@@ -1641,6 +1643,9 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
 	if base_chassis == "titan" and velocity.length() > 10.0:
 		amount *= 0.78   # -22%, valeur de prototypage — pas mesuree, a ajuster au playtest
 	hp -= amount
+	var tag: String = source_tag if source_tag != "" else "inconnu"
+	damage_log[tag] = float(damage_log.get(tag, 0.0)) + amount
+	last_damage_source = tag
 	_iframe = 0.55
 	_hurt_t = 0.30   # flash rouge du chassis — visible AUSSI en mouvement (voir _update_marker)
 	Audio.sfx("hurt", 0.1)
@@ -1655,6 +1660,7 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO) -> void:
 	if hp <= 0.0:
 		hp = 0.0
 		GameState.alive = false
+		GameState.death_cause = last_damage_source
 		mecha.play("die")
 		Events.player_died.emit()
 		return

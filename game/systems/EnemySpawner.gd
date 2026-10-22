@@ -525,21 +525,23 @@ func _def_for(kind: String) -> Dictionary:
 	if not _prof_defs.has(key):
 		_prof_defs[key] = _role_def(kind, prof["alt"] if use_alt else prof["main"], tier)
 	var d: Dictionary = _prof_defs[key]
-	# MONTEE EN CHARGE (banc 22/10 : niveaux 6/9/10/12/14 mortels en 25-50 s, le bot n'avait pas le temps de monter en niveau) :
+	# MONTEE EN CHARGE (banc 22/10 : niveaux 6/9/10/12/14/16/18 mortels en 25-70 s, le bot n'avait pas le temps de monter en niveau) :
 	# les ajouts de rang (bouclier, garde, PV) arrivent progressivement sur les 2 premieres minutes.
 	var t0: float = GameState.run_time
 	if t0 < 120.0:
 		var ease: float = clampf(t0 / 120.0, 0.25, 1.0)
 		d = d.duplicate()
-		if d.has("shield"):
-			d["shield"] = float(d["shield"]) * ease
-		if t0 < 45.0:
+		if t0 < 60.0:
+			d.erase("shield")
+		elif d.has("shield"):
+			d["shield"] = float(d["shield"]) * clampf((t0 - 60.0) / 60.0, 0.25, 1.0)
+		if t0 < 60.0:
 			d.erase("garde")
 		if t0 < 120.0:
 			d.erase("protecteur")
-		d["hp"] = float(d["hp"]) * lerpf(0.75, 1.0, ease)
+		d["hp"] = float(d["hp"]) * lerpf(0.70, 1.0, ease)
 	if t0 < 60.0 and _is_special(d):
-		d = _role_def(kind, ["tir"], tier)   # banc : 25 % de morts en < 65 s aux niveaux 9/16/18 : pas de charge/kamikaze/mine avant 1:00
+		d = _role_def(kind, ["tir"], tier)   # banc : pas de charge/kamikaze/mine avant 1:00
 	var lf: float = _lead_factor()
 	if lf != 1.0 and d.has("aim_lead"):
 		d = d.duplicate()
@@ -765,12 +767,12 @@ func _spawn_squad(force: bool = false) -> void:
 ##   boss  : boss de fin de niveau (rang 4, `final`) a 15:00 : sa mort = VICTOIRE ; invoque une escouade toutes les ~22 s ;
 ##           les apparitions normales ralentissent (x0,6) tant qu'il vit (survivor-td : pause des spawns pendant un boss)
 const TIERS: Dictionary = {
-	"mk2":   {"flags": ["blinde", "garde"],                          "hp": 2.2,  "dmg": 1.25, "size": 1.15, "radius": 1.1,  "rank": 0, "tint": Color(1.5, 0.85, 0.65), "label": "MARK 2"},
-	"inter": {"flags": ["lourd", "blinde", "garde"],                 "hp": 6.0,  "dmg": 1.5,  "size": 1.45, "radius": 1.35, "rank": 1, "tint": Color(1.6, 0.55, 0.5),  "label": "INTERMEDIAIRE"},
-	"mini":  {"flags": ["barrage", "blinde", "garde", "esquive"],    "hp": 12.0, "dmg": 1.5,  "size": 1.8,  "radius": 1.7,  "rank": 2, "tint": Color(1.7, 0.4, 0.9),   "label": "MINI-BOSS"},
-	"boss1": {"flags": ["barrage", "blinde", "garde"],       "hp": 10.0, "dmg": 1.4, "size": 2.0, "radius": 1.9, "rank": 3, "tint": Color(1.8, 0.5, 0.35), "label": "BOSS", "zone_shift": false},
-	"boss2": {"flags": ["barrage", "lourd", "blinde", "garde"], "hp": 14.0, "dmg": 1.5, "size": 2.15, "radius": 2.0, "rank": 3, "tint": Color(1.8, 0.4, 0.3), "label": "BOSS", "zone_shift": false},
-	"boss":  {"flags": ["barrage", "lourd", "blinde", "garde"], "hp": 18.0, "dmg": 1.6, "size": 2.3, "radius": 2.1, "rank": 4, "tint": Color(1.8, 0.35, 0.3), "label": "BOSS"},
+	"mk2":   {"flags": ["blinde", "garde"],                          "hp": 2.4,   "dmg": 1.25, "size": 1.15, "radius": 1.1,  "rank": 0, "tint": Color(1.5, 0.85, 0.65), "label": "MARK 2"},
+	"inter": {"flags": ["lourd", "blinde", "garde"],                 "hp": 12.0,  "dmg": 1.5,  "size": 1.45, "radius": 1.35, "rank": 1, "tint": Color(1.6, 0.55, 0.5),  "label": "INTERMEDIAIRE"},
+	"mini":  {"flags": ["barrage", "blinde", "garde"],               "hp": 24.0,  "dmg": 1.5,  "size": 1.8,  "radius": 1.7,  "rank": 2, "tint": Color(1.7, 0.4, 0.9),   "label": "MINI-BOSS", "shield": 80.0},
+	"boss1": {"flags": ["barrage", "blinde"],                         "hp": 48.0,  "dmg": 1.4,  "size": 2.0,  "radius": 1.9,  "rank": 3, "tint": Color(1.8, 0.5, 0.35), "label": "BOSS", "shield": 180.0, "zone_shift": false},
+	"boss2": {"flags": ["barrage", "lourd", "blinde"],               "hp": 85.0,  "dmg": 1.5,  "size": 2.15, "radius": 2.0,  "rank": 3, "tint": Color(1.8, 0.4, 0.3),  "label": "BOSS", "shield": 280.0, "zone_shift": false},
+	"boss":  {"flags": ["barrage", "lourd", "blinde"],               "hp": 130.0, "dmg": 1.6,  "size": 2.3,  "radius": 2.1,  "rank": 4, "tint": Color(1.8, 0.35, 0.3),  "label": "BOSS", "shield": 420.0},
 }
 var _boss_ref: Variant = null
 var _tier_last: Dictionary = {"inter": 120.0, "summon": 0.0}
@@ -789,6 +791,8 @@ func _tier_def(tier_name: String) -> Dictionary:
 	var d: Dictionary = _role_def(String(pool[0]), (prof["main"] as Array) + (tp["flags"] as Array), tier)
 	d["name"] = "%s %s" % [String(DEFS[String(pool[0])]["name"]), String(tp["label"])]
 	d["hp"] = float(d["hp"]) * float(tp["hp"])
+	if tp.has("shield"):
+		d["shield"] = float(tp["shield"])
 	d["dmg"] = float(d["dmg"]) * float(tp["dmg"])
 	d["attack_dmg"] = float(d["attack_dmg"]) * float(tp["dmg"])
 	d["size"] = float(d["size"]) * float(tp["size"])
@@ -931,15 +935,21 @@ func _scale_enemy(e: Enemy) -> void:
 	# (dasher) et le coefficient individuel (+/-15 %) s'ajoutent par-dessus : brefs, pas permanents.
 	if player != null and "base_speed" in player:
 		e.speed = minf(e.speed, float(player.base_speed) * 0.80)
-	# 22/10 (banc d'equilibre) : la difficulte doit MONTER avec le niveau (chapitre) : +4 % de PV et +3 % de degats par rang de niveau
+	# 22/10 (banc d'equilibre) : la difficulte doit MONTER avec le niveau (chapitre) : +4 % de PV par rang de niveau.
+	# MONTEE EN CHARGE sur les 90 premieres secondes : adoucit les multiplicateurs extremes de tier et de protocole (ex: COLOSSES)
+	# pour que le joueur de niveau 1-2 puisse faire ses premiers kills et lancer son build (supprime les 25% de morts precoces).
 	var tier_n: float = float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)
-	var hp_scale: float = (1.0 + 0.04 * tier_n) * (1.0 + GameState.run_time * 0.0020) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * Protocols.enemy_hp
+	var t0: float = GameState.run_time
+	var tier_ease: float = clampf(t0 / 90.0, 0.35, 1.0)
+	var proto_hp: float = lerpf(1.0, Protocols.enemy_hp, clampf(t0 / 75.0, 0.0, 1.0))
+	var hp_scale: float = (1.0 + 0.04 * tier_n * tier_ease) * (1.0 + t0 * 0.0020) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * proto_hp
 	e.hp *= hp_scale
 	e.hp_max = e.hp
 	if e.shield_max > 0.0:               # shields scale with HP too, else late-game shields are trivial
 		e.shield_max *= hp_scale
 		e.shield = e.shield_max
-	var dmg_scale: float = (1.0 + GameState.run_time * 0.0008)   # PAS de degats par niveau : banc 22/10, des coups de 15-24 PV tuaient en 20-60 s ; le niveau durcit par PV, nombre et complexite * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * Protocols.enemy_dmg
+	var proto_dmg: float = lerpf(1.0, Protocols.enemy_dmg, clampf(t0 / 75.0, 0.0, 1.0))
+	var dmg_scale: float = (1.0 + GameState.run_time * 0.0008) * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * proto_dmg
 	e.contact_dmg *= dmg_scale
 	e.attack_dmg *= dmg_scale             # ranged bolts scale too (else late-game shooters are harmless)
 

@@ -21,7 +21,7 @@ class StubGame extends Node:
 class DummyPlayer extends Node2D:
 	var velocity: Vector2 = Vector2.ZERO
 	var field_slow: float = 1.0
-	func take_damage(_a, _s = Vector2.ZERO) -> void: pass
+	func take_damage(_a, _s = Vector2.ZERO, _tag: String = "") -> void: pass
 
 var _fail: int = 0
 func _ok(cond: bool, label: String, detail: String = "") -> void:

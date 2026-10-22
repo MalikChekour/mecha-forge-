@@ -29,6 +29,7 @@ var tint: Color = Color(1.0, 0.55, 0.25)
 var size: float = 1.0
 var game: Node = null
 var missile: bool = false
+var style_tag: String = "bolt"
 ## GUIDAGE (palier 3 « TRAQUEUR » de l'arme ennemie). En radians/seconde, 0 = tir droit.
 ## 🚨 Volontairement FAIBLE et LIMITE DANS LE TEMPS (HOMING_T) : un projectile qui suit
 ## indefiniment est increvable au doigt sur telephone. Il corrige sa course au debut, puis
@@ -186,7 +187,7 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if body.is_in_group("player") and body.has_method("take_damage"):
 		_impact()
-		body.take_damage(_dmg, global_position)
+		body.take_damage(_dmg, global_position, style_tag)
 		_recycle.call_deferred()
 	elif body.is_in_group("cover"):
 		_impact()

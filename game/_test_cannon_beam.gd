@@ -16,7 +16,7 @@ class DummyPlayer extends CharacterBody2D:
 	var field_slow: float = 1.0
 	func _init() -> void:
 		add_to_group("player")
-	func take_damage(amount: float, _from_pos: Vector2 = Vector2.ZERO) -> void:
+	func take_damage(amount: float, _from_pos: Vector2 = Vector2.ZERO, _tag: String = "") -> void:
 		hp -= amount
 		hit_count += 1
 

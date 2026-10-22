@@ -227,7 +227,9 @@ func _cur_muzzle() -> Vector2:
 
 func _hurt(amount: float, from: Vector2) -> void:
 	if plr != null and is_instance_valid(plr) and plr.has_method("take_damage"):
-		plr.take_damage(amount, from)
+		if GameState.run_time < 90.0:
+			amount *= clampf(GameState.run_time / 90.0, 0.35, 1.0)
+		plr.take_damage(amount, from, "decor:turret")
 
 func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 	return Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p)
@@ -1029,7 +1031,7 @@ class TurretAfter extends Node2D:
 				_tick -= delta
 				if dps > 0.0 and _tick <= 0.0 and plr.has_method("take_damage"):
 					_tick = 0.25
-					plr.take_damage(dps * 0.25, a)
+					plr.take_damage(dps * 0.25, a, "decor:laser_rotatif")
 		queue_redraw()
 		if _emit != null:
 			_emit.queue_redraw()

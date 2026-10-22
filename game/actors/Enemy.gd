@@ -771,7 +771,7 @@ func _tire_arme(dir: Vector2) -> void:
 		# eventail centre : pour n=1 l'ecart vaut 0, pour n=3 on obtient -demi, 0, +demi.
 		var a: float = 0.0 if n == 1 else (-demi + 2.0 * demi * float(i) / float(n - 1))
 		game.spawn_enemy_bolt(muzzle, dir.rotated(a), attack_dmg * ARME_PART[t], c,
-			ARME_TAILLE[t], ARME_VITESSE[t], false, ARME_GUIDAGE[t])
+			ARME_TAILLE[t], ARME_VITESSE[t], false, ARME_GUIDAGE[t], "bolt:" + kind)
 	if game.has_method("spawn_vfx") and Enemy._fx_ok():
 		# effet de bouche PROPRE A CHAQUE PALIER : c'est le tell instantane du danger.
 		game.spawn_vfx(ARME_MUZZLE[t], muzzle, dir.angle(), 0.42 + 0.16 * float(t), c)
@@ -924,7 +924,7 @@ func _frappe_arc(dir: Vector2) -> void:
 		if player.has_method("take_damage"):
 			# PAS de bonus de degats : ce que le palier apporte, c'est l'ALLONGE. Frapper plus
 			# loin ET plus fort faisait deux ameliorations d'un coup — d'ou la falaise mesuree.
-			player.take_damage(contact_dmg, global_position)
+			player.take_damage(contact_dmg, global_position, "arc:" + kind)
 	_libere_arc()
 	play("attack", true)
 
@@ -951,7 +951,7 @@ func _fire_heavy(dir: Vector2) -> void:
 	var c: Color = _teinte_arme()
 	var muzzle: Vector2 = global_position + dir * 24.0
 	game.spawn_enemy_bolt(muzzle, dir, attack_dmg, c,
-		2.1 + 0.16 * float(t), 235.0 + 32.0 * float(t), true, HEAVY_GUIDAGE[t])
+		2.1 + 0.16 * float(t), 235.0 + 32.0 * float(t), true, HEAVY_GUIDAGE[t], "missile:" + kind)
 	if game.has_method("spawn_vfx"):
 		game.spawn_vfx(ARME_MUZZLE[t], muzzle, dir.angle(), 0.60 + 0.14 * float(t), c)
 		if t >= 2:
@@ -1258,7 +1258,7 @@ func _physics_process(delta: float) -> void:
 						if player.has_method("take_damage"):
 							# the charge lands the big hit (attack_dmg), not the light contact graze
 							var charge_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg
-							player.take_damage(charge_dmg, global_position)
+							player.take_damage(charge_dmg, global_position, "charge:" + kind)
 							_impact_charge(_dash_dir)
 							# Phase 3 (BELIER-01) : chaque impact laisse une GroundZone — la charge
 							# elle-meme modifie l'arene, sans nouveau pattern a lire pour le joueur.
@@ -1412,7 +1412,7 @@ func _physics_process(delta: float) -> void:
 					if dist < 46.0 and _contact_cd <= 0.0:
 						_contact_cd = 0.5
 						if player.has_method("take_damage"):
-							player.take_damage(attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.6, global_position)
+							player.take_damage(attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.6, global_position, "bull:" + kind)
 							_impact_charge(_bull_dir)   # meme arme, impact de plus en plus lourd
 					_bull_t -= delta
 					if _bull_t <= 0.0:
@@ -1471,7 +1471,7 @@ func _physics_process(delta: float) -> void:
 					if dist < CONTACT_PORTEE[_palier] and _contact_cd <= 0.0:
 						_contact_cd = CONTACT_CAD[_palier]
 						if player.has_method("take_damage"):
-							player.take_damage(contact_dmg, global_position)
+							player.take_damage(contact_dmg, global_position, "contact:" + kind)
 							play("attack", true)
 							if _palier >= 1:
 								_percussion(dir)   # palier 1 : le coup au contact se VOIT partir
@@ -1675,10 +1675,13 @@ func _update_shield(delta: float) -> void:
 	if shield_max <= 0.0:
 		return
 	# regenerate after a lull without taking damage
-	if _shield_regen_t > 0.0:
+	if rank >= 3 and shield <= 0.0:
+		pass  # bouclier de boss brise : reste perce pour eviter de faire durer le combat a l'infini
+	elif _shield_regen_t > 0.0:
 		_shield_regen_t -= delta
 	elif shield < shield_max:
-		shield = minf(shield_max, shield + shield_max * 0.22 * delta)
+		var srate: float = 0.08 if rank >= 3 else 0.22
+		shield = minf(shield_max, shield + shield_max * srate * delta)
 	if _shield_flash > 0.0:
 		_shield_flash = maxf(0.0, _shield_flash - delta * 4.0)
 	if _shield_spr != null:
@@ -1826,19 +1829,19 @@ func _style_fire(dir: Vector2) -> void:
 			_burst_dir = dir
 		"eventail":
 			for i in 5:
-				game.spawn_enemy_bolt(muzzle, dir.rotated(-0.5 + 0.25 * float(i)), d * 0.5, col, 0.9, 270.0, false, 0.0)
+				game.spawn_enemy_bolt(muzzle, dir.rotated(-0.5 + 0.25 * float(i)), d * 0.5, col, 0.9, 270.0, false, 0.0, "style:eventail")
 		"sniper":
-			game.spawn_enemy_bolt(muzzle, dir, d * 1.8, col, 0.7, 780.0, false, 0.0)
+			game.spawn_enemy_bolt(muzzle, dir, d * 1.8, col, 0.7, 780.0, false, 0.0, "style:sniper")
 		"guide":
-			game.spawn_enemy_bolt(muzzle, dir, d * 1.0, col, 1.2, 230.0, true, 1.2)
+			game.spawn_enemy_bolt(muzzle, dir, d * 1.0, col, 1.2, 230.0, true, 1.2, "style:guide")
 		"anneau":
 			var nr: int = 10 if get_tree().get_nodes_in_group("enemies").size() < 90 else 6   # en foule : anneau allege (rendu)
 			for i in nr:
-				game.spawn_enemy_bolt(global_position, Vector2.from_angle(TAU * float(i) / float(nr) + _aim), d * 0.55, col, 1.0, 210.0, false, 0.0)
+				game.spawn_enemy_bolt(global_position, Vector2.from_angle(TAU * float(i) / float(nr) + _aim), d * 0.55, col, 1.0, 210.0, false, 0.0, "style:anneau")
 			if game.has_method("spawn_vfx"):
 				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.5, col)
 		"orbe":
-			game.spawn_enemy_bolt(muzzle, dir, d * 1.6, col, 2.1, 175.0, true, 0.0)
+			game.spawn_enemy_bolt(muzzle, dir, d * 1.6, col, 2.1, 175.0, true, 0.0, "style:orbe")
 	if tir_style != "anneau" and game.has_method("spawn_vfx") and Enemy._fx_ok():
 		game.spawn_vfx("fire_blast", muzzle, dir.angle(), 0.45, col)
 	play("attack", true)
@@ -1865,7 +1868,7 @@ func _style_tick(delta: float, player_valid: bool) -> void:
 			_burst_t = 0.11
 			_burst_left -= 1
 			if game != null and game.has_method("spawn_enemy_bolt"):
-				game.spawn_enemy_bolt(global_position + _burst_dir * 22.0, _burst_dir, attack_dmg * 0.7, _STYLES["rafale"]["col"], 0.85, 430.0, false, 0.0)
+				game.spawn_enemy_bolt(global_position + _burst_dir * 22.0, _burst_dir, attack_dmg * 0.7, _STYLES["rafale"]["col"], 0.85, 430.0, false, 0.0, "style:rafale")
 	# charge de sniper / anneau / orbe : la silhouette rougit, la visee continue de suivre pendant la charge
 	if _style_charge > 0.0:
 		_style_charge -= delta
