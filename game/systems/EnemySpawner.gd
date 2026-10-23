@@ -411,10 +411,10 @@ const PROFILES: Dictionary = {
 	"desert":    {"tier": 2, "forms": ["tenaille","colonne","ligne"],  "pat": "pincer",   "main": ["charge", "esquive"],           "alt": ["tir", "rafale"],              "share": 0.20},
 	"jungle":    {"tier": 3, "forms": ["embuscade","tirailleurs"],  "pat": "ambush",   "main": ["eventail"],              "alt": ["bull", "garde"],             "share": 0.25},
 	"volcanic":  {"tier": 4, "forms": ["coin","feu_et_mouvement"],  "pat": "ahead",    "main": ["mine", "esquive"],             "alt": ["orbe"],              "share": 0.25},
-	"swamp":     {"tier": 5, "forms": ["colonne","fer_a_cheval"],  "pat": "close",    "main": ["bull", "garde"],             "alt": ["mine"],             "share": 0.20},
+	"swamp":     {"tier": 5, "forms": ["colonne","fer_a_cheval"],  "pat": "pincer",   "main": ["tir", "garde"],             "alt": ["bull", "mine"],             "share": 0.25},
 	"cryo":      {"tier": 6, "forms": ["ligne","vague","tirailleurs"],  "pat": "line",     "main": ["sniper", "blinde", "garde"], "alt": ["charge"],       "share": 0.25},
 	"reacteur":  {"tier": 7, "forms": ["coin","vague","embuscade"],  "pat": "burst",    "main": ["kamikaze", "esquive"],         "alt": ["anneau"],              "share": 0.30},
-	"ruche":     {"tier": 8, "forms": ["encerclement","vague"],  "pat": "burst",    "main": ["bull", "esquive"],             "alt": ["rafale", "garde"],              "share": 0.30},
+	"ruche":     {"tier": 8, "forms": ["encerclement","vague"],  "pat": "burst",    "main": ["rafale", "esquive"],           "alt": ["bull", "garde"],              "share": 0.25},
 	"citadelle": {"tier": 9, "forms": ["vague","echelon","feu_et_mouvement"],  "pat": "pincer",   "main": ["tir", "blinde", "lourd", "garde"], "alt": ["tir", "protecteur"], "share": 0.25},
 	"abyss":     {"tier": 10, "forms": ["encerclement","spirale","fer_a_cheval"], "pat": "encircle", "main": ["guide", "garde"],     "alt": ["charge", "esquive"],           "share": 0.25},
 	"ether":     {"tier": 11, "forms": ["leurre","embuscade","tenaille"], "pat": "dropin",   "main": ["charge", "esquive"],           "alt": ["kamikaze"],         "share": 0.20},
@@ -456,7 +456,7 @@ func _special_cap(tier: int) -> int:
 
 func _is_special(d: Dictionary) -> bool:
 	var b: String = String(d.get("behavior", ""))
-	return b == "dasher" or b == "kamikaze" or b == "miner"
+	return b == "dasher" or b == "kamikaze" or b == "miner" or b == "rush" or bool(d.get("bull", false))
 
 func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 	var d: Dictionary = (DEFS[kind] as Dictionary).duplicate()
@@ -531,17 +531,16 @@ func _def_for(kind: String) -> Dictionary:
 	if t0 < 120.0:
 		var ease: float = clampf(t0 / 120.0, 0.25, 1.0)
 		d = d.duplicate()
-		if t0 < 60.0:
+		if t0 < 90.0:
 			d.erase("shield")
-		elif d.has("shield"):
-			d["shield"] = float(d["shield"]) * clampf((t0 - 60.0) / 60.0, 0.25, 1.0)
-		if t0 < 60.0:
 			d.erase("garde")
+		elif d.has("shield"):
+			d["shield"] = float(d["shield"]) * clampf((t0 - 90.0) / 30.0, 0.25, 1.0)
 		if t0 < 120.0:
 			d.erase("protecteur")
 		d["hp"] = float(d["hp"]) * lerpf(0.70, 1.0, ease)
-	if t0 < 60.0 and _is_special(d):
-		d = _role_def(kind, ["tir"], tier)   # banc : pas de charge/kamikaze/mine avant 1:00
+	if t0 < 90.0 and _is_special(d):
+		d = _role_def(kind, ["tir"], tier)   # banc : pas de charge/kamikaze/mine/rush avant 1:30
 	var lf: float = _lead_factor()
 	if lf != 1.0 and d.has("aim_lead"):
 		d = d.duplicate()
@@ -549,7 +548,7 @@ func _def_for(kind: String) -> Dictionary:
 	if _is_special(d):
 		var n: int = 0
 		for e in get_tree().get_nodes_in_group("enemies"):
-			if e is Enemy and (e as Enemy).behavior in ["dasher", "kamikaze", "miner"]:
+			if e is Enemy and ((e as Enemy).behavior in ["dasher", "kamikaze", "miner", "rush"] or (e as Enemy).bull):
 				n += 1
 		if n >= mini(_special_cap(tier), 2 + int(t0 / 30.0)):
 			return _role_def(kind, ["tir"], tier)   # plafond atteint : tireur banal, jamais un mur de charges
@@ -767,12 +766,12 @@ func _spawn_squad(force: bool = false) -> void:
 ##   boss  : boss de fin de niveau (rang 4, `final`) a 15:00 : sa mort = VICTOIRE ; invoque une escouade toutes les ~22 s ;
 ##           les apparitions normales ralentissent (x0,6) tant qu'il vit (survivor-td : pause des spawns pendant un boss)
 const TIERS: Dictionary = {
-	"mk2":   {"flags": ["blinde", "garde"],                          "hp": 2.4,   "dmg": 1.25, "size": 1.15, "radius": 1.1,  "rank": 0, "tint": Color(1.5, 0.85, 0.65), "label": "MARK 2"},
-	"inter": {"flags": ["lourd", "blinde", "garde"],                 "hp": 12.0,  "dmg": 1.5,  "size": 1.45, "radius": 1.35, "rank": 1, "tint": Color(1.6, 0.55, 0.5),  "label": "INTERMEDIAIRE"},
-	"mini":  {"flags": ["barrage", "blinde", "garde"],               "hp": 24.0,  "dmg": 1.5,  "size": 1.8,  "radius": 1.7,  "rank": 2, "tint": Color(1.7, 0.4, 0.9),   "label": "MINI-BOSS", "shield": 80.0},
-	"boss1": {"flags": ["barrage", "blinde"],                         "hp": 48.0,  "dmg": 1.4,  "size": 2.0,  "radius": 1.9,  "rank": 3, "tint": Color(1.8, 0.5, 0.35), "label": "BOSS", "shield": 180.0, "zone_shift": false},
-	"boss2": {"flags": ["barrage", "lourd", "blinde"],               "hp": 85.0,  "dmg": 1.5,  "size": 2.15, "radius": 2.0,  "rank": 3, "tint": Color(1.8, 0.4, 0.3),  "label": "BOSS", "shield": 280.0, "zone_shift": false},
-	"boss":  {"flags": ["barrage", "lourd", "blinde"],               "hp": 130.0, "dmg": 1.6,  "size": 2.3,  "radius": 2.1,  "rank": 4, "tint": Color(1.8, 0.35, 0.3),  "label": "BOSS", "shield": 420.0},
+	"mk2":   {"flags": ["blinde"],                                    "hp": 2.0,   "dmg": 1.15, "size": 1.15, "radius": 1.1,  "rank": 0, "tint": Color(1.5, 0.85, 0.65), "label": "MARK 2"},
+	"inter": {"flags": ["lourd", "blinde"],                           "hp": 5.0,   "dmg": 1.25, "size": 1.45, "radius": 1.35, "rank": 1, "tint": Color(1.6, 0.55, 0.5),  "label": "INTERMEDIAIRE"},
+	"mini":  {"flags": ["barrage", "blinde"],                         "hp": 7.5,   "dmg": 1.3,  "size": 1.8,  "radius": 1.7,  "rank": 2, "tint": Color(1.7, 0.4, 0.9),   "label": "MINI-BOSS", "shield": 25.0},
+	"boss1": {"flags": ["barrage", "blinde"],                         "hp": 14.0,  "dmg": 1.35, "size": 2.0,  "radius": 1.9,  "rank": 3, "tint": Color(1.8, 0.5, 0.35), "label": "BOSS", "shield": 35.0, "zone_shift": false},
+	"boss2": {"flags": ["barrage", "lourd", "blinde"],               "hp": 26.0,  "dmg": 1.45, "size": 2.15, "radius": 2.0,  "rank": 3, "tint": Color(1.8, 0.4, 0.3),  "label": "BOSS", "shield": 60.0, "zone_shift": false},
+	"boss":  {"flags": ["barrage", "lourd", "blinde"],               "hp": 45.0,  "dmg": 1.55, "size": 2.3,  "radius": 2.1,  "rank": 4, "tint": Color(1.8, 0.35, 0.3),  "label": "BOSS", "shield": 90.0},
 }
 var _boss_ref: Variant = null
 var _tier_last: Dictionary = {"inter": 120.0, "summon": 0.0}
@@ -805,7 +804,13 @@ func _tier_def(tier_name: String) -> Dictionary:
 		d["ogive"] = true
 		d["final"] = (tier_name == "boss") and not GameState.endless
 		d["behavior"] = "ranged"
-		d["prefer_dist"] = 300.0
+		d["prefer_dist"] = 230.0
+		d["garde"] = false
+		d["esquive"] = false
+	elif tier_name == "mini":
+		d["garde"] = false
+		d["esquive"] = false
+		d["prefer_dist"] = 210.0
 	_prof_defs[key] = d
 	return d
 
@@ -860,12 +865,20 @@ func _tier_tick(_delta: float) -> void:
 		_spawn_tier("inter")
 	for ev in TIER_EVENTS:
 		var et: float = float(ev["t"])
-		if t >= et and not _tier_fired.has(et) and not _boss_up():
+		if t >= et and not _tier_fired.has(et):
+			if _boss_up():
+				if String(ev["tier"]).begins_with("boss"):
+					continue
+				else:
+					_tier_fired[et] = true
+					continue
 			_tier_fired[et] = true
 			_spawn_tier(String(ev["tier"]))
+			break
 	if _boss_up() and t - float(_tier_last["summon"]) >= 22.0:
 		_tier_last["summon"] = t
 		_spawn_squad(true)
+
 
 ## MARK 2 : part des apparitions de base. Introduits des 1:30, puis « swap de base » apres le boss 1 (5:00) et le boss 2 (10:00).
 func _mk2_share() -> float:

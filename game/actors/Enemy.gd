@@ -1680,7 +1680,7 @@ func _update_shield(delta: float) -> void:
 	elif _shield_regen_t > 0.0:
 		_shield_regen_t -= delta
 	elif shield < shield_max:
-		var srate: float = 0.08 if rank >= 3 else 0.22
+		var srate: float = 0.02 if rank >= 2 else 0.15
 		shield = minf(shield_max, shield + shield_max * srate * delta)
 	if _shield_flash > 0.0:
 		_shield_flash = maxf(0.0, _shield_flash - delta * 4.0)
@@ -2064,7 +2064,7 @@ func take_damage(amount: float, source_chassis: String = "", weapon_id: String =
 		shield -= absorbed
 		amount -= absorbed
 		_shield_flash = 1.0
-		_shield_regen_t = 3.0
+		_shield_regen_t = 6.0
 		if game != null and game.has_method("shield_ripple"):
 			game.shield_ripple(global_position + _visual_offset(), _body_radius * 1.5, Palette.CYAN)
 		if shield <= 0.0:
