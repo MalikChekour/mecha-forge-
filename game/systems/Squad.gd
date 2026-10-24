@@ -197,6 +197,14 @@ func update(delta: float, p: Vector2, mspeed: float) -> void:
 		return
 	var to: Vector2 = p - c
 	var d: float = to.length()
+	# AUDIT 24/10 : chefs/lieutenants figes 22-30 % du temps avec un joueur immobile (emplacements tenus). Une escouade s'engage
+	# des qu'un de ses membres est a portee de tir (< 320 px) ou apres 12 s, quel que soit le joueur.
+	if state == "advance":
+		var dmin: float = 1.0e9
+		for mm in ms:
+			dmin = minf(dmin, (mm as Node2D).global_position.distance_to(p))
+		if dmin < 320.0 or t > 12.0:
+			state = "engage"
 	_u = to / maxf(d, 1.0)
 	if ADVANCE_FORMS.has(form):
 		if state == "advance":
@@ -208,7 +216,7 @@ func update(delta: float, p: Vector2, mspeed: float) -> void:
 	elif state == "advance":
 		match form:
 			"embuscade":
-				if d < 420.0 or t > 8.0:
+				if d < 420.0 or t > 5.0:
 					state = "engage"
 			"leurre":
 				if _decoy == null:

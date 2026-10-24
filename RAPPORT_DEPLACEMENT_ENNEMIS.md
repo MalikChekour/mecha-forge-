@@ -84,3 +84,41 @@ Référence : le joueur de référence va à 336 px/s.
 - **Simulation logique, pas le rendu** : aucune capture Web ; le « fluide » ressenti dépend aussi des animations et du framerate.
 - **Pas de décor/obstacles** dans ce banc (aucun solide : `cover_list` vide) ni de plafond d'ennemis réel ; **faux joueur** (pas de collisions ni de dégâts).
 - ⚠️ **Découverte importante sur le banc d'équilibre** : à `--scale=6`, Godot passe un **pas physique de 0,1 s** (`get_physics_process_delta_time` = 0,1 au lieu de 0,0167). Mes vitesses ont été corrigées en conséquence, mais **les parties du banc d'équilibre `_bal_run` faites à ×6 utilisent des pas de 0,1 s** (collisions et balles moins précises). Leurs tendances restent utiles mais les chiffres de survie sont à **revérifier à `--scale=2` ou 3**.
+
+---
+
+# Audit n°2 (après corrections) — 24/10
+
+## Ce qui a été corrigé
+1. **Escouades** (`Squad.gd`) : une escouade s'engage maintenant dès qu'un membre est à moins de 320 px du joueur ou après 12 s (avant : emplacements tenus tant que le joueur ne bougeait pas). Embuscade : déclenchement à 5 s au lieu de 8 s.
+2. **Mineurs** (`Enemy.gd`) : strafe plus posé (changement de sens toutes les 2,6–4,6 s au lieu de 1,2–2,6 s, vitesse de strafe 0,55 au lieu de 0,65).
+3. **Banc et audit** : pas physique corrigé (`Engine.physics_ticks_per_second = 60 × accélération`, donc delta = 1/60 quelle que soit l'accélération). `_bal_run.gd` est corrigé aussi : **les futures mesures d'équilibre sont à pas physique normal** (les anciennes, faites à ×6 avec un pas de 0,1 s, sont à refaire pour les chiffres de survie).
+4. Essai écarté : lissage de la poussée de séparation entre ennemis → aucun effet mesurable (251 vs 256), **retiré**.
+
+## Résultats (≈ 700 ennemis observés par scénario, 18 niveaux, 20 s de jeu)
+| Mesure | Audit 1 (joueur immobile) | Audit 2 (joueur immobile) | Audit 1 (joueur mobile) | Audit 2 (joueur mobile) |
+|---|---|---|---|---|
+| Temps immobile | 10,7 % | **3,4 %** | 1,2 % | **0,4 %** |
+| Groupes > 15 % immobiles | **29** | **5** | – | – |
+| Chefs de meute immobiles | 24,7 % | **8,3 %** | 2,2 % | 1,8 % |
+| Lieutenants immobiles | 29,3 % | **3,9 %** | 3,3 % | 0,9 % |
+| Directions de regard (sur 8) | 7,7 | 7,3 | 8,0 | 8,0 |
+| Distance gagnée vers le joueur en 20 s | 431 px | 435 px | 422 px | 332 px* |
+
+\* l'audit 1 faisait tourner le joueur 6 fois trop vite (pas de 0,1 s) ; la valeur de l'audit 2 est la bonne.
+Vitesse moyenne réelle (joueur mobile) : **134 px/s** (≈ 0,4 × le joueur de référence ; charges et kamikazes plus rapides : ≈ 190 px/s pour les kamikazes).
+
+## Par niveau — joueur en mouvement | joueur immobile
+(vitesse px/s · % immobile · distance gagnée px · directions)
+Tous les niveaux : 116–163 px/s, 0,1–2,9 % immobile (mobile) ; 82–105 px/s, 1,2–10,2 % immobile (fixe). Détail dans `tools/audit_deplacement.json`.
+
+## Restent > 15 % immobiles (joueur fixe) — jugés normaux
+- niv. 3 (chef 26 %, élite 16 %) et niv. 6 (chef 40 %) : escouade en embuscade/ligne qui attend son déclenchement ;
+- niv. 8 « rush » (44 %) : ils sont **arrivés au contact** du joueur immobile et s'y tiennent ;
+- niv. 10 dasher (18 %) : phases d'armement de la charge.
+
+## Correction d'une erreur de mesure
+Ma mesure des « demi-tours » compte des **échantillons**, pas des événements : un demi-tour (≈ 0,25 s) en fait ≈ 15. Le chiffre brut de l'audit 2 (≈ 250 avec joueur fixe, ≈ 60 avec joueur mobile) correspond donc à **≈ 17 demi-tours/min (un toutes les 3,5 s) et ≈ 4/min** : c'est le strafe normal des tireurs, **pas du tremblement**. Contre-vérification : trace d'un tireur isolé = inversion propre toutes les 1–2,5 s (rampe d'accélération de 0,3 s, aucune oscillation).
+
+## Limites
+Simulation logique sans décor ni collisions, faux joueur, pas de rendu. Aucune capture Web regardée. Corrections commitées mais **non publiées** (la publication de versions est gérée avec Antigravity).

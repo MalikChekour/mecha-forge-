@@ -33,7 +33,8 @@ var rows: Array = []
 
 func _ready() -> void:
 	GameState.reset()
-	Engine.time_scale = 6.0
+	Engine.physics_ticks_per_second = 240   # 240 ticks x time_scale 4 = delta physique de 1/60 (a x6 avec 60 ticks, delta = 0,1 s !)
+	Engine.time_scale = 4.0
 	var g: StubGame = StubGame.new()
 	add_child(g)
 	await get_tree().process_frame
@@ -54,6 +55,7 @@ func _ready() -> void:
 		for scen in ["fixe", "mobile"]:
 			await _run(g, sp, pl, String(pb[1]), int(pb[0]), scen)
 	Engine.time_scale = 1.0
+	Engine.physics_ticks_per_second = 60
 	var f: FileAccess = FileAccess.open("res://../tools/audit_deplacement.json", FileAccess.WRITE)
 	f.store_string(JSON.stringify(rows))
 	f.close()
@@ -112,9 +114,14 @@ func _run(g: StubGame, sp: EnemySpawner, pl: FakePlayer, biome: String, tier: in
 			s["v"] += v.length()
 			if v.length() < 8.0:
 				s["stat"] += 1
-			if prevv.has(e) and v.length() > 40.0 and (prevv[e] as Vector2).length() > 40.0 and v.normalized().dot((prevv[e] as Vector2).normalized()) < 0.0:
-				s["flip"] += 1
-			prevv[e] = v
+			# demi-tour = vitesse opposee a celle d'il y a 0,25 s (15 ticks) ; deux echantillons > 30 px/s
+			var hist: Array = prevv.get(e, [])
+			hist.append(v)
+			if hist.size() > 15:
+				var old_v: Vector2 = hist.pop_front()
+				if v.length() > 30.0 and old_v.length() > 30.0 and v.normalized().dot(old_v.normalized()) < -0.3:
+					s["flip"] += 1
+			prevv[e] = hist
 			(s["dirs"] as Dictionary)[e._dir] = 1
 	for e in last.keys():
 		if is_instance_valid(e) and e.alive:

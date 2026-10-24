@@ -28,6 +28,7 @@ func _ready() -> void:
 	g._chapter = ch
 	g._apply_chapter_biome(String(c["biome"]))
 	print("BAL chapitre %d (%s) %.0f s, x%.0f" % [ch, c["biome"], secs, scale])
+	Engine.physics_ticks_per_second = int(60.0 * scale)   # pas physique = 1/60 quelle que soit l'acceleration (corrige le delta de 0,1 s a x6)
 	Engine.time_scale = scale
 	_t_wall = Time.get_ticks_msec()
 func _process(_d: float) -> void:

@@ -1350,8 +1350,8 @@ func _physics_process(delta: float) -> void:
 					_strafe_timer -= delta
 					if _strafe_timer <= 0.0:
 						_strafe_dir *= -1.0
-						_strafe_timer = randf_range(1.2, 2.6)
-					desired_vel = Vector2(-dir.y, dir.x) * _strafe_dir * speed * _speed_mult * 0.65
+						_strafe_timer = randf_range(2.6, 4.6)   # audit : 51 demi-tours/min -> strafe plus pose
+					desired_vel = Vector2(-dir.y, dir.x) * _strafe_dir * speed * _speed_mult * 0.55
 					_mine_cd -= delta
 					if _mine_cd <= 0.0 and game != null and game.has_method("spawn_ground_zone"):
 						_mine_cd = MINE_COOLDOWN
