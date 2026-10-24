@@ -63,10 +63,67 @@ const DEFS: Dictionary = {
 	"mech16": {"name": "Spectra-mecha", "chassis": "en16_prism", "hp": 66.0, "speed": 168.0, "dmg": 13.4, "radius": 40.0, "size": 156.0, "motion": "walk", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 9.6, "attack_cd": 2.2, "prefer_dist": 240.0, "unlock": 0.0},
 	"mech17": {"name": "Terreur a vapeur", "chassis": "en17_steampunk", "hp": 68.5, "speed": 172.0, "dmg": 13.8, "radius": 40.0, "size": 158.4, "motion": "walk", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 9.9, "attack_cd": 2.2, "prefer_dist": 240.0, "unlock": 0.0},
 	"mech18": {"name": "Gladiateur", "chassis": "en18_colosseum", "hp": 71.0, "speed": 176.0, "dmg": 14.2, "radius": 40.0, "size": 160.8, "motion": "walk", "rank": 0, "w": 5, "behavior": "ranged", "attack_dmg": 10.3, "attack_cd": 2.2, "prefer_dist": 240.0, "unlock": 0.0},
-	# "cryoboss":      {"name": "Le Cryarque",   "chassis": "cryoboss",      "hp": 2800.0, "speed": 236.0, "dmg": 30.0, "radius": 78.0, "size": 360.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 26.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 380.0},
-	# "reacteurboss":  {"name": "Le Fulgurant",  "chassis": "reacteurboss",  "hp": 2940.0, "speed": 240.0, "dmg": 31.0, "radius": 78.0, "size": 370.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 27.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 400.0},
-	# "rucheboss":     {"name": "La Matriarche", "chassis": "rucheboss",     "hp": 3080.0, "speed": 244.0, "dmg": 32.0, "radius": 80.0, "size": 385.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 28.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 420.0},
-	# "citadelleboss": {"name": "L'Arcange",     "chassis": "citadelleboss", "hp": 3220.0, "speed": 248.0, "dmg": 34.0, "radius": 82.0, "size": 400.0, "rank": 4, "w": 0, "final": true, "behavior": "ranged", "heavy": true, "ogive": true, "attack_dmg": 30.0, "attack_cd": 2.2, "prefer_dist": 360.0, "shield": 440.0},
+
+	# --- ESCOUADES TRIPARTITES PAR BIOME (Pilier 1 : Diversification) ---
+	# Swarmers (drones rapides de meute, rush + zigzag, AoE requis)
+	"mech01_swarm": {"name": "Drone d'atelier", "chassis": "en01_tech", "hp": 14.0, "speed": 245.0, "dmg": 4.2, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech02_swarm": {"name": "Scorpion des sables", "chassis": "en02_desert", "hp": 15.0, "speed": 248.0, "dmg": 4.5, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech03_swarm": {"name": "Essaim de canopée", "chassis": "en03_jungle", "hp": 16.5, "speed": 252.0, "dmg": 4.8, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech04_swarm": {"name": "Éclat de lave", "chassis": "en04_volcanic", "hp": 18.0, "speed": 242.0, "dmg": 5.1, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech05_swarm": {"name": "Sangsue des marais", "chassis": "en05_swamp", "hp": 19.5, "speed": 245.0, "dmg": 5.4, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech06_swarm": {"name": "Drone de givre", "chassis": "en06_cryo", "hp": 21.0, "speed": 248.0, "dmg": 5.7, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech07_swarm": {"name": "Particule fugitive", "chassis": "en07_reacteur", "hp": 22.5, "speed": 252.0, "dmg": 6.0, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech08_swarm": {"name": "Ouvrière carnassière", "chassis": "en08_ruche", "hp": 24.0, "speed": 244.0, "dmg": 6.3, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech09_swarm": {"name": "Intercepteur orbital", "chassis": "en09_citadelle", "hp": 25.5, "speed": 248.0, "dmg": 6.6, "radius": 28.0, "size": 115.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech10_swarm": {"name": "Harponneur abyssal", "chassis": "en10_abyss", "hp": 27.0, "speed": 250.0, "dmg": 6.9, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech11_swarm": {"name": "Parasite d'éther", "chassis": "en11_ether", "hp": 28.5, "speed": 254.0, "dmg": 7.2, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech12_swarm": {"name": "Scarabée titanique", "chassis": "en12_titans", "hp": 30.0, "speed": 242.0, "dmg": 7.5, "radius": 28.0, "size": 116.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech13_swarm": {"name": "Sonde orbitale", "chassis": "en13_orbit", "hp": 31.5, "speed": 246.0, "dmg": 7.8, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech14_swarm": {"name": "Fragment binaire", "chassis": "en14_quantum", "hp": 33.0, "speed": 250.0, "dmg": 8.1, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech15_swarm": {"name": "Étincelle d'ozone", "chassis": "en15_ozone", "hp": 34.5, "speed": 254.0, "dmg": 8.4, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech16_swarm": {"name": "Réfracteur agile", "chassis": "en16_prism", "hp": 36.0, "speed": 244.0, "dmg": 8.7, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech17_swarm": {"name": "Bielle à vapeur", "chassis": "en17_steampunk", "hp": 37.5, "speed": 248.0, "dmg": 9.0, "radius": 28.0, "size": 115.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech18_swarm": {"name": "Légionnaire rapide", "chassis": "en18_colosseum", "hp": 39.0, "speed": 252.0, "dmg": 9.3, "radius": 28.0, "size": 116.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+
+	# Tanks / Vanguards Blindés (châssis lourds, dôme garde, shield front, protecteur)
+	"mech01_shield": {"name": "Rempart d'avant-garde", "chassis": "en01_tech", "hp": 52.0, "speed": 136.0, "dmg": 8.5, "radius": 46.0, "size": 164.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 24.0, "protecteur": true, "attack_dmg": 4.8, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech02_shield": {"name": "Forteresse des dunes", "chassis": "en02_desert", "hp": 56.0, "speed": 138.0, "dmg": 9.0, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 26.0, "protecteur": true, "attack_dmg": 5.2, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech03_shield": {"name": "Colosse d'écorce", "chassis": "en03_jungle", "hp": 60.0, "speed": 140.0, "dmg": 9.5, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 28.0, "protecteur": true, "attack_dmg": 5.5, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech04_shield": {"name": "Cuirassé de magma", "chassis": "en04_volcanic", "hp": 64.0, "speed": 132.0, "dmg": 10.0, "radius": 46.0, "size": 165.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 30.0, "protecteur": true, "attack_dmg": 5.9, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech05_shield": {"name": "Blindé des bourbiers", "chassis": "en05_swamp", "hp": 68.0, "speed": 135.0, "dmg": 10.5, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 32.0, "protecteur": true, "attack_dmg": 6.3, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech06_shield": {"name": "Bastion permafrost", "chassis": "en06_cryo", "hp": 72.0, "speed": 138.0, "dmg": 11.0, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 34.0, "protecteur": true, "attack_dmg": 6.6, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech07_shield": {"name": "Bouclier isotopique", "chassis": "en07_reacteur", "hp": 76.0, "speed": 140.0, "dmg": 11.5, "radius": 46.0, "size": 164.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 36.0, "protecteur": true, "attack_dmg": 7.0, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech08_shield": {"name": "Garde royal de ruche", "chassis": "en08_ruche", "hp": 80.0, "speed": 134.0, "dmg": 12.0, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 38.0, "protecteur": true, "attack_dmg": 7.4, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech09_shield": {"name": "Rempart de citadelle", "chassis": "en09_citadelle", "hp": 84.0, "speed": 136.0, "dmg": 12.5, "radius": 46.0, "size": 170.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 40.0, "protecteur": true, "attack_dmg": 7.8, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech10_shield": {"name": "Léviathan cuirassé", "chassis": "en10_abyss", "hp": 88.0, "speed": 138.0, "dmg": 13.0, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 42.0, "protecteur": true, "attack_dmg": 8.1, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech11_shield": {"name": "Tronc d'éther", "chassis": "en11_ether", "hp": 92.0, "speed": 140.0, "dmg": 13.5, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 44.0, "protecteur": true, "attack_dmg": 8.5, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech12_shield": {"name": "Garde de titan", "chassis": "en12_titans", "hp": 96.0, "speed": 132.0, "dmg": 14.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 46.0, "protecteur": true, "attack_dmg": 8.9, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech13_shield": {"name": "Bouclier stellaire", "chassis": "en13_orbit", "hp": 100.0, "speed": 135.0, "dmg": 14.5, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 48.0, "protecteur": true, "attack_dmg": 9.3, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech14_shield": {"name": "Firewall quantique", "chassis": "en14_quantum", "hp": 104.0, "speed": 138.0, "dmg": 15.0, "radius": 46.0, "size": 165.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 50.0, "protecteur": true, "attack_dmg": 9.6, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech15_shield": {"name": "Cage de Faraday", "chassis": "en15_ozone", "hp": 108.0, "speed": 140.0, "dmg": 15.5, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 52.0, "protecteur": true, "attack_dmg": 10.0, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech16_shield": {"name": "Miroir prismatique", "chassis": "en16_prism", "hp": 112.0, "speed": 132.0, "dmg": 16.0, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 54.0, "protecteur": true, "attack_dmg": 10.4, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech17_shield": {"name": "Cuirassé à chaudière", "chassis": "en17_steampunk", "hp": 116.0, "speed": 135.0, "dmg": 16.5, "radius": 46.0, "size": 170.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 56.0, "protecteur": true, "attack_dmg": 10.8, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech18_shield": {"name": "Centurion blindé", "chassis": "en18_colosseum", "hp": 120.0, "speed": 138.0, "dmg": 17.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 58.0, "protecteur": true, "attack_dmg": 11.2, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+
+	# Snipers / Sentinelles Laser (tir_style sniper, ligne de télégraphe Line2D, dégâts lourds)
+	"mech01_sniper": {"name": "Sentinelle Laser", "chassis": "en01_tech", "hp": 22.0, "speed": 158.0, "dmg": 5.5, "radius": 34.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 11.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech02_sniper": {"name": "Tireur des mirages", "chassis": "en02_desert", "hp": 24.0, "speed": 160.0, "dmg": 6.0, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech03_sniper": {"name": "Archer de sous-bois", "chassis": "en03_jungle", "hp": 26.0, "speed": 162.0, "dmg": 6.4, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.8, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech04_sniper": {"name": "Pointeur thermique", "chassis": "en04_volcanic", "hp": 28.0, "speed": 154.0, "dmg": 6.8, "radius": 34.0, "size": 135.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 13.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech05_sniper": {"name": "Guetteur de brume", "chassis": "en05_swamp", "hp": 30.0, "speed": 156.0, "dmg": 7.2, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.1, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech06_sniper": {"name": "Sniper cryogénique", "chassis": "en06_cryo", "hp": 32.0, "speed": 158.0, "dmg": 7.6, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.7, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech07_sniper": {"name": "Focaliseur gamma", "chassis": "en07_reacteur", "hp": 34.0, "speed": 160.0, "dmg": 8.0, "radius": 34.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 15.3, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech08_sniper": {"name": "Dard perforant", "chassis": "en08_ruche", "hp": 36.0, "speed": 155.0, "dmg": 8.4, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 16.0, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech09_sniper": {"name": "Canon rail orbital", "chassis": "en09_citadelle", "hp": 38.0, "speed": 158.0, "dmg": 8.8, "radius": 34.0, "size": 140.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 16.6, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech10_sniper": {"name": "Sonar longue-vue", "chassis": "en10_abyss", "hp": 40.0, "speed": 160.0, "dmg": 9.2, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 17.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech11_sniper": {"name": "Tireur fongique", "chassis": "en11_ether", "hp": 42.0, "speed": 162.0, "dmg": 9.6, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 17.8, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech12_sniper": {"name": "Canonnier titan", "chassis": "en12_titans", "hp": 44.0, "speed": 154.0, "dmg": 10.0, "radius": 34.0, "size": 142.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 18.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech13_sniper": {"name": "Faisceau d'orbite", "chassis": "en13_orbit", "hp": 46.0, "speed": 156.0, "dmg": 10.4, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 19.1, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech14_sniper": {"name": "Pointeur quantique", "chassis": "en14_quantum", "hp": 48.0, "speed": 158.0, "dmg": 10.8, "radius": 34.0, "size": 135.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 19.7, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech15_sniper": {"name": "Éclair téléguidé", "chassis": "en15_ozone", "hp": 50.0, "speed": 160.0, "dmg": 11.2, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 20.3, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech16_sniper": {"name": "Faisceau spectral", "chassis": "en16_prism", "hp": 52.0, "speed": 154.0, "dmg": 11.6, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 21.0, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech17_sniper": {"name": "Fusilier haute pression", "chassis": "en17_steampunk", "hp": 54.0, "speed": 156.0, "dmg": 12.0, "radius": 34.0, "size": 140.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 21.6, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech18_sniper": {"name": "Sagittaire de l'arène", "chassis": "en18_colosseum", "hp": 56.0, "speed": 158.0, "dmg": 12.4, "radius": 34.0, "size": 142.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 22.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 }
 
 const BOSS_PHASE_THRESHOLDS: Dictionary = {
@@ -78,28 +135,27 @@ const BOSS_PHASE_THRESHOLDS: Dictionary = {
 	"citadelleboss": [0.5, 0.2],
 }
 
-# 19/10 (patron : « supprime les ennemis de la demo ») : plus de Rodeur/Guepe/Belier dans les pools. Chaque niveau 10-18 n'a QUE son ennemi de base,
-# des le debut (unlock 0). Niveaux 1-9 : aucun ennemi tant que leurs mecha ne sont pas modelises (les DEFS brute/drone/quadshell restent : refs carcasse/balise).
+# 19/10 : Escouades tripartites par biome (mechXX de ligne, swarm rapide, shield vanguard, sniper laser)
 const BIOME_POOL: Dictionary = {
 	"earth": [], "spaceship": [], "ice": [], "ruines": [],
-	"tech": ["mech01"],
-	"desert": ["mech02"],
-	"jungle": ["mech03"],
-	"volcanic": ["mech04"],
-	"swamp": ["mech05"],
-	"cryo": ["mech06"],
-	"reacteur": ["mech07"],
-	"ruche": ["mech08"],
-	"citadelle": ["mech09"],
-	"abyss": ["mech10"],
-	"ether": ["mech11"],
-	"titans": ["mech12"],
-	"orbit": ["mech13"],
-	"quantum": ["mech14"],
-	"ozone": ["mech15"],
-	"prism": ["mech16"],
-	"steampunk": ["mech17"],
-	"colosseum": ["mech18"],
+	"tech": ["mech01", "mech01_swarm", "mech01_shield", "mech01_sniper"],
+	"desert": ["mech02", "mech02_swarm", "mech02_shield", "mech02_sniper"],
+	"jungle": ["mech03", "mech03_swarm", "mech03_shield", "mech03_sniper"],
+	"volcanic": ["mech04", "mech04_swarm", "mech04_shield", "mech04_sniper"],
+	"swamp": ["mech05", "mech05_swarm", "mech05_shield", "mech05_sniper"],
+	"cryo": ["mech06", "mech06_swarm", "mech06_shield", "mech06_sniper"],
+	"reacteur": ["mech07", "mech07_swarm", "mech07_shield", "mech07_sniper"],
+	"ruche": ["mech08", "mech08_swarm", "mech08_shield", "mech08_sniper"],
+	"citadelle": ["mech09", "mech09_swarm", "mech09_shield", "mech09_sniper"],
+	"abyss": ["mech10", "mech10_swarm", "mech10_shield", "mech10_sniper"],
+	"ether": ["mech11", "mech11_swarm", "mech11_shield", "mech11_sniper"],
+	"titans": ["mech12", "mech12_swarm", "mech12_shield", "mech12_sniper"],
+	"orbit": ["mech13", "mech13_swarm", "mech13_shield", "mech13_sniper"],
+	"quantum": ["mech14", "mech14_swarm", "mech14_shield", "mech14_sniper"],
+	"ozone": ["mech15", "mech15_swarm", "mech15_shield", "mech15_sniper"],
+	"prism": ["mech16", "mech16_swarm", "mech16_shield", "mech16_sniper"],
+	"steampunk": ["mech17", "mech17_swarm", "mech17_shield", "mech17_sniper"],
+	"colosseum": ["mech18", "mech18_swarm", "mech18_shield", "mech18_sniper"],
 }
 
 # CORRUPTION visuelle par biome : teinte multiplicative sur CHAQUE ennemi (self_modulate). Subtile.
@@ -516,7 +572,16 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 ## Definition a utiliser pour CE spawn : role principal, ou secondaire selon `share`.
 func _def_for(kind: String) -> Dictionary:
 	var prof: Dictionary = PROFILES.get(current_biome, {})
-	if prof.is_empty() or not DEFS.has(kind) or not kind.begins_with("mech"):
+	if prof.is_empty() or not DEFS.has(kind):
+		return DEFS[kind] if DEFS.has(kind) else {}
+	# Archétypes spécialisés d'escouades (swarm, shield, sniper) : préservent leurs rôles tactiques
+	if kind.contains("_") and not kind.contains("_mk2") and not kind.contains("_inter") and not kind.contains("_mini") and not kind.contains("_boss"):
+		var d_spec: Dictionary = (DEFS[kind] as Dictionary).duplicate()
+		var tier_s: float = float(prof.get("tier", 1))
+		d_spec["speed"] = float(d_spec.get("speed", 180.0)) * (0.95 + 0.005 * (tier_s - 1.0))
+		d_spec["hp"] = float(d_spec.get("hp", 20.0)) * (1.0 + 0.03 * (tier_s - 1.0))
+		return d_spec
+	if not kind.begins_with("mech"):
 		return DEFS[kind] if DEFS.has(kind) else {}
 	var tier: int = int(prof["tier"])
 	if randf() < _mk2_share():
@@ -730,7 +795,7 @@ func _spawn_squad(force: bool = false) -> void:
 	if _squads.size() >= 1 + tier / 7 and not force:
 		return
 	var n: int = clampi(4 + tier / 3, 4, 10)
-	n = maxi(3, int(round(float(n) * clampf(0.5 + GameState.run_time / 240.0, 0.5, 1.0))))   # escouades plus petites en debut de partie
+	n = maxi(4, int(round(float(n) * clampf(0.5 + GameState.run_time / 240.0, 0.5, 1.0))))   # escouades d'au moins 4 membres pour les 4 rôles
 	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
 		return
 	var kind: String = String(pool[0])
@@ -751,10 +816,22 @@ func _spawn_squad(force: bool = false) -> void:
 		if arena_half > 0.0:
 			pos.x = clampf(pos.x, arena.position.x, arena.end.x)
 			pos.y = clampf(pos.y, arena.position.y, arena.end.y)
+		var member_kind: String = kind
+		if pool.size() >= 4 and i > 0:
+			if i == 1:
+				member_kind = String(pool[1])   # fast swarm skirmisher
+			elif i == 2:
+				member_kind = String(pool[2])   # shield vanguard
+			elif i == 3:
+				member_kind = String(pool[3])   # sniper rear-guard
+			elif i % 2 == 0:
+				member_kind = String(pool[1])   # swarm
+			else:
+				member_kind = kind              # frontline mecha
 		var e: Enemy = Enemy.new()
 		e.global_position = pos
 		game.enemy_layer.add_child(e)
-		e.setup(kind, _def_for(kind), player, game)
+		e.setup(member_kind, _def_for(member_kind), player, game)
 		_scale_enemy(e)
 		q.members.append(e)
 	q.assign_ranks()

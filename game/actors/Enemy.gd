@@ -226,6 +226,7 @@ var _proc_base_pos: Vector2 = Vector2.ZERO
 var _proc_base_scale: Vector2 = Vector2.ONE
 var _proc_t: float = 0.0
 var field_slow: float = 1.0   # transient: a slow-field prop dampens this each frame inside it
+var stun_t: float = 0.0       # IEM / EMP stun: freezes enemy movement and attacks while active
 var _speed_mult: float = 1.0
 ## Ciblage prioritaire (27/09, rapport "Archives-machines" : rendre l'auto-visee interessante).
 ## Reduit fictivement la distance vue par Player._nearest_enemy()/_cone_target() -> cet ennemi
@@ -1103,6 +1104,14 @@ func _physics_process(delta: float) -> void:
 			_advance_one_shot(delta)
 			if _anim_done or _die_timer <= 0.0:
 				queue_free()
+		return
+
+	if stun_t > 0.0:
+		stun_t -= delta
+		velocity = velocity.move_toward(Vector2.ZERO, 900.0 * delta)
+		global_position += velocity * delta
+		if _spr != null and (Engine.get_physics_frames() + get_instance_id()) % 8 == 0:
+			_spr.self_modulate = Color(0.6, 1.6, 2.2) if ((Engine.get_physics_frames() / 8) % 2 == 0) else Color.WHITE
 		return
 		
 	var desired_vel: Vector2 = Vector2.ZERO
@@ -2160,3 +2169,17 @@ func _die() -> void:
 		_die_timer = 0.7
 	else:
 		queue_free()
+
+## Applique un étourdissement IEM (EMP) : fige les mouvements et interrompt les tirs
+func apply_stun(duration: float) -> void:
+	if not alive:
+		return
+	stun_t = maxf(stun_t, duration)
+	velocity = Vector2.ZERO
+	if _spr != null:
+		var tw: Tween = create_tween()
+		tw.tween_property(_spr, "self_modulate", Color(0.5, 1.8, 2.5), 0.1)
+		tw.tween_property(_spr, "self_modulate", Color.WHITE, 0.25)
+	if game != null and game.has_method("spawn_vfx"):
+		game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.45, Color(0.4, 0.9, 1.6))
+

@@ -22,7 +22,7 @@ class FakePlayer extends Node2D:
 	var velocity: Vector2 = Vector2(200, 0)
 	var base_speed: float = 300.0
 	var chassis_family: String = "vortex"
-	func take_damage(_a, _b = Vector2.ZERO) -> void: pass
+	func take_damage(_a, _b = Vector2.ZERO, _c: String = "") -> void: pass
 
 var _fail: int = 0
 func _check(ok: bool, msg: String) -> void:

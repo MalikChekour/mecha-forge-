@@ -91,6 +91,13 @@ const DECOR: Dictionary = {
 	# --- fuel barrels: get close and they arm, then blow up (see BOOM_* in Prop) ---
 	"baril":      {"f": "g20", "hp": 40.0,  "sz": 118.0, "destruct": true,  "skill": 0.30, "boom": true, "glow": "orange"},
 	"caisses":    {"f": "g21", "hp": 38.0,  "sz": 120.0, "destruct": true,  "skill": 0.50},
+	# --- DECORS INTERACTIFS & TACTIQUES (Pilier 2) ---
+	"cuve_promethee":     {"f": "g20", "hp": 45.0,  "sz": 130.0, "destruct": true, "glow": "cyan",
+	                       "emp_barrel": true, "emp_r": 280.0, "emp_dmg": 65.0, "emp_stun": 2.5},
+	"generateur_scrap":   {"f": "g21", "hp": 35.0,  "sz": 120.0, "destruct": true, "glow": "gold",
+	                       "scrap_generator": true},
+	"barricade_blindee":  {"f": "g28", "hp": 140.0, "sz": 150.0, "destruct": true, "glow": "orange",
+	                       "block": 0.45, "cover_barricade": true},
 	# ARC PYLON: zaps the nearest enemies with lightning, and blows an EMP shockwave when destroyed.
 	# Neutral-helpful — lead the horde past it and it thins them; break it for a burst. Tougher HP.
 	"generateur": {"f": "g22", "hp": 170.0, "sz": 175.0, "destruct": true, "glow": "cyan",
@@ -900,19 +907,23 @@ const BIOME_DECOR: Dictionary = {
 	# container, conduit) appartient au niveau 1 (L'Usine) ; les nouveaux decors propres a chaque
 	# niveau arriveront avec leurs images (voir la bible des niveaux). Une liste vide = biome sans decor.
 	"tech":      ["tech_soudeuse", "tech_portique_laser", "tech_bac_composants", "tech_cuve_vapeur", "tech_chariot_robot",
+	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "generateur", "conduit", "antenne", "capaciteur", "tourelle", "emetteur", "baril", "container", "caisses", "aimant", "terminal", "archives", "quai", "convoyeur",
 	              "convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "vanne_refroidissement", "surchauffe_sol", "porte_automatique", "zone_chargement", "container_mobile"],
 	"desert":    ["desert_miroir_solaire", "desert_generateur_tempete", "desert_malle_survie", "desert_fosse_aspiration",
+	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "desert_collecteur_solaire", "desert_projecteur_mirage", "desert_ver_foreur", "desert_fumerolle_vapeur",
 	              "desert_char_enfoui", "desert_arche_verre"],
 	"jungle":    ["jungle_mortier_plante", "jungle_liane_fouet", "jungle_cosse_geante",
 	              "jungle_fleur_catapulte", "jungle_plante_lasso", "jungle_nuee_lucioles",
 	              "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_colonne_racines", "jungle_statue_mecha"],
 	"volcanic":  ["volcanic_mortier_scories", "volcanic_event_magma", "volcanic_lingotiere",
+	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "volcanic_marteau_pilon", "volcanic_creuset_basculant", "volcanic_bassin_trempe",
 	              "volcanic_electroaimant", "volcanic_soufflerie_braises", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "volcanic_robot_constructeur"],
 	"swamp":     ["swamp_tourelle_dca", "swamp_vanne_crue", "swamp_coffre_banque", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_lampadaire_phare", "swamp_barricade_vehicules", "swamp_brouilleur_radio", "swamp_gratte_ciel", "swamp_pont_brise"],
 	"cryo":      ["cryo_canon_azote", "cryo_condenseur_givre", "cryo_caisson_echantillons", "cryo_teleporteur_paire", "cryo_mur_glace_regen", "cryo_cuve_stase", "cryo_serveur_givre",
+	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "brouillard_froid", "radiateur", "pic_de_glace", "borne_thermique", "glace_fragile"],
 	"reacteur":  ["reacteur_canon_particules", "reacteur_bobine_tesla", "reacteur_barre_combustible", "reacteur_barre_controle", "reacteur_cellule_confinement", "reacteur_turbine_hs", "reacteur_cuve_plomb",
 	              "bassin_toxique", "vanne_drainage", "poche_de_vent", "console_vent", "grille_ventilation", "zone_alternante", "cristal_instable", "pulse_energie"],
@@ -928,7 +939,9 @@ const BIOME_DECOR: Dictionary = {
 	"ozone":     ["ozone_tourelle_arc_eclair", "ozone_emetteur_parafoudre", "ozone_butin_accumulateur", "ozone_inter_condensateur_surcharge", "ozone_inter_cristal_piezo", "ozone_terrain_fleche_fulgurite"],
 	"prism":     ["prism_tourelle_refracteur", "prism_emetteur_faisceau_laser", "prism_butin_geode_cristal", "prism_inter_miroir_deflexion", "prism_inter_stalagmite_fragile", "prism_terrain_grappe_cristaux"],
 	"steampunk": ["steampunk_tourelle_gatling_vapeur", "steampunk_emetteur_purge_vapeur", "steampunk_butin_coffre_fort_laiton", "steampunk_inter_vanne_surchauffe", "steampunk_inter_chaudiere_instable", "steampunk_terrain_engrenage_monumental"],
-	"colosseum": ["colosseum_tourelle_simulation", "colosseum_emetteur_barre_exercice", "colosseum_butin_module_test", "colosseum_inter_pod_overdrive", "colosseum_inter_mine_exercice", "colosseum_terrain_pilier_holomur"],
+	"colosseum": ["colosseum_tourelle_simulation", "colosseum_emetteur_barre_exercice", "colosseum_butin_module_test",
+	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
+	              "colosseum_inter_pod_overdrive", "colosseum_inter_mine_exercice", "colosseum_terrain_pilier_holomur"],
 
 	# biomes hors campagne (SANS FIN) : un seul decor propre, ou aucun
 	"ice":       ["glace"],
@@ -1461,6 +1474,15 @@ class Prop extends StaticBody2D:
 	const BOOM_FUSE: float = 4.0
 	const BOOM_R: float = 250.0
 	const BOOM_DMG: float = 68.0
+	# --- EMP BARREL / CUVES DE PROMETHEE (Pilier 2) ---
+	var _emp_barrel: bool = false
+	var _emp_r: float = 280.0
+	var _emp_dmg: float = 65.0
+	var _emp_stun: float = 2.5
+	# --- SCRAP & NANITE GENERATOR (style Arbres de Brotato) ---
+	var _scrap_generator: bool = false
+	# --- BARRICADE BLINDEE TACTIQUE ---
+	var _cover_barricade: bool = false
 	# --- BEACON: emits enemies until destroyed (see the DECOR entry) ---
 	var _beacon: bool = false
 	var _beacon_cd: float = 3.5
@@ -2181,6 +2203,13 @@ class Prop extends StaticBody2D:
 		if _pylon:
 			_pylon_cd = float(def.get("arc_cd", 1.5)); _pylon_dmg = float(def.get("arc_dmg", 22.0))
 			_pylon_r = float(def.get("arc_r", 300.0)); _pylon_t = randf() * _pylon_cd
+		_emp_barrel = bool(def.get("emp_barrel", false))
+		if _emp_barrel:
+			_emp_r = float(def.get("emp_r", 280.0))
+			_emp_dmg = float(def.get("emp_dmg", 65.0))
+			_emp_stun = float(def.get("emp_stun", 2.5))
+		_scrap_generator = bool(def.get("scrap_generator", false))
+		_cover_barricade = bool(def.get("cover_barricade", false))
 		_slow = bool(def.get("slow", false))
 		if _slow:
 			_slow_r = float(def.get("slow_r", 200.0)); _slow_mult = float(def.get("slow_mult", 0.5))
@@ -4702,6 +4731,41 @@ class Prop extends StaticBody2D:
 						var ikind: String = "desert_miroir_solaire" if _solar_mirror else ("tech_tourelle_soudeuse" if _welder else "laser")
 						game.impact_fx(pp, col, ikind, shot_dir, 1.8)
 
+	## Cuve de Promethee (Baril IEM) : onde electrique qui inflige des degats ET paralyse (stun 2.5s) les ennemis
+	func _emp_barrel_explode() -> void:
+		set_process(false)
+		var pos: Vector2 = global_position
+		_mark_gone(pos)
+		GameState.props_destroyed += 1
+		if game != null and is_instance_valid(game):
+			if game.has_method("death_fx"):
+				game.death_fx(pos, 2, true)
+			if game.has_method("impact_fx"):
+				game.impact_fx(pos, Color(0.4, 0.95, 1.8), kind, Vector2.ZERO, 2.6)
+			if game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_shockwave", pos, 0.0, 2.5, Color(0.3, 0.8, 1.8))
+				game.spawn_vfx("aaa_aoe", pos, 0.0, 2.0, Color(0.4, 1.0, 1.8))
+			Events.screen_shake.emit(6.5)
+			Audio.sfx("hit", 0.25)
+			var r2: float = _emp_r * _emp_r
+			for e in _enemies():
+				if e is Node2D and is_instance_valid(e) and "alive" in e and e.alive:
+					var to: Vector2 = (e as Node2D).global_position - pos
+					if to.length_squared() <= r2:
+						if e.has_method("apply_stun"):
+							e.apply_stun(_emp_stun)
+						if e.has_method("take_damage"):
+							e.take_damage(_emp_dmg)
+						if "velocity" in e:
+							e.velocity += to.normalized() * 280.0
+			if _plr != null and is_instance_valid(_plr) and pos.distance_to(_plr.global_position) <= _emp_r * 0.5:
+				if _plr.has_method("take_damage"):
+					_plr.take_damage(_emp_dmg * 0.2)
+			_drop_loot(pos)
+			if "cover_list" in game:
+				game.cover_list.erase(self)
+		call_deferred("queue_free")
+
 	## Fuel barrel detonation: hurts EVERYTHING in BOOM_R, the player included — the 4s fuse is
 	## the fair warning. Leading the horde over a barrel is the reward.
 	func _explode() -> void:
@@ -4729,6 +4793,14 @@ class Prop extends StaticBody2D:
 	## Roll what a smashed prop leaves behind. Gold-glow crates always pay a competence.
 	func _drop_loot(pos: Vector2) -> void:
 		if game == null or not is_instance_valid(game):
+			return
+		if _scrap_generator:
+			if game.has_method("spawn_heal"):
+				game.spawn_heal(pos)
+			if game.has_method("spawn_scrap"):
+				game.spawn_scrap(pos, 8 + randi() % 6)
+			if game.has_method("spawn_xp"):
+				game.spawn_xp(pos, 3)
 			return
 		if _skill and game.has_method("spawn_skill"):
 			game.spawn_skill(pos)
@@ -4792,6 +4864,9 @@ class Prop extends StaticBody2D:
 			return
 		if hp <= 0.0:
 			_clear_beam()
+			if _emp_barrel:
+				_emp_barrel_explode()
+				return
 			if _boom:
 				_explode()      # shooting a fuel barrel sets it off — no fuse, you chose this
 				return
