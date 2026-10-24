@@ -8,6 +8,8 @@ var xp: int = 0
 var xp_to_next: int = 5
 var kills: int = 0
 var kills_by_weapon: Dictionary = {}   # weapon id -> kill count this run (evolution "kills" condition)
+var damage_by_weapon: Dictionary = {}  # weapon id -> total damage dealt this run
+var total_damage: float = 0.0          # total damage dealt across all weapons
 var props_destroyed: int = 0   # decor broken this run (daily-quest tracking)
 var scrap: int = 0
 var run_xp_mult: float = 1.0     # passif +EXP (Koga Ninja Scroll) — reset chaque partie
@@ -320,6 +322,8 @@ func reset() -> void:
 	xp_to_next = 5
 	kills = 0
 	kills_by_weapon = {}
+	damage_by_weapon = {}
+	total_damage = 0.0
 	props_destroyed = 0
 	scrap = 0
 	run_xp_mult = 1.0
@@ -375,6 +379,13 @@ func add_scrap(amount: int) -> void:
 	amount = int(round(amount * float(diff().get("reward", 1.0)) * Protocols.reward * run_scrap_mult))   # diff + protocole + passif +Or
 	scrap += amount
 	Events.scrap_collected.emit(amount)
+
+func add_damage(weapon_id: String, amount: float) -> void:
+	if amount <= 0.0:
+		return
+	total_damage += amount
+	var key: String = weapon_id if weapon_id != "" else "divers"
+	damage_by_weapon[key] = float(damage_by_weapon.get(key, 0.0)) + amount
 
 func add_kill(pos: Vector2, rank: int, weapon_id: String = "") -> void:
 	kills += 1

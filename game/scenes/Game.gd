@@ -202,15 +202,26 @@ var _floor_mat: ShaderMaterial
 # condition du rapport (Puissance/Agilite/Cupidite/Surcharge) ; les 4 non couvertes par le
 # rapport (missilepod/railgun/disperseur/ricochet) passent en kills, seuils de 1ere passe.
 const EVO_RULES: Dictionary = {
-	"autocannon": {"cond": {"type": "meta", "key": "puissance", "level": 3}, "evo": "vulcan", "name": "EVOLUTION : Vulcan (barrage)"},
-	"missilepod": {"cond": {"type": "kills", "count": 25}, "evo": "hydra", "name": "EVOLUTION : Hydra (essaim)"},
-	"railgun": {"cond": {"type": "kills", "count": 30}, "evo": "annihilator", "name": "EVOLUTION : Annihilateur"},
-	"plasma": {"cond": {"type": "meta", "key": "surcharge", "level": 2}, "evo": "singularity", "name": "EVOLUTION : Singularite"},
-	"sabre": {"cond": {"type": "meta", "key": "agilite", "level": 2}, "evo": "tempest", "name": "EVOLUTION : Tempete (360)"},
-	"disperseur": {"cond": {"type": "kills", "count": 25}, "evo": "deflagrateur", "name": "EVOLUTION : Deflagrateur"},
-	"ricochet": {"cond": {"type": "kills", "count": 30}, "evo": "carambole", "name": "EVOLUTION : Carambole"},
-	"disque": {"cond": {"type": "meta", "key": "agilite", "level": 3}, "evo": "guillotine", "name": "EVOLUTION : Guillotine"},
-	"faisceau": {"cond": {"type": "meta", "key": "cupidite", "level": 3}, "evo": "rayon_spectre", "name": "EVOLUTION : Rayon Spectre"},
+	"autocannon": {"passive": "he_fuel", "passive_name": "Carburant HE", "evo": "vulcan", "name": "EVOLUTION : Vulcan Barrage"},
+	"missilepod": {"passive": "ammo", "passive_name": "Propulseur munitions", "evo": "hydra", "name": "EVOLUTION : Hydre Traqueuse"},
+	"railgun": {"passive": "haste", "passive_name": "Cadence de tir", "evo": "annihilator", "name": "EVOLUTION : Faisceau Annihilateur"},
+	"plasma": {"passive": "dmg", "passive_name": "Dégâts", "evo": "singularity", "name": "EVOLUTION : Singularité Gravitationnelle"},
+	"sabre": {"passive": "armor", "passive_name": "Armure", "evo": "tempest", "name": "EVOLUTION : Tempête de Lames 360°"},
+	"disperseur": {"passive": "crit", "passive_name": "Chance Critique", "evo": "deflagrateur", "name": "EVOLUTION : Déflagrateur"},
+	"ricochet": {"passive": "magnet", "passive_name": "Aimant à XP", "evo": "carambole", "name": "EVOLUTION : Carambole"},
+	"disque": {"passive": "spd", "passive_name": "Vitesse", "evo": "guillotine", "name": "EVOLUTION : Guillotine Orbitale"},
+	"faisceau": {"passive": "goldgain", "passive_name": "Liaison à huile", "evo": "rayon_spectre", "name": "EVOLUTION : Rayon Spectre"},
+}
+const PASSIVE_EVO_SYNERGY: Dictionary = {
+	"he_fuel": "Autocanon",
+	"ammo": "Missiles",
+	"haste": "Railgun",
+	"dmg": "Plasma",
+	"armor": "Sabre",
+	"crit": "Disperseur",
+	"magnet": "Ricochet",
+	"spd": "Disque",
+	"goldgain": "Faisceau",
 }
 
 ## ARMES HYBRIDES (plan de refonte, 29/09) : fusionne DEUX armes de base MAX (jamais 1 seule
@@ -1422,6 +1433,68 @@ func spawn_weapon_loan(pos: Vector2) -> void:
 	# guarantie (pas un jet de chance), a la difference du "bonus" des ennemis intermediaires.
 	_spawn_pickup(pos, "arme_volee", 1)
 
+func spawn_boss_chest(pos: Vector2) -> void:
+	_spawn_pickup(pos, "coffre_boss", 1)
+
+func open_lucky_chest() -> void:
+	if not GameState.alive:
+		return
+	var roll: float = randf()
+	var count: int = 1
+	if roll > 0.95:
+		count = 5
+	elif roll > 0.70:
+		count = 3
+	
+	var rewards: Array = []
+	var evos: Array = _eligible_evolutions()
+	if not evos.is_empty():
+		evos.shuffle()
+		rewards.append(evos[0])
+	
+	var pool: Array = []
+	for u: Dictionary in UPGRADES:
+		if _banished.has(u["id"]):
+			continue
+		pool.append(u)
+	pool.shuffle()
+	
+	for u in pool:
+		if rewards.size() >= count:
+			break
+		var already: bool = false
+		for r in rewards:
+			if String(r.get("id", "")) == String(u.get("id", "")):
+				already = true
+				break
+		if not already:
+			rewards.append(u)
+			
+	var scrap_bonus: int = 50 * count
+	
+	if _headless or _bot:
+		for r in rewards:
+			_apply_upgrade(String(r.get("id", "")))
+		GameState.add_scrap(scrap_bonus)
+		show_banner("COFFRE x%d REÇU (+%d ferraille) !" % [count, scrap_bonus], Color(1.0, 0.85, 0.2))
+		return
+		
+	if get_tree() != null:
+		get_tree().paused = true
+	Audio.sfx("levelup")
+	if hud != null and hud.has_method("show_lucky_chest"):
+		hud.show_lucky_chest(rewards, count, scrap_bonus)
+
+func claim_lucky_chest(rewards: Array, scrap_bonus: int) -> void:
+	for r in rewards:
+		_apply_upgrade(String(r.get("id", "")))
+	GameState.add_scrap(scrap_bonus)
+	Audio.sfx("victory")
+	if get_tree() != null:
+		get_tree().paused = false
+	if player != null and player.has_method("reset_input_state"):
+		player.reset_input_state()
+
 func spawn_heal(pos: Vector2) -> void:
 	# pure med-pack out of a smashed crate
 	_spawn_pickup(pos, "heal", 1)
@@ -2036,6 +2109,78 @@ func show_banner(text: String, color: Color = Color(1.0, 0.92, 0.7)) -> void:
 	tw.tween_interval(2.4)
 	tw.tween_property(lb, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(cl.queue_free)
+
+func show_horde_warning(title_text: String = "⚠️ ATTENTION : VAGUE IMMINENTE ⚠️", subtitle: String = "") -> void:
+	if _headless:
+		return
+	_shake = maxf(_shake, 14.0)   # Immediate tactile screen shake
+	Audio.sfx("boss", 0.0)
+
+	var cl: CanvasLayer = CanvasLayer.new()
+	cl.layer = 25
+	add_child(cl)
+
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var top_y: float = vp.y * 0.26
+	var h: float = 88.0
+
+	# Dark translucent backing band with red neon borders
+	var band: Panel = Panel.new()
+	band.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	band.offset_top = top_y
+	band.offset_bottom = top_y + h
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.16, 0.02, 0.02, 0.88)
+	sb.border_width_top = 3; sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.25, 0.2, 0.95)
+	sb.shadow_color = Color(1.0, 0.1, 0.1, 0.5)
+	sb.shadow_size = 18
+	band.add_theme_stylebox_override("panel", sb)
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(band)
+
+	var vb: VBoxContainer = VBoxContainer.new()
+	vb.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	vb.offset_top = top_y + 12.0
+	vb.offset_bottom = top_y + h
+	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(vb)
+
+	var lbl: Label = Label.new()
+	lbl.text = title_text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", Palette.fs(26))
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
+	lbl.add_theme_color_override("font_outline_color", Color(0.6, 0.05, 0.05))
+	lbl.add_theme_constant_override("outline_size", 8)
+	vb.add_child(lbl)
+
+	if subtitle != "":
+		var sub: Label = Label.new()
+		sub.text = subtitle
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub.add_theme_font_size_override("font_size", Palette.fs(15))
+		sub.add_theme_color_override("font_color", Color(1.0, 0.75, 0.75))
+		vb.add_child(sub)
+
+	# Dramatic warning flash tween
+	band.modulate.a = 0.0
+	vb.modulate.a = 0.0
+	var tw: Tween = create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(band, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(vb, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
+	
+	tw.chain().tween_property(lbl, "modulate", Color(1.0, 0.35, 0.35), 0.25)
+	tw.tween_property(lbl, "modulate", Color(1.0, 0.95, 0.4), 0.25)
+	tw.tween_property(lbl, "modulate", Color(1.0, 0.35, 0.35), 0.25)
+	tw.tween_property(lbl, "modulate", Color(1.0, 0.95, 0.4), 0.25)
+	tw.tween_interval(1.2)
+	
+	tw.chain().set_parallel(true)
+	tw.tween_property(band, "modulate:a", 0.0, 0.5)
+	tw.tween_property(vb, "modulate:a", 0.0, 0.5)
+	tw.chain().tween_callback(cl.queue_free)
 
 ## INDICE d'apprentissage : une PHRASE, pas un titre.
 ## show_banner() est calibre pour deux mots (police 32, pas de retour a la ligne, ancre en
@@ -2787,16 +2932,23 @@ func _draw_cards() -> void:
 				var wid: String = String(_WEAPON_CARD.get(cid, ""))
 				if wid != "":
 					var lv: int = ws2.weapon_level(wid)
+					var c: Dictionary = (_cards[i] as Dictionary).duplicate()
 					if lv > 0:
-						var c: Dictionary = (_cards[i] as Dictionary).duplicate()
 						c["name"] = "%s   —   %s" % [String(c["name"]), _gain_niveau(wid, lv)]
-						_cards[i] = c
+					if EVO_RULES.has(wid):
+						var er: Dictionary = EVO_RULES[wid]
+						c["desc_evo"] = "⚡ Synergie EVO : + %s" % String(er.get("passive_name", ""))
+					_cards[i] = c
+				elif PASSIVE_EVO_SYNERGY.has(cid):
+					var c: Dictionary = (_cards[i] as Dictionary).duplicate()
+					c["desc_evo"] = "⚡ Synergie EVO : %s" % String(PASSIVE_EVO_SYNERGY[cid])
+					_cards[i] = c
 				elif cid.begins_with("evo_"):
-					# Le mot « EVOLUTION » n'etait explique nulle part : on dit ce qu'il fait.
 					var base_id: String = cid.substr(4)
 					var c2: Dictionary = (_cards[i] as Dictionary).duplicate()
 					c2["name"] = "%s   —   remplace %s et demarre au niveau max" % [
 						String(c2["name"]), _nom_arme(base_id)]
+					c2["desc_evo"] = "★ ARME ÉVOLUÉE ULTIME ★"
 					_cards[i] = c2
 
 ## Categorie d'une carte : "act" = arme/competence active, "pas" = passif/stat. Sert a diversifier le draft.
@@ -2815,19 +2967,29 @@ func _eligible_evolutions() -> Array:
 		return out
 	for base: String in EVO_RULES:
 		var r: Dictionary = EVO_RULES[base]
-		if ws.is_max(base) and _evo_cond_met(base, r["cond"]) and not ws.owned_weapons().has(r["evo"]):
-			out.append({"id": "evo_" + base, "name": String(r["name"]), "evo": true})
+		if ws.is_max(base) and _evo_cond_met(base, r) and not ws.owned_weapons().has(String(r["evo"])):
+			out.append({
+				"id": "evo_" + base,
+				"name": String(r["name"]),
+				"evo": true,
+				"base": base,
+				"desc_evo": "★ ARME ÉVOLUÉE ULTIME ★"
+			})
 	return out
 
-## Verifie la condition typee d'une regle d'evolution (voir EVO_RULES). "meta" lit un niveau de
-## competence PERSISTANT (achete entre les parties, SaveManager) ; "kills" lit le compteur PAR
-## ARME de cette run (GameState.kills_by_weapon, alimente par Enemy.take_damage/_die).
-func _evo_cond_met(base: String, cond: Dictionary) -> bool:
-	match String(cond.get("type", "")):
-		"meta":
-			return SaveManager.meta_level(String(cond.get("key", ""))) >= int(cond.get("level", 99))
-		"kills":
-			return int(GameState.kills_by_weapon.get(base, 0)) >= int(cond.get("count", 999))
+## Verifie la condition d'une regle d'evolution (voir EVO_RULES).
+## Priorite a la synergie en partie : posseder au moins 1 rang du passif associe (_passives.has).
+func _evo_cond_met(base: String, r: Dictionary) -> bool:
+	var req_passive: String = String(r.get("passive", ""))
+	if req_passive != "":
+		return int(_passives.get(req_passive, 0)) > 0
+	if r.has("cond"):
+		var cond: Dictionary = r["cond"]
+		match String(cond.get("type", "")):
+			"meta":
+				return SaveManager.meta_level(String(cond.get("key", ""))) >= int(cond.get("level", 99))
+			"kills":
+				return int(GameState.kills_by_weapon.get(base, 0)) >= int(cond.get("count", 999))
 	return false
 
 ## Calque sur _eligible_evolutions() : une fusion exige les DEUX armes de la paire au niveau MAX
@@ -2902,31 +3064,33 @@ func _apply_upgrade(id: String) -> void:
 				break
 		return
 	_passives[id] = int(_passives.get(id, 0)) + 1
+	if player != null:
+		match id:
+			"dmg": player.damage *= 1.25
+			"spd": player.base_speed *= 1.12
+			"hp":
+				player.max_hp += 25.0
+				player.hp = minf(player.max_hp, player.hp + 25.0)
+				Events.player_damaged.emit(player.hp, player.max_hp)
+			"haste": player.cooldown_mult = maxf(0.35, player.cooldown_mult * 0.88)
+			"crit": player.crit_chance = minf(0.75, player.crit_chance + 0.08)
+			"armor": player.armor = minf(0.6, player.armor + 0.08)
+			"magnet": player.magnet_range += 105.0   # base is tiny now -> each pick is a real jump in reach
+			"he_fuel": player.size_mult = minf(1.7, player.size_mult + 0.15)
+			"ammo": player.proj_speed_mult = minf(1.6, player.proj_speed_mult + 0.12)
+			"regen": player.hp_regen += 1.5
+			"w_autocannon": player.add_weapon("autocannon")
+			"w_missile": player.add_weapon("missilepod")
+			"w_railgun": player.add_weapon("railgun")
+			"w_disperseur": player.add_weapon("disperseur")
+			"w_ricochet": player.add_weapon("ricochet")
+			"w_disque": player.add_weapon("disque")
+			"w_faisceau": player.add_weapon("faisceau")
+			"w_plasma": player.add_weapon("plasma")
+			"w_sabre": player.add_weapon("sabre")
 	match id:
-		"dmg": player.damage *= 1.25
-		"spd": player.base_speed *= 1.12
-		"hp":
-			player.max_hp += 25.0
-			player.hp = minf(player.max_hp, player.hp + 25.0)
-			Events.player_damaged.emit(player.hp, player.max_hp)
-		"haste": player.cooldown_mult = maxf(0.35, player.cooldown_mult * 0.88)
-		"crit": player.crit_chance = minf(0.75, player.crit_chance + 0.08)
-		"armor": player.armor = minf(0.6, player.armor + 0.08)
-		"magnet": player.magnet_range += 105.0   # base is tiny now -> each pick is a real jump in reach
-		"he_fuel": player.size_mult = minf(1.7, player.size_mult + 0.15)
-		"ammo": player.proj_speed_mult = minf(1.6, player.proj_speed_mult + 0.12)
-		"regen": player.hp_regen += 1.5
 		"xpgain": GameState.run_xp_mult += 0.15
 		"goldgain": GameState.run_scrap_mult += 0.20
-		"w_autocannon": player.add_weapon("autocannon")
-		"w_missile": player.add_weapon("missilepod")
-		"w_railgun": player.add_weapon("railgun")
-		"w_disperseur": player.add_weapon("disperseur")
-		"w_ricochet": player.add_weapon("ricochet")
-		"w_disque": player.add_weapon("disque")
-		"w_faisceau": player.add_weapon("faisceau")
-		"w_plasma": player.add_weapon("plasma")
-		"w_sabre": player.add_weapon("sabre")
 		"aura":
 			player.add_aura()
 			show_banner("BOUCLIER A IMPULSIONS  niv.%d" % player.aura_level, Color(0.5, 0.95, 1.0))

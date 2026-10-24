@@ -335,8 +335,11 @@ func _spawn_boss(kind: String) -> void:
 	_scale_enemy(e)   # bosses scale with run time + cleared-zone bonus + difficulty, like the trash
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 3.0, Color(1.0, 0.5, 0.4))   # menacing arrival ring
-	if game != null and game.has_method("show_banner"):
-		game.show_banner("!  MENACE MAJEURE  !", Color(1.0, 0.4, 0.3))
+	if game != null:
+		if game.has_method("show_horde_warning"):
+			game.show_horde_warning("🚨 MENACE COLOSSALE EN APPROCHE 🚨", "Alerte rouge : Boss détecté !")
+		elif game.has_method("show_banner"):
+			game.show_banner("!  MENACE MAJEURE  !", Color(1.0, 0.4, 0.3))
 	Audio.sfx("boss")
 	Audio.music("boss")
 
@@ -999,6 +1002,9 @@ func _spawn_wave() -> void:
 			"dist": 700.0 + randf_range(-90.0, 260.0),
 			"kind": lead if randf() < 0.82 else _weighted_pick(true),
 		})
-	if game != null and game.has_method("show_banner"):
-		game.show_banner(">>>  VAGUE MASSIVE  <<<", Color(1.0, 0.55, 0.3))
+	if game != null:
+		if game.has_method("show_horde_warning"):
+			game.show_horde_warning("⚠️ ATTENTION : VAGUE IMMINENTE ⚠️", "Une horde massive encercle la zone !")
+		elif game.has_method("show_banner"):
+			game.show_banner(">>>  VAGUE MASSIVE  <<<", Color(1.0, 0.55, 0.3))
 	Audio.sfx("boss", 0.1)

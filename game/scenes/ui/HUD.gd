@@ -543,7 +543,7 @@ func _render_draft() -> void:
 	var vp: Vector2 = _vp()
 	var k: float = _k()
 	var pw: float = clampf(vp.x * 0.86, 280.0, 640.0)
-	var row_h: float = maxf(56.0, 62.0 * k)
+	var row_h: float = maxf(64.0, 72.0 * k)
 	var row_gap: float = 12.0 * k
 	var mar: float = 20.0 * k
 
@@ -586,10 +586,13 @@ func _render_draft() -> void:
 		var b: Button = Button.new()
 		var is_evo: bool = bool(cards[i].get("evo", false))
 		var is_hybrid: bool = bool(cards[i].get("hybrid", false))
-		b.text = ("BANNIR : " if _banish_mode else "") + String(cards[i].get("name", "?"))
+		var card_txt: String = ("BANNIR : " if _banish_mode else "") + String(cards[i].get("name", "?"))
+		if cards[i].has("desc_evo"):
+			card_txt += "\n" + String(cards[i]["desc_evo"])
+		b.text = card_txt
 		b.custom_minimum_size = Vector2(0, row_h)
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.add_theme_font_size_override("font_size", Palette.fs(17))
+		b.add_theme_font_size_override("font_size", Palette.fs(16 if cards[i].has("desc_evo") else 17))
 		
 		# Holographic card styling
 		var btn_sb: StyleBoxFlat = StyleBoxFlat.new()
@@ -597,20 +600,38 @@ func _render_draft() -> void:
 		btn_sb.border_width_left = 1; btn_sb.border_width_right = 1
 		btn_sb.border_width_top = 1; btn_sb.border_width_bottom = 1
 		btn_sb.border_color = Color(0.2, 0.6, 0.8, 0.4)
-		btn_sb.corner_radius_top_left = 4; btn_sb.corner_radius_bottom_right = 4
-		b.add_theme_stylebox_override("normal", btn_sb)
+		btn_sb.corner_radius_top_left = 6; btn_sb.corner_radius_bottom_right = 6
+		btn_sb.corner_radius_top_right = 6; btn_sb.corner_radius_bottom_left = 6
 		
 		var btn_sb_hover: StyleBoxFlat = btn_sb.duplicate()
 		btn_sb_hover.bg_color = Color(0.1, 0.25, 0.4, 0.8)
 		btn_sb_hover.border_color = Color(0.15, 0.85, 1.0, 1.0)
 		btn_sb_hover.shadow_color = Color(0.15, 0.85, 1.0, 0.5)
 		btn_sb_hover.shadow_size = 8
+
+		if is_evo and not _banish_mode:
+			b.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35))   # gold evolution
+			btn_sb.border_color = Color(1.0, 0.82, 0.2, 0.85)
+			btn_sb.border_width_left = 2; btn_sb.border_width_right = 2
+			btn_sb.border_width_top = 2; btn_sb.border_width_bottom = 2
+			btn_sb.shadow_color = Color(1.0, 0.75, 0.1, 0.35)
+			btn_sb.shadow_size = 10
+			btn_sb.bg_color = Color(0.12, 0.09, 0.03, 0.85)
+			btn_sb_hover.bg_color = Color(0.22, 0.16, 0.05, 0.95)
+			btn_sb_hover.border_color = Color(1.0, 0.92, 0.4, 1.0)
+		elif is_hybrid and not _banish_mode:
+			b.add_theme_color_override("font_color", Color(0.85, 0.6, 1.0))   # violet fusion hybride
+			btn_sb.border_color = Color(0.75, 0.45, 1.0, 0.85)
+			btn_sb.border_width_left = 2; btn_sb.border_width_right = 2
+			btn_sb.border_width_top = 2; btn_sb.border_width_bottom = 2
+			btn_sb.shadow_color = Color(0.75, 0.45, 1.0, 0.35)
+			btn_sb.shadow_size = 10
+			btn_sb.bg_color = Color(0.09, 0.04, 0.14, 0.85)
+			btn_sb_hover.bg_color = Color(0.18, 0.08, 0.26, 0.95)
+			btn_sb_hover.border_color = Color(0.85, 0.65, 1.0, 1.0)
+		b.add_theme_stylebox_override("normal", btn_sb)
 		b.add_theme_stylebox_override("hover", btn_sb_hover)
 		b.add_theme_stylebox_override("pressed", btn_sb_hover)
-		if is_evo and not _banish_mode:
-			b.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))   # gold evolution
-		elif is_hybrid and not _banish_mode:
-			b.add_theme_color_override("font_color", Color(0.75, 0.5, 1.0))   # violet fusion hybride
 		var idx: int = i
 		if _banish_mode:
 			b.disabled = is_evo or is_hybrid   # evolutions/fusions can't be banished
@@ -673,6 +694,133 @@ func pick(i: int) -> void:      # headless bot entry point
 func _pick(i: int) -> void:
 	_draft_root.visible = false
 	card_picked.emit(i)
+
+func show_lucky_chest(rewards: Array, count: int, scrap_bonus: int) -> void:
+	for ch in _draft_root.get_children():
+		ch.queue_free()
+	_card_btns.clear()
+	var vp: Vector2 = _vp()
+	var k: float = _k()
+	var pw: float = clampf(vp.x * 0.88, 300.0, 680.0)
+	var row_h: float = maxf(60.0, 66.0 * k)
+	var row_gap: float = 10.0 * k
+	var mar: float = 20.0 * k
+
+	# 1. Full-screen blur overlay
+	var bg_blur: ColorRect = ColorRect.new()
+	bg_blur.material = ShaderMaterial.new()
+	bg_blur.material.shader = load("res://shaders/ui_blur.gdshader")
+	bg_blur.color = Color.WHITE
+	bg_blur.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg_blur.mouse_filter = Control.MOUSE_FILTER_STOP
+	_draft_root.add_child(bg_blur)
+
+	# 2. Golden Cybernetic Panel
+	var panel: Panel = Panel.new()
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.06, 0.02, 0.92)
+	sb.border_width_left = 3; sb.border_width_right = 3
+	sb.border_width_top = 3; sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.82, 0.2, 0.95) # Radiant Gold border
+	sb.corner_radius_top_left = 14; sb.corner_radius_top_right = 14
+	sb.corner_radius_bottom_left = 14; sb.corner_radius_bottom_right = 14
+	sb.shadow_color = Color(1.0, 0.75, 0.1, 0.45)
+	sb.shadow_size = 22
+	panel.add_theme_stylebox_override("panel", sb)
+	_draft_root.add_child(panel)
+
+	var vb: VBoxContainer = VBoxContainer.new()
+	vb.add_theme_constant_override("separation", int(row_gap))
+	_draft_root.add_child(vb)
+
+	var title: Label = Label.new()
+	if count >= 5:
+		title.text = "★ ★ ★ MEGA JACKPOT x5 ! ★ ★ ★"
+		title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
+	elif count >= 3:
+		title.text = "★ ★ SUPER COFFRE x3 ! ★ ★"
+		title.add_theme_color_override("font_color", Color(1.0, 0.8, 0.25))
+	else:
+		title.text = "★ COFFRE DE GUERRE ★"
+		title.add_theme_color_override("font_color", Color(0.9, 0.85, 0.4))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", Palette.fs(22))
+	vb.add_child(title)
+
+	var sub: Label = Label.new()
+	sub.text = "Butin de Boss récupéré   ·   +%d Ferraille !" % scrap_bonus
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", Palette.fs(15))
+	sub.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
+	vb.add_child(sub)
+
+	for i in rewards.size():
+		var r: Dictionary = rewards[i]
+		var is_evo: bool = bool(r.get("evo", false))
+		var card_p: Panel = Panel.new()
+		var card_sb: StyleBoxFlat = StyleBoxFlat.new()
+		card_sb.bg_color = Color(0.18, 0.13, 0.03, 0.8) if is_evo else Color(0.04, 0.08, 0.14, 0.8)
+		card_sb.border_width_left = 2; card_sb.border_width_right = 2
+		card_sb.border_width_top = 2; card_sb.border_width_bottom = 2
+		card_sb.border_color = Color(1.0, 0.84, 0.2, 0.9) if is_evo else Color(0.2, 0.6, 0.85, 0.6)
+		card_sb.corner_radius_top_left = 6; card_sb.corner_radius_bottom_right = 6
+		card_sb.corner_radius_top_right = 6; card_sb.corner_radius_bottom_left = 6
+		card_p.add_theme_stylebox_override("panel", card_sb)
+		card_p.custom_minimum_size = Vector2(0, row_h)
+
+		var lbl: Label = Label.new()
+		lbl.text = ("★ ÉVOLUTION ULTIME : " if is_evo else "AMÉLIORATION : ") + String(r.get("name", "?"))
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.add_theme_font_size_override("font_size", Palette.fs(16))
+		lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3) if is_evo else Color(0.85, 0.95, 1.0))
+		card_p.add_child(lbl)
+		vb.add_child(card_p)
+
+	var claim_btn: Button = Button.new()
+	claim_btn.text = "RÉCUPÉRER LE BUTIN"
+	claim_btn.custom_minimum_size = Vector2(0, maxf(50.0, 48.0 * k))
+	claim_btn.add_theme_font_size_override("font_size", Palette.fs(18))
+	var btn_sb: StyleBoxFlat = StyleBoxFlat.new()
+	btn_sb.bg_color = Color(0.25, 0.18, 0.04, 0.9)
+	btn_sb.border_color = Color(1.0, 0.85, 0.3, 1.0)
+	btn_sb.border_width_left = 2; btn_sb.border_width_right = 2
+	btn_sb.border_width_top = 2; btn_sb.border_width_bottom = 2
+	btn_sb.corner_radius_top_left = 8; btn_sb.corner_radius_bottom_right = 8
+	btn_sb.corner_radius_top_right = 8; btn_sb.corner_radius_bottom_left = 8
+	btn_sb.shadow_color = Color(1.0, 0.8, 0.2, 0.5)
+	btn_sb.shadow_size = 12
+	claim_btn.add_theme_stylebox_override("normal", btn_sb)
+	var btn_sb_h: StyleBoxFlat = btn_sb.duplicate()
+	btn_sb_h.bg_color = Color(0.4, 0.28, 0.06, 0.95)
+	btn_sb_h.border_color = Color(1.0, 0.95, 0.5, 1.0)
+	claim_btn.add_theme_stylebox_override("hover", btn_sb_h)
+	claim_btn.add_theme_stylebox_override("pressed", btn_sb_h)
+	claim_btn.pressed.connect(func() -> void:
+		_draft_root.visible = false
+		if player != null and "game" in player and player.game != null and player.game.has_method("claim_lucky_chest"):
+			player.game.claim_lucky_chest(rewards, scrap_bonus))
+	vb.add_child(claim_btn)
+
+	var title_h: float = float(Palette.fs(22)) * 1.5 + float(Palette.fs(15)) * 1.3
+	var foot_h: float = maxf(50.0, 48.0 * k)
+	var content_h: float = title_h + float(rewards.size()) * row_h + foot_h + row_gap * float(rewards.size() + 2)
+	vb.size = Vector2(pw - mar * 2.0, 0)
+	var ph: float = minf(vp.y * 0.94, content_h + mar * 2.0)
+	var ox: float = (vp.x - pw) * 0.5
+	var oy: float = (vp.y - ph) * 0.5
+	panel.position = Vector2(ox, oy)
+	panel.size = Vector2(pw, ph)
+	vb.position = Vector2(ox + mar, oy + mar)
+	vb.size = Vector2(pw - mar * 2.0, ph - mar * 2.0)
+	_draft_root.visible = true
+
+	Palette.fade_in(bg_blur)
+	Palette.pop_in(panel)
+	Palette.stagger_reveal(vb, 0.05, 0.1)
 
 
 ## Anneau du stick tactile. Le testeur « nouveau joueur » notait qu'aucun stick n'etait

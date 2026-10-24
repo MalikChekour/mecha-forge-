@@ -64,21 +64,25 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 		# or = bonus, ambre = od, magenta = skill) — mais PAS repasse par la mesure Machado
 		# qui a fixe les teintes skill/heal ci-dessus. A refaire si un daltonien le confond.
 		col = Color(0.55, 0.48, 1.0)          # butin de guerre : arme empruntee sur un boss
+	elif k == "coffre_boss":
+		col = Color(1.0, 0.84, 0.22)          # coffre dore jackpot de boss
 	elif k == "scrap":
 		col = Palette.ACCENT
 	else:
 		col = Palette.CYAN
-	var big: bool = k == "bonus" or k == "skill" or k == "heal" or k == "od" or k == "arme_volee"
-	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 24)
+	var big: bool = k in ["bonus", "skill", "heal", "od", "arme_volee", "coffre_boss"]
+	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 28)
 	# `skill` rejoint les teintes appliquees : sans ca, seul son halo prenait la couleur et la
 	# correction daltonisme ci-dessus n'aurait porte que sur la lueur, pas sur l'objet.
-	_spr.modulate = col if (k == "xp" or k == "heal" or k == "od" or k == "skill") else Color.WHITE
+	_spr.modulate = col if (k in ["xp", "heal", "od", "skill", "coffre_boss"]) else Color.WHITE
 	var th: float = float(_spr.texture.get_height())
 	if th > 0.0:
-		_spr.scale = Vector2.ONE * ((34.0 if big else 24.0) / th)
+		var target_h: float = 42.0 if k == "coffre_boss" else (34.0 if big else 24.0)
+		_spr.scale = Vector2.ONE * (target_h / th)
 	_light.texture = Tex.glow(col, 64)
-	_light.modulate = Color(col.r, col.g, col.b, 0.52 if big else 0.32)
-	_light.scale = Vector2.ONE * ((2.8 if big else 1.9) * (34.0 if big else 24.0) / 64.0)
+	_light.modulate = Color(col.r, col.g, col.b, 0.65 if k == "coffre_boss" else (0.52 if big else 0.32))
+	var light_mult: float = 3.6 if k == "coffre_boss" else ((2.8 if big else 1.9) * (34.0 if big else 24.0) / 64.0)
+	_light.scale = Vector2.ONE * light_mult
 
 func _physics_process(delta: float) -> void:
 	_t += delta
@@ -103,6 +107,13 @@ func _physics_process(delta: float) -> void:
 				game.grant_skill()                                          # free random competence
 			if game != null and game.has_method("spawn_vfx"):
 				game.spawn_vfx("levelup", player.global_position, 0.0, 1.2)  # golden burst
+		elif kind == "coffre_boss":
+			if game != null and game.has_method("open_lucky_chest"):
+				game.open_lucky_chest()
+			elif player.has_method("borrow_weapon"):
+				player.borrow_weapon()
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("levelup", player.global_position, 0.0, 1.8)
 		elif kind == "bonus":
 			if player.has_method("heal"):
 				player.heal(25.0)

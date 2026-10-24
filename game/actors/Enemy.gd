@@ -2059,10 +2059,12 @@ func take_damage(amount: float, source_chassis: String = "", weapon_id: String =
 			if amount <= 0.05:
 				return
 	# the energy shield soaks damage first; only the overflow reaches HP
+	var src_weapon: String = weapon_id if weapon_id != "" else _last_weapon_id
 	if shield > 0.0:
 		var absorbed: float = minf(shield, amount)
 		shield -= absorbed
 		amount -= absorbed
+		GameState.add_damage(src_weapon, absorbed)
 		_shield_flash = 1.0
 		_shield_regen_t = 6.0
 		if game != null and game.has_method("shield_ripple"):
@@ -2075,6 +2077,7 @@ func take_damage(amount: float, source_chassis: String = "", weapon_id: String =
 				game.spawn_vfx("shield", global_position + _visual_offset(), 0.0, _body_radius / 55.0, Palette.CYAN)
 		if amount <= 0.0:
 			return
+	GameState.add_damage(src_weapon, amount)
 	hp -= amount
 	# 🚨 le flash de coup etait a 1.0 = silhouette ENTIEREMENT blanche. Tres bon a l'unite,
 	# mais « sept ennemis virant au blanc en meme temps » font une tache indifferenciee.
@@ -2128,11 +2131,12 @@ func _die() -> void:
 			game.spawn_xp(global_position, 1 + rank)
 		if drops_bonus and game.has_method("spawn_bonus"):
 			game.spawn_bonus(global_position)   # intermediate foe -> guaranteed bonus drop (heal/scrap)
-		# BUTIN DE GUERRE (patron, 23/09) : reserve aux BOSS (rank>=3 = midboss/crusherboss/
-		# ogreboss/endboss), pas aux foes intermediaires deja couverts par drops_bonus
-		# ci-dessus — sinon l'emprunt perdrait son cote "tu viens de battre une vraie menace".
-		if rank >= 3 and game.has_method("spawn_weapon_loan"):
-			game.spawn_weapon_loan(global_position)
+		# COFFRE JACKPOT BOSS (style Survivor.io) : un BOSS tue laisse un coffre dore jackpot
+		if rank >= 3:
+			if game.has_method("spawn_boss_chest"):
+				game.spawn_boss_chest(global_position)
+			elif game.has_method("spawn_weapon_loan"):
+				game.spawn_weapon_loan(global_position)
 		# FORGE DETERMINISTE (26/09) : chance de plan a la mort d'un boss — seulement les VRAIS
 		# boss nommes (kind existe dans PLAN_SLOT_BY_BOSS/PLAN_RARITY_WEIGHT), pas n'importe quel
 		# rank>=3 futur qui n'aurait pas d'affinite de slot definie.

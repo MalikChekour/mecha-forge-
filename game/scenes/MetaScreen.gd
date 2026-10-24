@@ -763,6 +763,8 @@ func _build_shop() -> void:
 			total_picks += int(passives[k])
 		if total_picks > 0:
 			_title(v, "%d amelioration(s) prise(s) cette partie" % total_picks, Color(0.7, 0.85, 1.0), 15)
+	if not _home:
+		_build_combat_report(v)
 	_currency_row(v)
 
 	# 🚨 REJOUER etait en 5e position, SOUS LA LIGNE DE FLOTTAISON (3 crans de molette pour
@@ -1290,9 +1292,20 @@ func _build_gear() -> void:
 			odds_str += "  ·  "
 	_title(v, odds_str, Color(0.6, 0.65, 0.75), 14)
 	# 🚨 verifie contre SaveManager.gear_pull()/gear_salvage() avant d'ecrire ceci : les doublons
-	# ne sont PAS convertis automatiquement (gear_pull ne deduplique jamais) — c'est le bouton
-	# RECYCLER (gear_salvage, pieces non equipees) qui le fait, a la main.
-	_title(v, "Une pièce en trop ? RECYCLER la convertit en noyaux (bouton sur chaque pièce non équipée)",
+	# FUSION 3-EN-1 (Survivor.io) : combine 3 pieces identiques au palier superieur
+	var can_merge_any: bool = false
+	for s: String in SaveManager.GEAR_SLOTS:
+		for r in ["commun", "rare", "epique"]:
+			if SaveManager.gear_can_merge(s, r):
+				can_merge_any = true
+				break
+		if can_merge_any:
+			break
+
+	if can_merge_any:
+		_big_button(v, "⚡ FUSIONNER TOUT (3-en-1 disponibles !)", _auto_merge_all, Color(0.9, 0.72, 0.2))
+
+	_title(v, "Doublons ? Fusionnez 3 pièces identiques au palier supérieur, ou recyclez-les en noyaux",
 		Color(0.6, 0.65, 0.75), 14)
 	var can_pull: bool = int(SaveManager.data.get("crystals", 0)) >= SaveManager.GEAR_PULL_COST
 	if can_pull:
@@ -1304,6 +1317,14 @@ func _build_gear() -> void:
 		_big_button(v, "INVOCATION GRATUITE  (%s%d restantes)" % [_ad_tag(), Ads.remaining("free_pull")],
 			_gear_pull_ad, Color(0.75, 0.55, 0.2))
 	_big_button(v, "RETOUR", _back, Color(0.4, 0.4, 0.5))
+
+func _auto_merge_all() -> void:
+	var count: int = SaveManager.gear_auto_merge_all()
+	if count > 0:
+		Audio.sfx("victory")
+	else:
+		Audio.sfx("click")
+	_build_gear()
 
 func _gear_pull_ad() -> void:
 	Ads.show_rewarded("free_pull", func(rewarded: bool) -> void:
@@ -1329,6 +1350,24 @@ func _build_gear_slot(slot: String) -> void:
 	var v: VBoxContainer = _scaffold(620.0)
 	_title(v, String(SaveManager.GEAR_SLOT_NAMES[slot]), Color(0.75, 0.65, 1.0))
 	_currency_row(v)
+
+	# Fusions 3-en-1 disponibles pour ce slot :
+	for r in ["commun", "rare", "epique"]:
+		if SaveManager.gear_can_merge(slot, r):
+			var r_name: String = String(SaveManager.GEAR_RARITY_NAMES[r])
+			var next_r: String = String(SaveManager.GEAR_MERGE_NEXT[r])
+			var next_name: String = String(SaveManager.GEAR_RARITY_NAMES[next_r])
+			var b_merge: Button = Button.new()
+			b_merge.text = "⚡ FUSIONNER : 3x %s -> 1x %s" % [r_name, next_name]
+			b_merge.custom_minimum_size = Vector2(0, 48)
+			b_merge.add_theme_font_size_override("font_size", Palette.fs(16))
+			b_merge.add_theme_color_override("font_color", RARITY_COL.get(next_r, Color(1, 0.85, 0.3)))
+			b_merge.pressed.connect(func() -> void:
+				SaveManager.gear_merge(slot, r)
+				Audio.sfx("levelup")
+				_build_gear_slot(slot))
+			v.add_child(b_merge)
+
 	var equipped_uid: int = int(SaveManager.gear_equipped().get(slot, -1))
 	var any: bool = false
 	for p: Dictionary in SaveManager.gear_parts():
@@ -1397,3 +1436,118 @@ func _replay_now() -> void:
 		g.restart_run()
 	else:
 		get_tree().reload_current_scene()
+
+func _build_combat_report(v: VBoxContainer) -> void:
+	if GameState.total_damage <= 0.0 and GameState.damage_by_weapon.is_empty():
+		return
+	var sep: Control = Control.new()
+	sep.custom_minimum_size = Vector2(0, 10)
+	v.add_child(sep)
+
+	var frame: PanelContainer = PanelContainer.new()
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.03, 0.07, 0.12, 0.85)
+	sb.border_width_left = 2; sb.border_width_right = 2
+	sb.border_width_top = 2; sb.border_width_bottom = 2
+	sb.border_color = Color(0.2, 0.7, 0.95, 0.7)
+	sb.corner_radius_top_left = 10; sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10; sb.corner_radius_bottom_right = 10
+	sb.content_margin_left = 14; sb.content_margin_right = 14
+	sb.content_margin_top = 12; sb.content_margin_bottom = 12
+	frame.add_theme_stylebox_override("panel", sb)
+	v.add_child(frame)
+
+	var vb: VBoxContainer = VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	frame.add_child(vb)
+
+	var rep_title: Label = Label.new()
+	rep_title.text = "RAPPORT DE COMBAT (DPS & DÉGÂTS)"
+	rep_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rep_title.add_theme_font_size_override("font_size", Palette.fs(18))
+	rep_title.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))
+	vb.add_child(rep_title)
+
+	var dps_global: float = GameState.total_damage / maxf(1.0, GameState.run_time)
+	var tot_lbl: Label = Label.new()
+	tot_lbl.text = "Dégâts Totaux : %s   ·   DPS Moyen : %d/s" % [_format_number(GameState.total_damage), int(dps_global)]
+	tot_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tot_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
+	tot_lbl.add_theme_color_override("font_color", Color(0.8, 0.88, 1.0))
+	vb.add_child(tot_lbl)
+
+	# Sort weapons by damage descending
+	var sorted_wids: Array = GameState.damage_by_weapon.keys()
+	sorted_wids.sort_custom(func(a, b):
+		return float(GameState.damage_by_weapon[a]) > float(GameState.damage_by_weapon[b]))
+
+	for wid in sorted_wids:
+		var dmg: float = float(GameState.damage_by_weapon[wid])
+		var pct: float = (dmg / maxf(1.0, GameState.total_damage)) * 100.0
+		var kills_cnt: int = int(GameState.kills_by_weapon.get(wid, 0))
+		var w_dps: float = dmg / maxf(1.0, GameState.run_time)
+
+		var row: VBoxContainer = VBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+
+		var h_info: HBoxContainer = HBoxContainer.new()
+		var name_l: Label = Label.new()
+		name_l.text = _format_weapon_name(String(wid))
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_l.add_theme_font_size_override("font_size", Palette.fs(14))
+		name_l.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
+		h_info.add_child(name_l)
+
+		var stat_l: Label = Label.new()
+		stat_l.text = "%s (%d%%)  ·  %d DPS  ·  %d kills" % [_format_number(dmg), int(pct), int(w_dps), kills_cnt]
+		stat_l.add_theme_font_size_override("font_size", Palette.fs(13))
+		stat_l.add_theme_color_override("font_color", Color(0.7, 0.85, 0.95))
+		h_info.add_child(stat_l)
+		row.add_child(h_info)
+
+		# Progress Bar
+		var bar_bg: ColorRect = ColorRect.new()
+		bar_bg.custom_minimum_size = Vector2(0, 8)
+		bar_bg.color = Color(0.08, 0.15, 0.22, 0.8)
+		
+		var bar_fill: ColorRect = ColorRect.new()
+		bar_fill.custom_minimum_size = Vector2(0, 8)
+		bar_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar_fill.color = Color(0.15, 0.85, 1.0, 0.85) if pct > 30.0 else Color(0.3, 0.65, 0.9, 0.75)
+		bar_fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+		bar_fill.anchor_right = clampf(pct / 100.0, 0.02, 1.0)
+		bar_bg.add_child(bar_fill)
+		row.add_child(bar_bg)
+
+		vb.add_child(row)
+
+func _format_number(n: float) -> String:
+	if n >= 1_000_000.0:
+		return "%.2fM" % (n / 1_000_000.0)
+	elif n >= 1_000.0:
+		return "%.1fK" % (n / 1_000.0)
+	return "%d" % int(n)
+
+func _format_weapon_name(wid: String) -> String:
+	for w in GameState.WEAPONS:
+		if String(w["id"]) == wid:
+			return String(w["name"])
+	match wid:
+		"vulcan": return "Vulcan Barrage"
+		"hydra": return "Hydre Traqueuse"
+		"annihilator": return "Faisceau Annihilateur"
+		"singularity": return "Singularité"
+		"tempest": return "Tempête de Lames"
+		"deflagrateur": return "Déflagrateur"
+		"carambole": return "Carambole"
+		"guillotine": return "Guillotine"
+		"rayon_spectre": return "Rayon Spectre"
+		"rail_nova": return "Rail-Nova"
+		"frelon": return "Frelon"
+		"aura": return "Bouclier Impulsions"
+		"drone": return "Drone de Combat"
+		"blade": return "Lame Orbitale"
+		"orb": return "Orbe Plasma"
+		"arc": return "Arc Tesla"
+		"pool": return "Brasier Plasma"
+	return wid.capitalize()

@@ -456,6 +456,98 @@ func gear_salvage(uid: int) -> bool:
 	save_data()
 	return true
 
+const GEAR_MERGE_NEXT: Dictionary = {
+	"commun": "rare",
+	"rare": "epique",
+	"epique": "legendaire",
+}
+
+## Compte combien de pieces de ce slot et cette rarete sont possedees.
+func gear_count(slot: String, rarity: String) -> int:
+	var count: int = 0
+	for p: Dictionary in gear_parts():
+		if String(p.get("slot", "")) == slot and String(p.get("rarity", "")) == rarity:
+			count += 1
+	return count
+
+func gear_can_merge(slot: String, rarity: String) -> bool:
+	if not GEAR_MERGE_NEXT.has(rarity):
+		return false
+	return gear_count(slot, rarity) >= 3
+
+## Fusion 3-en-1 (formule canonique Survivor.io) : combine 3 pieces identiques de meme slot
+## et meme rarete en 1 piece du palier superieur. Si l'une des 3 pieces etait equipee, la piece
+## resultante reste automatiquement equipee.
+func gear_merge(slot: String, rarity: String) -> Dictionary:
+	if not gear_can_merge(slot, rarity):
+		return {}
+	var next_rarity: String = String(GEAR_MERGE_NEXT[rarity])
+	var matching: Array = []
+	var ps: Array = gear_parts()
+	var was_equipped: bool = false
+	var eq: Dictionary = gear_equipped()
+	var eq_uid: int = int(eq.get(slot, -1))
+	var max_lvl: int = 1
+
+	for p: Dictionary in ps:
+		if String(p.get("slot", "")) == slot and String(p.get("rarity", "")) == rarity:
+			matching.append(p)
+			var uid: int = int(p.get("uid", -1))
+			if uid == eq_uid:
+				was_equipped = true
+			max_lvl = maxi(max_lvl, int(p.get("level", 1)))
+			if matching.size() >= 3:
+				break
+
+	if matching.size() < 3:
+		return {}
+
+	# Retirer les 3 pieces
+	for m in matching:
+		var uid_del: int = int(m.get("uid", -1))
+		for i in range(ps.size() - 1, -1, -1):
+			if int(ps[i].get("uid", -1)) == uid_del:
+				ps.remove_at(i)
+				break
+
+	# Creer la nouvelle piece du palier superieur
+	var new_uid: int = int(data.get("part_uid", 1))
+	data["part_uid"] = new_uid + 1
+	var new_part: Dictionary = {
+		"uid": new_uid,
+		"slot": slot,
+		"rarity": next_rarity,
+		"level": max_lvl,
+	}
+	ps.append(new_part)
+	data["parts"] = ps
+
+	# Garder le slot equipe si l'une des pieces etait equipee
+	if was_equipped or eq_uid < 0:
+		eq[slot] = new_uid
+		data["equipped"] = eq
+
+	save_data()
+	return new_part
+
+## Fusionne automatiquement toutes les combinaisons 3-en-1 possibles dans l'inventaire.
+func gear_auto_merge_all() -> int:
+	var total_merged: int = 0
+	var merged_in_pass: bool = true
+	while merged_in_pass:
+		merged_in_pass = false
+		for slot: String in GEAR_SLOTS:
+			for r in ["commun", "rare", "epique"]:
+				if gear_can_merge(slot, r):
+					var res: Dictionary = gear_merge(slot, r)
+					if not res.is_empty():
+						total_merged += 1
+						merged_in_pass = true
+						break
+			if merged_in_pass:
+				break
+	return total_merged
+
 # --- REWARDED-AD DAILY CAPS ---------------------------------------------------------------
 # Counts reset on date change (same rotation trick as the daily quests). Kept here rather than
 # in Ads.gd so a reinstall/reload can't be used to farm past the cap within a day.
