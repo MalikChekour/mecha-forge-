@@ -227,6 +227,11 @@ var _proc_base_scale: Vector2 = Vector2.ONE
 var _proc_t: float = 0.0
 var field_slow: float = 1.0   # transient: a slow-field prop dampens this each frame inside it
 var stun_t: float = 0.0       # IEM / EMP stun: freezes enemy movement and attacks while active
+var contact_sword: bool = false
+var sword_dmg: float = 16.0
+var sword_range: float = 160.0
+var _sword_cd: float = 0.0
+var special_vfx: String = ""
 var _speed_mult: float = 1.0
 ## Ciblage prioritaire (27/09, rapport "Archives-machines" : rendre l'auto-visee interessante).
 ## Reduit fictivement la distance vue par Player._nearest_enemy()/_cone_target() -> cet ennemi
@@ -439,6 +444,10 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	if ogive:
 		_bolt_color = Color(1.0, 0.72, 0.2)     # or/orange = ogives du boss
 	drops_bonus = bool(def.get("drops_bonus", false))
+	contact_sword = bool(def.get("contact_sword", false))
+	sword_dmg = float(def.get("sword_dmg", 16.0))
+	sword_range = float(def.get("sword_range", 160.0))
+	special_vfx = String(def.get("special_vfx", ""))
 	_proc = bool(def.get("proc", false))
 	_proc_hover = _proc and String(def.get("motion", "")) == "hover"
 
@@ -1134,6 +1143,12 @@ func _physics_process(delta: float) -> void:
 		_style_tick(delta, player_valid)
 	if player_valid and behavior == "ranged":
 		_aim_tick(delta)
+	if contact_sword and player_valid:
+		_sword_cd -= delta
+		var dist_to_p: float = global_position.distance_to(player.global_position)
+		if dist_to_p <= sword_range and _sword_cd <= 0.0:
+			_sword_cd = 2.0
+			_trigger_sword_slash(player)
 	if _boss_hazard_cd > 0.0:
 		_boss_hazard_cd -= delta
 		if _boss_hazard_cd <= 0.0 and game != null:
@@ -1664,6 +1679,35 @@ func _physics_process(delta: float) -> void:
 		_hp_fill.points = PackedVector2Array([
 			Vector2(-_hp_bar_w * 0.5, _hp_bar_y),
 			Vector2(-_hp_bar_w * 0.5 + _hp_bar_w * frac, _hp_bar_y)])
+
+
+func _trigger_sword_slash(p: Node) -> void:
+	if p == null or not is_instance_valid(p):
+		return
+	if p.has_method("take_damage"):
+		p.take_damage(sword_dmg, global_position, "sword")
+	if game != null and game.has_method("spawn_vfx"):
+		game.spawn_vfx("aaa_shockwave", global_position, (p.global_position - global_position).angle(), 0.85, Color(1.3, 0.5, 0.2))
+		game.spawn_vfx("aaa_aoe", (global_position + p.global_position) * 0.5, 0.0, 0.75, Color(1.0, 0.9, 0.4))
+	match special_vfx:
+		"iem_slash":
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 1.1, Color(0.3, 0.9, 1.5))
+		"fire_trail", "magma_wave":
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_aoe", global_position, 0.0, 1.2, Color(1.8, 0.4, 0.1))
+		"cryo_freeze":
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 1.1, Color(0.4, 1.4, 2.0))
+		"radiation_aura":
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_aoe", global_position, 0.0, 1.2, Color(0.8, 1.8, 0.2))
+		"arc_lightning":
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 1.1, Color(1.5, 1.5, 0.4))
+		_:
+			pass
+
 
 
 ## Style/couleur/geometrie du bouclier selon le PORTEUR (reglages patron via l'editeur, convertis

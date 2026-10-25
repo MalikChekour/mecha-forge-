@@ -124,6 +124,26 @@ const DEFS: Dictionary = {
 	"mech16_sniper": {"name": "Faisceau spectral", "chassis": "en16_prism", "hp": 52.0, "speed": 154.0, "dmg": 11.6, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 21.0, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech17_sniper": {"name": "Fusilier haute pression", "chassis": "en17_steampunk", "hp": 54.0, "speed": 156.0, "dmg": 12.0, "radius": 34.0, "size": 140.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 21.6, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech18_sniper": {"name": "Sagittaire de l'arène", "chassis": "en18_colosseum", "hp": 56.0, "speed": 158.0, "dmg": 12.4, "radius": 34.0, "size": 142.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 22.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+
+	# --- MÉCHAS ÉLITES SUPÉRIEURS (Gundam Dual-Arms : Tir + Épée de Contact & Effets Spéciaux) ---
+	"mech01_elite": {"name": "MS-01K Vulcan-Enforcer", "chassis": "en01_tech", "hp": 75.0, "speed": 165.0, "dmg": 10.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 8.5, "attack_cd": 2.0, "prefer_dist": 220.0, "contact_sword": true, "sword_dmg": 16.0, "sword_range": 160.0, "special_vfx": "iem_slash", "unlock": 80.0},
+	"mech02_elite": {"name": "MS-02D Dust-Vanguard", "chassis": "en02_desert", "hp": 80.0, "speed": 168.0, "dmg": 10.5, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.0, "attack_cd": 2.8, "prefer_dist": 300.0, "contact_sword": true, "sword_dmg": 17.0, "sword_range": 160.0, "special_vfx": "fire_trail", "unlock": 80.0},
+	"mech03_elite": {"name": "MS-03J Jungle-Striker", "chassis": "en03_jungle", "hp": 85.0, "speed": 170.0, "dmg": 11.0, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 7.5, "attack_cd": 2.2, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 18.0, "sword_range": 160.0, "special_vfx": "tungsten_slam", "unlock": 80.0},
+	"mech04_elite": {"name": "MS-04V Magma-Executioner", "chassis": "en04_volcanic", "hp": 90.0, "speed": 162.0, "dmg": 11.5, "radius": 46.0, "size": 175.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 16.0, "attack_cd": 3.0, "prefer_dist": 250.0, "contact_sword": true, "sword_dmg": 19.0, "sword_range": 165.0, "special_vfx": "magma_wave", "unlock": 80.0},
+	"mech05_elite": {"name": "MS-05S Corrosion-Warlord", "chassis": "en05_swamp", "hp": 95.0, "speed": 164.0, "dmg": 12.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 8.0, "attack_cd": 2.3, "prefer_dist": 230.0, "contact_sword": true, "sword_dmg": 20.0, "sword_range": 160.0, "special_vfx": "acid_corrosion", "unlock": 80.0},
+	"mech06_elite": {"name": "MS-06C Frost-Paladin", "chassis": "en06_cryo", "hp": 100.0, "speed": 166.0, "dmg": 12.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 15.0, "attack_cd": 2.8, "prefer_dist": 300.0, "contact_sword": true, "sword_dmg": 21.0, "sword_range": 160.0, "special_vfx": "cryo_freeze", "unlock": 80.0},
+	"mech07_elite": {"name": "MS-07R Meltdown-Centurion", "chassis": "en07_reacteur", "hp": 105.0, "speed": 168.0, "dmg": 13.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "guide", "attack_dmg": 9.5, "attack_cd": 2.4, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 22.0, "sword_range": 160.0, "special_vfx": "radiation_aura", "unlock": 80.0},
+	"mech08_elite": {"name": "MS-08H Cell-Exterminator", "chassis": "en08_ruche", "hp": 110.0, "speed": 172.0, "dmg": 13.5, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 9.0, "attack_cd": 1.9, "prefer_dist": 230.0, "contact_sword": true, "sword_dmg": 23.0, "sword_range": 160.0, "special_vfx": "amber_cleave", "unlock": 80.0},
+	"mech09_elite": {"name": "MS-09O Citadel-Dominator", "chassis": "en09_citadelle", "hp": 115.0, "speed": 168.0, "dmg": 14.0, "radius": 46.0, "size": 178.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 18.0, "attack_cd": 2.9, "prefer_dist": 320.0, "contact_sword": true, "sword_dmg": 24.0, "sword_range": 165.0, "special_vfx": "gold_blast", "unlock": 80.0},
+	"mech10_elite": {"name": "MS-10A Trench-Colossus", "chassis": "en10_abyss", "hp": 120.0, "speed": 164.0, "dmg": 14.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 17.0, "attack_cd": 3.0, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 25.0, "sword_range": 160.0, "special_vfx": "hydro_vortex", "unlock": 80.0},
+	"mech11_elite": {"name": "MS-11E Spore-Phantom", "chassis": "en11_ether", "hp": 122.0, "speed": 174.0, "dmg": 15.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 9.2, "attack_cd": 2.1, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 26.0, "sword_range": 160.0, "special_vfx": "uv_rapier", "unlock": 80.0},
+	"mech12_elite": {"name": "MS-12T Olympus-Dreadnought", "chassis": "en12_titans", "hp": 130.0, "speed": 160.0, "dmg": 15.5, "radius": 48.0, "size": 182.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 20.0, "attack_cd": 3.2, "prefer_dist": 280.0, "contact_sword": true, "sword_dmg": 28.0, "sword_range": 170.0, "special_vfx": "titan_cleave", "unlock": 80.0},
+	"mech13_elite": {"name": "MS-13Z Zero-Interceptor", "chassis": "en13_orbit", "hp": 125.0, "speed": 175.0, "dmg": 16.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 10.5, "attack_cd": 2.0, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 27.0, "sword_range": 160.0, "special_vfx": "zero_g_dash", "unlock": 80.0},
+	"mech14_elite": {"name": "MS-14Q Tesseract-Sentinel", "chassis": "en14_quantum", "hp": 128.0, "speed": 172.0, "dmg": 16.5, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "guide", "attack_dmg": 11.0, "attack_cd": 2.4, "prefer_dist": 270.0, "contact_sword": true, "sword_dmg": 28.0, "sword_range": 160.0, "special_vfx": "phase_warp", "unlock": 80.0},
+	"mech15_elite": {"name": "MS-15O Thunder-Tempest", "chassis": "en15_ozone", "hp": 130.0, "speed": 170.0, "dmg": 17.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 11.5, "attack_cd": 2.1, "prefer_dist": 250.0, "contact_sword": true, "sword_dmg": 29.0, "sword_range": 160.0, "special_vfx": "arc_lightning", "unlock": 80.0},
+	"mech16_elite": {"name": "MS-16P Refraction-Avenger", "chassis": "en16_prism", "hp": 132.0, "speed": 168.0, "dmg": 17.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 10.0, "attack_cd": 2.2, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 30.0, "sword_range": 160.0, "special_vfx": "prismatic_burst", "unlock": 80.0},
+	"mech17_elite": {"name": "MS-17B Dread-Warhammer", "chassis": "en17_steampunk", "hp": 135.0, "speed": 165.0, "dmg": 18.0, "radius": 48.0, "size": 180.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 19.0, "attack_cd": 3.1, "prefer_dist": 270.0, "contact_sword": true, "sword_dmg": 31.0, "sword_range": 165.0, "special_vfx": "steam_burst", "unlock": 80.0},
+	"mech18_elite": {"name": "MS-18C Arena-Champion", "chassis": "en18_colosseum", "hp": 140.0, "speed": 172.0, "dmg": 18.5, "radius": 48.0, "size": 182.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 12.0, "attack_cd": 1.9, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 32.0, "sword_range": 170.0, "special_vfx": "arena_execution", "unlock": 80.0},
 }
 
 const BOSS_PHASE_THRESHOLDS: Dictionary = {
@@ -135,27 +155,27 @@ const BOSS_PHASE_THRESHOLDS: Dictionary = {
 	"citadelleboss": [0.5, 0.2],
 }
 
-# 19/10 : Escouades tripartites par biome (mechXX de ligne, swarm rapide, shield vanguard, sniper laser)
+# 19/10 : Escouades tripartites + Méchas Élites Supérieurs par biome
 const BIOME_POOL: Dictionary = {
 	"earth": [], "spaceship": [], "ice": [], "ruines": [],
-	"tech": ["mech01", "mech01_swarm", "mech01_shield", "mech01_sniper"],
-	"desert": ["mech02", "mech02_swarm", "mech02_shield", "mech02_sniper"],
-	"jungle": ["mech03", "mech03_swarm", "mech03_shield", "mech03_sniper"],
-	"volcanic": ["mech04", "mech04_swarm", "mech04_shield", "mech04_sniper"],
-	"swamp": ["mech05", "mech05_swarm", "mech05_shield", "mech05_sniper"],
-	"cryo": ["mech06", "mech06_swarm", "mech06_shield", "mech06_sniper"],
-	"reacteur": ["mech07", "mech07_swarm", "mech07_shield", "mech07_sniper"],
-	"ruche": ["mech08", "mech08_swarm", "mech08_shield", "mech08_sniper"],
-	"citadelle": ["mech09", "mech09_swarm", "mech09_shield", "mech09_sniper"],
-	"abyss": ["mech10", "mech10_swarm", "mech10_shield", "mech10_sniper"],
-	"ether": ["mech11", "mech11_swarm", "mech11_shield", "mech11_sniper"],
-	"titans": ["mech12", "mech12_swarm", "mech12_shield", "mech12_sniper"],
-	"orbit": ["mech13", "mech13_swarm", "mech13_shield", "mech13_sniper"],
-	"quantum": ["mech14", "mech14_swarm", "mech14_shield", "mech14_sniper"],
-	"ozone": ["mech15", "mech15_swarm", "mech15_shield", "mech15_sniper"],
-	"prism": ["mech16", "mech16_swarm", "mech16_shield", "mech16_sniper"],
-	"steampunk": ["mech17", "mech17_swarm", "mech17_shield", "mech17_sniper"],
-	"colosseum": ["mech18", "mech18_swarm", "mech18_shield", "mech18_sniper"],
+	"tech": ["mech01", "mech01_swarm", "mech01_shield", "mech01_sniper", "mech01_elite"],
+	"desert": ["mech02", "mech02_swarm", "mech02_shield", "mech02_sniper", "mech02_elite"],
+	"jungle": ["mech03", "mech03_swarm", "mech03_shield", "mech03_sniper", "mech03_elite"],
+	"volcanic": ["mech04", "mech04_swarm", "mech04_shield", "mech04_sniper", "mech04_elite"],
+	"swamp": ["mech05", "mech05_swarm", "mech05_shield", "mech05_sniper", "mech05_elite"],
+	"cryo": ["mech06", "mech06_swarm", "mech06_shield", "mech06_sniper", "mech06_elite"],
+	"reacteur": ["mech07", "mech07_swarm", "mech07_shield", "mech07_sniper", "mech07_elite"],
+	"ruche": ["mech08", "mech08_swarm", "mech08_shield", "mech08_sniper", "mech08_elite"],
+	"citadelle": ["mech09", "mech09_swarm", "mech09_shield", "mech09_sniper", "mech09_elite"],
+	"abyss": ["mech10", "mech10_swarm", "mech10_shield", "mech10_sniper", "mech10_elite"],
+	"ether": ["mech11", "mech11_swarm", "mech11_shield", "mech11_sniper", "mech11_elite"],
+	"titans": ["mech12", "mech12_swarm", "mech12_shield", "mech12_sniper", "mech12_elite"],
+	"orbit": ["mech13", "mech13_swarm", "mech13_shield", "mech13_sniper", "mech13_elite"],
+	"quantum": ["mech14", "mech14_swarm", "mech14_shield", "mech14_sniper", "mech14_elite"],
+	"ozone": ["mech15", "mech15_swarm", "mech15_shield", "mech15_sniper", "mech15_elite"],
+	"prism": ["mech16", "mech16_swarm", "mech16_shield", "mech16_sniper", "mech16_elite"],
+	"steampunk": ["mech17", "mech17_swarm", "mech17_shield", "mech17_sniper", "mech17_elite"],
+	"colosseum": ["mech18", "mech18_swarm", "mech18_shield", "mech18_sniper", "mech18_elite"],
 }
 
 # CORRUPTION visuelle par biome : teinte multiplicative sur CHAQUE ennemi (self_modulate). Subtile.

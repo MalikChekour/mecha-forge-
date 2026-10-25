@@ -66,19 +66,23 @@ func _ready() -> void:
 		var swarm_k: String = String(pool[1])
 		var shield_k: String = String(pool[2])
 		var sniper_k: String = String(pool[3])
+		var elite_k: String = String(pool[4]) if pool.size() >= 5 else ""
 
 		_check(EnemySpawner.DEFS.has(swarm_k), "%s : DEFS contient %s" % [b, swarm_k])
 		_check(EnemySpawner.DEFS.has(shield_k), "%s : DEFS contient %s" % [b, shield_k])
 		_check(EnemySpawner.DEFS.has(sniper_k), "%s : DEFS contient %s" % [b, sniper_k])
+		_check(EnemySpawner.DEFS.has(elite_k), "%s : DEFS contient %s" % [b, elite_k])
 
 		sp.current_biome = b
 		var d_swarm: Dictionary = sp._def_for(swarm_k)
 		var d_shield: Dictionary = sp._def_for(shield_k)
 		var d_sniper: Dictionary = sp._def_for(sniper_k)
+		var d_elite: Dictionary = sp._def_for(elite_k)
 
 		_check(String(d_swarm.get("behavior", "")) == "rush", "%s : swarm a behavior=rush (vitesse %.0f)" % [b, float(d_swarm.get("speed", 0.0))])
 		_check(bool(d_shield.get("garde", false)) and float(d_shield.get("shield", 0.0)) > 0.0, "%s : shield a garde=true et shield=%.0f" % [b, float(d_shield.get("shield", 0.0))])
 		_check(String(d_sniper.get("tir_style", "")) == "sniper", "%s : sniper a tir_style=sniper (portée %.0f)" % [b, float(d_sniper.get("prefer_dist", 0.0))])
+		_check(bool(d_elite.get("contact_sword", false)) and String(d_elite.get("special_vfx", "")) != "", "%s : elite a contact_sword=true et special_vfx=%s" % [b, String(d_elite.get("special_vfx", ""))])
 
 	# 2. TEST ESCOUADE COMBINEE (Armes combinées : Chef + Shield + Sniper + Swarmers)
 	print("\n--- TEST 2 : COMPOSITION TACTIQUE DE L'ESCOUADE ---")
