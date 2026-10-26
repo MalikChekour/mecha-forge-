@@ -1,0 +1,1290 @@
+--- a/game/actors/Enemy.gd
++++ b/game/actors/Enemy.gd
+@@ -190,6 +190,12 @@
+ var _kamikaze_fuse: float = 0.0
+ const KAMIKAZE_RANGE: float = 90.0
+ const KAMIKAZE_FUSE_TIME: float = 0.6
++## Phase 2 — kami reutilise la meche ; l'anneau GroundZone (0,6 s) est pose a l'armement.
++var _summon_cd: float = 2.0               # invocateur : premiere vague pas instantanee
++var summon_kind: String = ""
++var _band_cd: float = 0.0                 # telegraphe elite/boss, une bande a la fois
++var _p2_palette_done: bool = false
++var _p2_spiral_done: bool = false
+ var _spr: Sprite2D
+ var _mat: ShaderMaterial
+ ## 🚨 tente le 26/09 ("trop de lag") : un ShaderMaterial PARTAGE entre tous les ennemis (batching)
+@@ -448,6 +454,8 @@
+ 	protecteur = bool(def.get("protecteur", false))
+ 	zone_shift = bool(def.get("zone_shift", true))
+ 	_prot_cd = randf_range(0.0, 0.5)
++	summon_kind = String(def.get("summon_kind", ""))
++	_summon_cd = 2.0
+ 	esquive = bool(def.get("esquive", false))
+ 	_esq_cd = randf_range(1.0, 3.0)
+ 	_garde_cd_t = randf_range(2.0, 6.0)
+@@ -1028,6 +1036,7 @@
+ 	# flash de tir a la bouche des ogives
+ 	if game.has_method("spawn_vfx"):
+ 		game.spawn_vfx("aaa_muzzle", global_position + dir * 30.0, dir.angle(), 0.75, _bolt_color)
++	_telegraph_band(dir)
+ 	if Events != null:
+ 		Events.screen_shake.emit(1.6)
+ 
+@@ -1040,9 +1049,7 @@
+ 	if hp_max <= 0.0:
+ 		return
+ 	var thresholds: Array = EnemySpawner.BOSS_PHASE_THRESHOLDS.get(kind, [0.5])
+-	if _phase_idx >= thresholds.size():
+-		return
+-	if hp <= hp_max * float(thresholds[_phase_idx]):
++	if _phase_idx < thresholds.size() and hp <= hp_max * float(thresholds[_phase_idx]):
+ 		_phase_idx += 1
+ 		if game != null:
+ 			if game.has_method("show_banner"):
+@@ -1051,6 +1058,14 @@
+ 				game.spawn_vfx("shockwave", global_position, 0.0, _body_radius / 40.0, Color(1.0, 0.5, 0.35))
+ 		Events.screen_shake.emit(5.0)
+ 		_apply_boss_phase(_phase_idx)
++	# Phase 2 : palette a 50 % et spirale a 20 %, meme si le boss n'a qu'un seuil [0.5].
++	if rank >= 2:
++		if not _p2_palette_done and hp <= hp_max * 0.5:
++			_p2_palette_done = true
++			_phase2_palette()
++		if not _p2_spiral_done and hp <= hp_max * 0.2:
++			_p2_spiral_done = true
++			_phase2_spiral()
+ 
+ func show_banner_phase() -> void:
+ 	game.show_banner("PHASE %d" % (_phase_idx + 1), Color(1.0, 0.45, 0.35))
+@@ -1136,6 +1151,67 @@
+ 		_boss_hazard_cd = 0.2
+ 
+ 
++## Teinte chaude a 50 % PV. N'ecrase pas le motif de phase deja applique.
++func _phase2_palette() -> void:
++	if _spr == null:
++		return
++	_spr.self_modulate = _spr.self_modulate.lerp(Color(1.35, 0.45, 0.85), 0.65)
++
++## A 20 % PV : une escouade en spirale, si le spawner expose le hook.
++func _phase2_spiral() -> void:
++	if game == null:
++		return
++	var sp: Variant = game.get("spawner")
++	if sp is Node and (sp as Node).has_method("spawn_spiral_squad"):
++		(sp as Node).call("spawn_spiral_squad")
++
++## Bande directionnelle 0,5–0,9 s + pulse au sol. Reserve aux elites et aux rangs >= 1.
++func _telegraph_band(dir: Vector2) -> void:
++	if _band_cd > 0.0 or game == null or not game.has_method("spawn_ground_zone"):
++		return
++	var marked: bool = grade == "elite" or rank >= 1
++	if not marked and has_meta("phase1_elite"):
++		marked = bool(get_meta("phase1_elite"))
++	if not marked:
++		return
++	_band_cd = 1.2
++	var aim: Vector2 = dir if dir.length() > 0.2 else Vector2.RIGHT
++	aim = aim.normalized()
++	var delay: float = randf_range(0.5, 0.9)
++	var dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg
++	game.spawn_ground_zone(global_position, 22.0, delay, dmg, Color(1.0, 0.28, 0.18), "decor_hit", "line", -aim * 36.0, aim * 280.0)
++	game.spawn_ground_zone(global_position, 48.0, delay * 0.7, dmg * 0.45, Color(1.0, 0.5, 0.16))
++
++func _living_drones() -> int:
++	var n: int = 0
++	var id: int = get_instance_id()
++	for e in _shared_enemies():
++		if e is Enemy and (e as Enemy).alive and (e as Node).has_meta("summoner_owner") and int((e as Node).get_meta("summoner_owner")) == id:
++			n += 1
++	return n
++
++func _summon_wave() -> void:
++	if summon_kind == "" or game == null:
++		return
++	var sp: Variant = game.get("spawner")
++	if not (sp is Node) or not (sp as Node).has_method("spawn_kind_at"):
++		return
++	var alive_n: int = _living_drones()
++	if alive_n >= 6:
++		return
++	if get_tree().get_nodes_in_group("enemies").size() >= EnemySpawner.ENEMY_CAP:
++		return
++	var room: int = mini(3, 6 - alive_n)
++	for i in room:
++		if get_tree().get_nodes_in_group("enemies").size() >= EnemySpawner.ENEMY_CAP:
++			return
++		var ang: float = TAU * float(i) / 3.0 + randf() * 0.35
++		var drone_v: Variant = (sp as Node).call("spawn_kind_at", summon_kind, global_position + Vector2.from_angle(ang) * 96.0)
++		if drone_v is Enemy:
++			(drone_v as Enemy).set_meta("summoner_owner", get_instance_id())
++	if game.has_method("spawn_vfx"):
++		game.spawn_vfx("shockwave", global_position, 0.0, 0.85, Color(0.62, 0.4, 1.0))
++
+ func _physics_process(delta: float) -> void:
+ 	if not alive:
+ 		if _dying:
+@@ -1157,6 +1233,7 @@
+ 	var player_valid: bool = player != null and is_instance_valid(player) and GameState.alive
+ 	
+ 	_atk_cd -= delta
++	_band_cd = maxf(0.0, _band_cd - delta)
+ 	if _atk_cd < 0.0:
+ 		_atk_cd = 0.0
+ 	if rank >= 3:
+@@ -1417,6 +1494,52 @@
+ 						var mine_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.8
+ 						game.spawn_ground_zone(global_position, 110.0, 1.1, mine_dmg, Color(1.0, 0.42, 0.12))
+ 
++			elif behavior == "kami":
++				# KAMI (Phase 2) : rush rapide, anneau visible 0,6 s, puis explosion. Distinct du
++				# role « kamikaze » (meche shader, zone quasi instantanee) qui reste inchange.
++				if not _kamikaze_arming:
++					desired_vel = dir * speed * _speed_mult * 1.35
++					if dist <= 110.0:
++						_kamikaze_arming = true
++						_kamikaze_fuse = 0.6
++						if game != null and game.has_method("spawn_ground_zone"):
++							var boom_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 2.4
++							game.spawn_ground_zone(global_position, 100.0, 0.6, boom_dmg, Color(1.0, 0.42, 0.08))
++						if game != null and game.has_method("spawn_vfx"):
++							game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.7, Color(1.0, 0.45, 0.12))
++				else:
++					desired_vel = dir * speed * _speed_mult * 0.25
++					_kamikaze_fuse -= delta
++					var kpulse: float = absf(sin(_kamikaze_fuse * 22.0))
++					if _mat != null and _mat.shader != null:
++						_mat.set_shader_parameter("warn", kpulse)
++					if _kamikaze_fuse <= 0.0:
++						if game != null and game.has_method("spawn_vfx"):
++							game.spawn_vfx("aaa_explosion", global_position, 0.0, 0.85, Color(1.0, 0.4, 0.1))
++						Audio.sfx("explosion", 0.08)
++						take_damage(hp_max + 1.0)
++
++			elif behavior == "summoner":
++				# INVOCATEUR : tient la distance, lache 3 drones fragiles toutes les ~8 s (plafond 6).
++				var keep: float = prefer_dist if prefer_dist > 40.0 else 300.0
++				if dist > keep + 50.0:
++					desired_vel = dir * speed * _speed_mult * 0.8
++				elif dist < keep - 70.0:
++					desired_vel = -dir * speed * _speed_mult * 0.55
++				else:
++					_strafe_timer -= delta
++					if _strafe_timer <= 0.0:
++						_strafe_dir *= -1.0
++						_strafe_timer = randf_range(2.2, 3.6)
++					desired_vel = Vector2(-dir.y, dir.x) * _strafe_dir * speed * _speed_mult * 0.45
++				_summon_cd -= delta
++				if _summon_cd <= 0.0:
++					_summon_cd = 8.0
++					_summon_wave()
++				if _atk_cd <= 0.0 and dist < keep + 80.0 and game != null and game.has_method("spawn_enemy_bolt"):
++					_atk_cd = attack_cd if attack_cd > 0.2 else 2.2
++					game.spawn_enemy_bolt(global_position + dir * 18.0, dir, attack_dmg if attack_dmg > 0.0 else 6.0, Color(0.7, 0.45, 1.0), 0.9, 260.0)
++
+ 			elif behavior == "kamikaze":
+ 				# KAMIKAZE : quasi identique a "miner" (approche + GroundZone), SAUF qu'il ne
+ 				# recule jamais — a portee, il s'arme (meche visible) puis fonce et se detruit ;
+@@ -1614,12 +1737,14 @@
+ 							if _mat != null and _mat.shader != null:
+ 								_mat.set_shader_parameter("warn", 0.0)
+ 							_fire_heavy(_aim_dir(dir))
++							_telegraph_band(_aim_dir(dir))
+ 					elif _atk_cd <= 0.0 and dist < prefer_dist + 120.0 and Enemy._fire_ok(2.0, rank):
+ 						_charging = true
+ 						_charge_t = HEAVY_CHARGE[_palier]
+ 				elif _atk_cd <= 0.0 and dist < prefer_dist + 100.0 and _aim_ready() and Enemy._fire_ok(_shot_cost(), rank):
+ 					_atk_cd = attack_cd * ARME_CADENCE[_palier]
+ 					_tire_dispatch(_aim_dir(dir))
++					_telegraph_band(_aim_dir(dir))
+ 					
+ 	else:
+ 		desired_vel = Vector2.ZERO
+@@ -2241,6 +2366,10 @@
+ 		# PHASE 1 : tirage rare bombe / aimant. Le marquage elite est pose par EnemySpawner
+ 		# (_maybe_elite -> grade "elite", _spawn_elite -> meta "phase1_elite").
+ 		GameState.roll_phase1_drop(self)
++		if has_meta("mastery_boss5") and bool(get_meta("mastery_boss5")):
++			if GameState.mastery_boss5_clean:
++				GameState.mastery_boss5_ok = true
++			GameState.mastery_boss5_active = false
+ 	if is_final:
+ 		# SANS FIN: the endboss is a milestone, not an ending — the run rolls on, harder.
+ 		if GameState.endless and game != null and game.has_method("endless_boss_down"):
+--- a/game/actors/EnemyProjectile.gd
++++ b/game/actors/EnemyProjectile.gd
+@@ -206,20 +206,27 @@
+ 	elif game.has_method("spawn_vfx"):
+ 		game.spawn_vfx("aaa_muzzle", global_position, 0.0, 0.4 * size, tint)
+ 
+-func _recycle() -> void:
++## Remise en reserve. Les compteurs missile/fumee sont rendus ici (idempotent).
++func reset() -> void:
+ 	visible = false
+ 	monitoring = false
+ 	set_physics_process(false)
+ 	_trail_points.clear()
+ 	if _trail != null:
+ 		_trail.points = PackedVector2Array()
+-	if _has_smoke:                              # rend le slot de particules
+-		_smoke_active -= 1; _has_smoke = false
+-	if _counted_missile:                        # rend le compteur missile
+-		_active_missiles -= 1; _counted_missile = false
++	if _has_smoke:
++		_smoke_active -= 1
++		_has_smoke = false
++	if _counted_missile:
++		_active_missiles -= 1
++		_counted_missile = false
+ 	if _smoke_ps != null:
+ 		_smoke_ps.emitting = false
++	global_position = Vector2(1.0e7, 1.0e7)
++
++func _recycle() -> void:
+ 	if game != null and game.has_method("recycle_enemy_bolt"):
+ 		game.recycle_enemy_bolt(self)
+ 	else:
++		reset()
+ 		queue_free()
+--- a/game/actors/GroundZone.gd
++++ b/game/actors/GroundZone.gd
+@@ -49,6 +49,8 @@
+ var _edge_a: Line2D
+ var _edge_b: Line2D
+ var _band: Line2D
++## Phase 2 : les cercles chauds viennent du pool. Les bandes ("line") restent des noeuds frais.
++var _pooled: bool = false
+ 
+ func _ready() -> void:
+ 	process_mode = Node.PROCESS_MODE_PAUSABLE   # se fige avec le draft (le parent Game tourne en ALWAYS)
+@@ -107,6 +109,53 @@
+ 	_smoke_ps.color_ramp = ramp
+ 	_missile.add_child(_smoke_ps)                # suit le missile + herite de sa rotation
+ 
++## Rearme une zone circulaire deja construite (pool). La forme "line" n'est pas recyclee :
++## son visuel est bake dans _ready, le reset ne le reconstruit pas.
++func arm(pos: Vector2, r: float, dly: float, dmg: float, col: Color, fx: String, g: Node, plr: Node2D) -> void:
++	shape = "circle"
++	radius = r
++	delay = maxf(0.05, dly)
++	damage = dmg
++	color = col
++	fx_kind = fx
++	game = g
++	player = plr
++	_t = 0.0
++	_exploded = false
++	visible = true
++	set_process(true)
++	global_position = pos
++	if _missile != null:
++		var show_m: bool = radius >= 100.0
++		_missile.visible = show_m
++		if show_m:
++			var a: float = deg_to_rad(-96.0 + randf_range(-22.0, 22.0))
++			_off = Vector2(cos(a), sin(a)) * (radius * 2.2 + 300.0)
++			_mscale = clampf(radius / 95.0, 0.7, 1.35) * 0.42
++			_missile.rotation = (-_off).angle()
++		if _smoke_ps != null:
++			_smoke_ps.emitting = show_m
++			if show_m:
++				_smoke_ps.restart()
++
++## Remise en reserve. N'appelle pas queue_free.
++func reset() -> void:
++	_t = 0.0
++	_exploded = false
++	visible = false
++	set_process(false)
++	global_position = Vector2(1.0e7, 1.0e7)
++	if _missile != null:
++		_missile.visible = false
++	if _smoke_ps != null:
++		_smoke_ps.emitting = false
++
++func _release_self() -> void:
++	if _pooled and game != null and game.has_method("reclaim_ground_zone"):
++		game.reclaim_ground_zone(self)
++	else:
++		queue_free()
++
+ ## Forme "line" (bras presseur, laser rotatif) : bande sombre + bande d'energie qui s'epaissit
+ ## + deux bords nets paralleles + halo doux. Plus de cercle parasite au centre.
+ func _build_line_telegraph(m: CanvasItemMaterial) -> void:
+@@ -244,4 +293,4 @@
+ 
+ 	if Events != null:
+ 		Events.screen_shake.emit(3.2)
+-	queue_free()
++	_release_self()
+--- a/game/actors/Pickup.gd
++++ b/game/actors/Pickup.gd
+@@ -172,6 +172,9 @@
+ 	else:
+ 		queue_free()
+ 
++func reset() -> void:
++	deactivate()
++
+ func deactivate() -> void:
+ 	set_physics_process(false)
+ 	visible = false
+--- a/game/actors/Player.gd
++++ b/game/actors/Player.gd
+@@ -141,6 +141,11 @@
+ var chassis_family: String = ""   # base_chassis ramene a sa famille (vortexmk2 -> vortex) : mecaniques propres au chassis
+ const TF_DUR: float = 8.0   # Overdrive "harvester" spike: short, intense, then vulnerable again
+ var _space_was: bool = false
++var _f_was: bool = false
++var _kit_cd: float = 0.0
++var _kit_cd_max: float = 12.0
++var _kit_boost_t: float = 0.0
++var _kit_id: String = ""
+ 
+ ## VERROUILLAGE avion de chasse (patron, 25/09) : forme par chassis, pas juste une couleur —
+ ## chacune colle a l'identite deja etablie du mecha (cf. GameState.MECHS "ligne"). La couleur,
+@@ -320,6 +325,7 @@
+ 		start_w = sig
+ 	if _weapons != null:
+ 		_weapons.reset_loadout([start_w])
++	_apply_phase3_loadout()
+ 
+ func _ready() -> void:
+ 	add_to_group("player")
+@@ -345,6 +351,7 @@
+ 	add_child(mecha)
+ 	base_chassis = hero_id
+ 	chassis_family = GameState.chassis_family(hero_id)
++	_apply_phase3_loadout()
+ 	if mecha.has_method("set_tint"):
+ 		mecha.set_tint(BASE_TINT)   # heros legerement plus clair que la pietaille (voir BASE_TINT)
+ 
+@@ -575,6 +582,12 @@
+ 	if bot_active and not transformed and GameState.overdrive >= 1.0:
+ 		_transform_on()
+ 	_space_was = edge
++	_kit_cd = maxf(0.0, _kit_cd - delta)
++	_kit_boost_t = maxf(0.0, _kit_boost_t - delta)
++	var fedge: bool = Input.is_key_pressed(KEY_F)
++	if fedge and not _f_was:
++		_cast_chassis_active()
++	_f_was = fedge
+ 
+ 	if transformed:
+ 		_tf_t -= delta
+@@ -628,6 +641,8 @@
+ 	else:
+ 		_thruster.color = Color(1.0, 0.6, 0.15) if jet_t > 0.0 else Palette.CYAN
+ 		var target_vel: Vector2 = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0) * (JET_MULT if jet_t > 0.0 else 1.0)
++		if _kit_boost_t > 0.0:
++			target_vel *= 1.45
+ 		var eff_inertia: float = maxf(inertia, _patch_inertia)
+ 		if eff_inertia > 0.0:
+ 			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
+@@ -1336,6 +1351,56 @@
+ 		if game != null and game.has_method("show_hint"):
+ 			game.show_hint("Arme empruntee epuisee — retour a l'origine.", Color(0.72, 0.92, 1.0), 3.0)
+ 
++
++## Sets 2/4 pieces + kit de chassis. Appele apres le calcul d'equipement, une fois par refresh.
++func _apply_phase3_loadout() -> void:
++	var bonus: Dictionary = SaveManager.gear_set_bonus()
++	damage *= (1.0 + float(bonus.get("damage_pct", 0.0)))
++	max_hp *= (1.0 + float(bonus.get("hp_pct", 0.0)))
++	hp = max_hp
++	base_speed *= (1.0 + float(bonus.get("speed_pct", 0.0)))
++	crit_chance += float(bonus.get("crit", 0.0))
++	armor = float(bonus.get("armor", 0.0))
++	magnet_range = 165.0 + float(bonus.get("magnet", 0.0))
++	GameState.run_xp_mult = 1.0 + float(bonus.get("xp_mult", 0.0))
++	GameState.overdrive_free_casts = int(bonus.get("overdrive_charges", 0))
++	var kit: Dictionary = GameState.chassis_kit(chassis_family)
++	_kit_id = String(kit.get("actif", ""))
++	_kit_cd_max = float(kit.get("cd", 12.0))
++	match String(kit.get("passif", "")):
++		"damage":
++			damage *= (1.0 + float(kit.get("pval", 0.0)))
++		"speed":
++			base_speed *= (1.0 + float(kit.get("pval", 0.0)))
++		"hp":
++			max_hp += float(kit.get("pval", 0.0))
++			hp = max_hp
++		"crit":
++			crit_chance += float(kit.get("pval", 0.0))
++
++## Touche F : actif du chassis (dash de vitesse, onde, ou jauge Overdrive).
++func _cast_chassis_active() -> void:
++	if not GameState.alive or _kit_id == "" or _kit_cd > 0.0:
++		return
++	_kit_cd = _kit_cd_max
++	match _kit_id:
++		"dash":
++			_kit_boost_t = 0.45
++			if game != null and game.has_method("spawn_vfx"):
++				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.55, Color(0.45, 0.85, 1.0))
++		"shock":
++			for n in get_tree().get_nodes_in_group("enemies"):
++				if n is Enemy and global_position.distance_to((n as Node2D).global_position) <= 180.0:
++					(n as Enemy).take_damage(damage * 1.6, chassis_family, "kit")
++			if game != null and game.has_method("spawn_vfx"):
++				game.spawn_vfx("shockwave", global_position, 0.0, 1.3, Color(1.0, 0.55, 0.2))
++			Events.screen_shake.emit(4.0)
++		"align_burst":
++			GameState.add_overdrive(0.35)
++			if game != null and game.has_method("spawn_vfx"):
++				game.spawn_vfx("energy", global_position, 0.0, 1.0, Color(0.55, 0.9, 1.0))
++	Audio.sfx("levelup", 0.04)
++
+ func _transform_on() -> void:
+ 	# OVERDRIVE "HARVESTER": invincible + double speed + global XP magnet for TF_DUR seconds,
+ 	# plus the continuous energy beam. A huge dopamine spike, then back to vulnerable.
+@@ -1356,7 +1421,14 @@
+ func _transform_off() -> void:
+ 	transformed = false
+ 	GameState.overdrive_active = false
+-	GameState.overdrive_cd = GameState.OVERDRIVE_COOLDOWN   # vulnerable stretch before the next spike
++	# Set Anahei 4 pieces : une charge de plus, sans laisser overdrive_active allume.
++	if GameState.overdrive_free_casts > 0:
++		GameState.overdrive_free_casts -= 1
++		GameState.overdrive = 1.0
++		GameState.overdrive_cd = 0.0
++		Events.overdrive_changed.emit(1.0)
++	else:
++		GameState.overdrive_cd = GameState.OVERDRIVE_COOLDOWN   # vulnerable stretch before the next spike
+ 	if mecha.has_method("set_tint"):
+ 		mecha.set_tint(BASE_TINT)   # on revient a la teinte du heros, pas au blanc neutre
+ 	if _od_aura != null:
+@@ -1702,6 +1774,8 @@
+ 	if base_chassis == "titan" and velocity.length() > 10.0:
+ 		amount *= 0.78   # -22%, valeur de prototypage — pas mesuree, a ajuster au playtest
+ 	hp -= amount
++	if GameState.mastery_boss5_active:
++		GameState.mastery_boss5_clean = false
+ 	var tag: String = source_tag if source_tag != "" else "inconnu"
+ 	damage_log[tag] = float(damage_log.get(tag, 0.0)) + amount
+ 	last_damage_source = tag
+--- a/game/actors/Projectile.gd
++++ b/game/actors/Projectile.gd
+@@ -466,6 +466,10 @@
+ 	else:
+ 		queue_free()
+ 
++## Alias pool Phase 2 : release() cherche reset() avant deactivate().
++func reset() -> void:
++	deactivate()
++
+ # Park far off-screen + stop processing (monitoring stays on -> no signal-time toggle,
+ # and nothing overlaps way out there). Reused via setup().
+ func deactivate() -> void:
+--- a/game/actors/VfxSprite.gd
++++ b/game/actors/VfxSprite.gd
+@@ -53,11 +53,15 @@
+ 			return
+ 	frame = _frame
+ 
+-func _finish() -> void:
++func reset() -> void:
+ 	_playing = false
+ 	visible = false
+ 	set_process(false)
++	global_position = Vector2(1.0e7, 1.0e7)
++
++func _finish() -> void:
+ 	if game != null and game.has_method("reclaim_vfx"):
+ 		game.reclaim_vfx(self)
+ 	else:
++		reset()
+ 		queue_free()
+--- a/game/autoload/GameState.gd
++++ b/game/autoload/GameState.gd
+@@ -28,6 +28,13 @@
+ var magnet_vacuum: bool = false
+ var magnet_vacuum_t: float = 0.0
+ const MAGNET_VACUUM_DUR: float = 2.5
++## Phase 3 — charge Overdrive offerte par le set Anahei 4 pieces (consommee dans Player._transform_off).
++var overdrive_free_casts: int = 0
++## Defis de maitrise de la run en cours. Remis a zero dans reset().
++var mastery_boss5_active: bool = false
++var mastery_boss5_clean: bool = true
++var mastery_boss5_ok: bool = false
++var mastery_ranged: bool = false
+ const BOMB_RADIUS: float = 420.0
+ const BOMB_TRASH_HP_FRAC: float = 0.35   # part de hp_max, ennemis non-boss (rank < 3)
+ const BOMB_BOSS_HP_FRAC: float = 0.08    # degats reduits sur boss (rank >= 3)
+@@ -325,6 +332,23 @@
+ 			return b
+ 	return id
+ 
++## Phase 3 — un passif permanent + un actif a cooldown, par famille de chassis.
++const CHASSIS_KITS: Dictionary = {
++	"vortex": {"passif": "damage", "pval": 0.06, "passif_nom": "Percee +6% degats", "actif": "align_burst", "actif_nom": "Salve d'alignement", "cd": 12.0},
++	"bluestrike": {"passif": "speed", "pval": 0.05, "passif_nom": "Glisse +5% vitesse", "actif": "dash", "actif_nom": "Dash de chasse", "cd": 8.0},
++	"titan": {"passif": "hp", "pval": 18.0, "passif_nom": "Blindage +18 PV", "actif": "shock", "actif_nom": "Onde de choc", "cd": 16.0},
++	"bruiser": {"passif": "damage", "pval": 0.08, "passif_nom": "Brisure +8% degats", "actif": "shock", "actif_nom": "Choc de brisure", "cd": 14.0},
++	"vanquisher": {"passif": "crit", "pval": 0.04, "passif_nom": "Visee +4% crit", "actif": "align_burst", "actif_nom": "Rafale critique", "cd": 11.0},
++	"pylone": {"passif": "damage", "pval": 0.05, "passif_nom": "Ancrage +5% degats", "actif": "shock", "actif_nom": "Impulsion d'ancre", "cd": 15.0},
++	"cerclier": {"passif": "speed", "pval": 0.04, "passif_nom": "Orbite +4% vitesse", "actif": "dash", "actif_nom": "Dash orbital", "cd": 9.0},
++}
++
++static func chassis_kit(id: String) -> Dictionary:
++	var fam: String = chassis_family(id)
++	if CHASSIS_KITS.has(fam):
++		return CHASSIS_KITS[fam]
++	return {"passif": "damage", "pval": 0.04, "passif_nom": "Signature +4% degats", "actif": "shock", "actif_nom": "Onde courte", "cd": 14.0}
++
+ static func mech_def(id: String) -> Dictionary:
+ 	for m in MECHS:
+ 		if String(m["id"]) == id:
+@@ -351,6 +375,11 @@
+ 	overdrive_cd = 0.0
+ 	magnet_vacuum = false
+ 	magnet_vacuum_t = 0.0
++	overdrive_free_casts = 0
++	mastery_boss5_active = false
++	mastery_boss5_clean = true
++	mastery_boss5_ok = false
++	mastery_ranged = false
+ 	alive = true
+ 	death_cause = ""
+ 	score = 0
+--- a/game/autoload/SaveManager.gd
++++ b/game/autoload/SaveManager.gd
+@@ -3,6 +3,13 @@
+ ## (meta tree, chassis, unlocks).
+ 
+ const PATH: String = "user://mecha_forge_save.json"
++const SAVE_SCHEMA: int = 2
++const MAKERS: Array = ["anahei", "korr", "voss", "sena"]
++const MAKER_NAMES: Dictionary = {
++	"anahei": "ANAHEI", "korr": "KORR", "voss": "VOSS", "sena": "SENA",
++}
++const MASTERY_IDS: Array = ["nohit", "fast", "melee"]
++const MASTERY_CORES: int = 12
+ 
+ var data: Dictionary = {
+ 	"meta_scrap": 0,
+@@ -42,9 +49,28 @@
+ 			if d is Dictionary:
+ 				for k in d:
+ 					data[k] = d[k]
++	_migrate_schema()
+ 	load_visual_scales()
+ 	_accorde_chassis_gratuits()
+ 
++## Anciennes sauvegardes (schema 1) : maker stable via uid % 4, table de maitrise vide.
++func _migrate_schema() -> void:
++	if int(data.get("schema", 1)) >= SAVE_SCHEMA:
++		if not data.has("mastery"):
++			data["mastery"] = {}
++		return
++	for p in data.get("parts", []):
++		if p is Dictionary and String((p as Dictionary).get("maker", "")) == "":
++			var uid: int = int((p as Dictionary).get("uid", 0))
++			(p as Dictionary)["maker"] = String(MAKERS[posmod(uid, MAKERS.size())])
++	if not data.has("mastery"):
++		data["mastery"] = {}
++	data["schema"] = SAVE_SCHEMA
++	save_data()
++
++func _roll_maker() -> String:
++	return String(MAKERS[randi() % MAKERS.size()])
++
+ ## Tout chassis dont le cout vaut 0 est POSSEDE d'office.
+ ## 🚨 Sans ca, mettre un prix a 0 ne suffirait pas : l'ecran GARAGE afficherait un bouton
+ ## « 0 » a cliquer, et surtout les sauvegardes DEJA EXISTANTES resteraient bloquees sur leur
+@@ -330,7 +356,8 @@
+ 	var plan: Dictionary = ps[index]
+ 	var uid: int = int(data.get("part_uid", 1))
+ 	data["part_uid"] = uid + 1
+-	var part: Dictionary = {"uid": uid, "slot": String(plan["slot"]), "rarity": String(plan["rarity"]), "level": 1}
++	var maker: String = String(plan.get("maker", _roll_maker()))
++	var part: Dictionary = {"uid": uid, "slot": String(plan["slot"]), "rarity": String(plan["rarity"]), "level": 1, "maker": maker}
+ 	var parts: Array = gear_parts()
+ 	parts.append(part)
+ 	data["parts"] = parts
+@@ -380,6 +407,115 @@
+ 			t[k] = float(t.get(k, 0.0)) + float(b[k])
+ 	return t
+ 
++func gear_set_counts() -> Dictionary:
++	var c: Dictionary = {}
++	for slot: String in GEAR_SLOTS:
++		var uid: int = int(gear_equipped().get(slot, -1))
++		if uid < 0:
++			continue
++		var p: Dictionary = gear_part(uid)
++		if p.is_empty():
++			continue
++		var m: String = String(p.get("maker", ""))
++		if m == "":
++			continue
++		c[m] = int(c.get(m, 0)) + 1
++	return c
++
++## 2 pieces : +8 % de la stat signature. 4 pieces : bonus distinct (Anahei = +1 charge Overdrive).
++func gear_set_bonus() -> Dictionary:
++	var b: Dictionary = {
++		"damage_pct": 0.0, "hp_pct": 0.0, "speed_pct": 0.0, "crit": 0.0,
++		"armor": 0.0, "magnet": 0.0, "xp_mult": 0.0, "overdrive_charges": 0,
++	}
++	var counts: Dictionary = gear_set_counts()
++	for maker in counts.keys():
++		var n: int = int(counts[maker])
++		if n >= 2:
++			match String(maker):
++				"anahei":
++					b["damage_pct"] = float(b["damage_pct"]) + 0.08
++				"korr":
++					b["hp_pct"] = float(b["hp_pct"]) + 0.08
++				"voss":
++					b["speed_pct"] = float(b["speed_pct"]) + 0.08
++				"sena":
++					b["crit"] = float(b["crit"]) + 0.08
++		if n >= 4:
++			match String(maker):
++				"anahei":
++					b["overdrive_charges"] = int(b["overdrive_charges"]) + 1
++				"korr":
++					b["armor"] = float(b["armor"]) + 0.08
++				"voss":
++					b["magnet"] = float(b["magnet"]) + 60.0
++				"sena":
++					b["xp_mult"] = float(b["xp_mult"]) + 0.08
++	return b
++
++func set_summary() -> String:
++	var counts: Dictionary = gear_set_counts()
++	if counts.is_empty():
++		return "Sets : aucune piece fabricant equipee (2 pieces = +8 %)."
++	var lines: PackedStringArray = PackedStringArray()
++	for m in MAKERS:
++		var n: int = int(counts.get(m, 0))
++		if n <= 0:
++			continue
++		var bit: String = "%s %d/4" % [String(MAKER_NAMES.get(m, m)), n]
++		if n >= 2:
++			bit += "  +8%"
++		if n >= 4:
++			match String(m):
++				"anahei":
++					bit += "  +1 charge Overdrive"
++				"korr":
++					bit += "  +8% armure"
++				"voss":
++					bit += "  aimant +60"
++				"sena":
++					bit += "  +8% XP"
++		lines.append(bit)
++	return "\n".join(lines)
++
++func mastery_done(biome: String, id: String) -> bool:
++	return bool(data.get("mastery", {}).get(biome, {}).get(id, false))
++
++## Une fois par biome et par defi. Noyaux + plan rare du fabricant.
++func record_mastery(biome: String, id: String) -> bool:
++	if biome == "" or not MASTERY_IDS.has(id):
++		return false
++	var all: Dictionary = data.get("mastery", {}).duplicate(true)
++	var row: Dictionary = all.get(biome, {})
++	if bool(row.get(id, false)):
++		return false
++	row[id] = true
++	all[biome] = row
++	data["mastery"] = all
++	data["cores"] = int(data.get("cores", 0)) + MASTERY_CORES
++	var plan: Dictionary = {
++		"slot": String(GEAR_SLOTS[randi() % GEAR_SLOTS.size()]),
++		"rarity": "rare",
++		"maker": _roll_maker(),
++		"source": "mastery",
++	}
++	var ps: Array = plans()
++	ps.append(plan)
++	data["plans"] = ps
++	save_data()
++	return true
++
++## nohit = boss 5:00 sans degat subi ; fast = victoire avant 12 min ; melee = aucun projectile.
++func commit_run_mastery(biome: String, run_time: float, boss5_ok: bool, melee_only: bool) -> Array:
++	var got: Array = []
++	if boss5_ok and record_mastery(biome, "nohit"):
++		got.append("no-hit 5:00")
++	if run_time > 1.0 and run_time < 720.0 and record_mastery(biome, "fast"):
++		got.append("clear < 12 min")
++	if melee_only and record_mastery(biome, "melee"):
++		got.append("melee-only")
++	return got
++
+ func _roll_rarity() -> String:
+ 	var total: int = 0
+ 	for w in GEAR_RARITY_WEIGHT:
+@@ -406,6 +542,7 @@
+ 		"slot": String(GEAR_SLOTS[randi() % GEAR_SLOTS.size()]),
+ 		"rarity": _roll_rarity(),
+ 		"level": 1,
++		"maker": _roll_maker(),
+ 	}
+ 	var ps: Array = gear_parts()
+ 	ps.append(part)
+@@ -518,6 +655,7 @@
+ 		"slot": slot,
+ 		"rarity": next_rarity,
+ 		"level": max_lvl,
++		"maker": String(matching[0].get("maker", _roll_maker())),
+ 	}
+ 	ps.append(new_part)
+ 	data["parts"] = ps
+--- a/game/scenes/Game.gd
++++ b/game/scenes/Game.gd
+@@ -13,6 +13,15 @@
+ var projectile_layer: Node2D
+ var pickup_layer: Node2D
+ var fx_layer: Node2D
++## Phase 2 — pools prechauffes. Le script vit dans systems/ (miroir res://systems/).
++const _ObjectPool = preload("res://systems/ObjectPool.gd")
++var _pool_proj = null
++var _pool_ebolt = null
++var _pool_zone = null
++var _pool_vfx = null
++var _pool_pick = null
++var _pools_ready: bool = false
++var _ebolt_live: int = 0
+ 
+ var _shake: float = 0.0
+ var _dmg_active: int = 0
+@@ -330,6 +339,7 @@
+ 	# painted UNDER the mech and vanished behind it. Lift the FX above the actors so they read
+ 	# ON the sprite. Stays below the overdrive beam (60) and the point lights (100).
+ 	fx_layer.z_index = 40
++	_ensure_pools()
+ 
+ 	player = Player.new()
+ 	player.game = self
+@@ -1380,39 +1390,84 @@
+ 	add_child(n)
+ 	return n
+ 
++## Prechauffe : 128 projectiles joueur, 64 bolts ennemis, 32 zones, 64 etincelles, 48 pickups.
++## Les tableaux historiques (_proj_pool, etc.) restent pour ne pas casser un reclaim oublie,
++## mais le chemin chaud passe par ObjectPool.
++func _ensure_pools() -> void:
++	if _pools_ready or projectile_layer == null or fx_layer == null or enemy_layer == null or pickup_layer == null:
++		return
++	_pools_ready = true
++	_pool_proj = _ObjectPool.new()
++	_pool_proj.setup(func() -> Node:
++		var p: Projectile = Projectile.new()
++		p.game = self
++		return p
++	, 128)
++	_pool_proj.prewarm(128, projectile_layer)
++	_pool_ebolt = _ObjectPool.new()
++	_pool_ebolt.setup(func() -> Node:
++		var b: EnemyProjectile = EnemyProjectile.new()
++		b.game = self
++		return b
++	, 64)
++	_pool_ebolt.prewarm(64, projectile_layer)
++	_pool_zone = _ObjectPool.new()
++	_pool_zone.setup(func() -> Node:
++		var z: GroundZone = GroundZone.new()
++		z.radius = 110.0
++		z._pooled = true
++		z.game = self
++		return z
++	, 32)
++	_pool_zone.prewarm(32, enemy_layer)
++	_pool_vfx = _ObjectPool.new()
++	_pool_vfx.setup(func() -> Node:
++		var v: VfxSprite = VfxSprite.new()
++		v.game = self
++		return v
++	, 64)
++	_pool_vfx.prewarm(64, fx_layer)
++	_pool_pick = _ObjectPool.new()
++	_pool_pick.setup(func() -> Node:
++		var g: Pickup = Pickup.new()
++		g.game = self
++		return g
++	, 48)
++	_pool_pick.prewarm(48, pickup_layer)
++
+ # ---- weapon fire (pooled: reuse instead of new/queue_free in the hot loop) ----
+ func spawn_shot(muzzle: Vector2, dir: Vector2, params: Dictionary) -> void:
+-	var p: Projectile
+-	if _proj_pool.is_empty():
+-		p = Projectile.new()
+-		p.game = self
+-		projectile_layer.add_child(p)
+-	else:
+-		p = _proj_pool.pop_back()
++	_ensure_pools()
++	# Defi melee-only : tout projectile compte. Le sabre ne passe pas par ici.
++	var wid: String = String(params.get("impact", ""))
++	if wid != "sabre":
++		GameState.mastery_ranged = true
++	var p: Projectile = _pool_proj.acquire() as Projectile
++	p.game = self
+ 	p.setup(muzzle, dir, params)
+ 	_muzzle_flash(muzzle, dir, Color(params.get("color", Palette.CYAN)))
+ 	Audio.sfx("shoot", 0.14)
+ 
+ func reclaim_proj(p: Projectile) -> void:
+-	p.deactivate()
+-	_proj_pool.append(p)
++	_ensure_pools()
++	_pool_proj.release(p)
+ 
+ func spawn_bolt(pos: Vector2, dir: Vector2, dmg: float) -> void:
+ 	spawn_shot(pos, dir, {"dmg": dmg, "pierce": player.bolt_pierce})
+ 
+ func _spawn_pickup(pos: Vector2, kind: String, val: int) -> void:
+-	var g: Pickup
+-	if _pickup_pool.is_empty():
+-		g = Pickup.new()
+-		g.game = self
+-		pickup_layer.add_child(g)
+-	else:
+-		g = _pickup_pool.pop_back()
++	_ensure_pools()
++	var g: Pickup = _pool_pick.acquire() as Pickup
++	g.game = self
+ 	g.setup(pos, kind, val, player)
+ 
+ func reclaim_pickup(p: Pickup) -> void:
+-	p.deactivate()
+-	_pickup_pool.append(p)
++	_ensure_pools()
++	_pool_pick.release(p)
++
++## Phase 1 : les drops bombe/aimant passent par le meme pool que l'XP.
++func spawn_phase1_pickup(pos: Vector2, kind: String) -> void:
++	_spawn_pickup(pos, kind, 1)
+ 
+ func spawn_xp(pos: Vector2, val: int) -> void:
+ 	_spawn_pickup(pos, "xp", val)
+@@ -1536,16 +1591,12 @@
+ 	show_banner("COMPETENCE : %s" % String(_SKILL_NAME.get(id, id)), Palette.BONUS)
+ 
+ func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false, homing: float = 0.0, style_tag: String = "bolt") -> void:
+-	var b: EnemyProjectile
+-	if _enemy_bolts_made - _enemy_proj_pool.size() >= ENEMY_BOLT_CAP:
++	_ensure_pools()
++	if _ebolt_live >= ENEMY_BOLT_CAP:
+ 		return
+-	if _enemy_proj_pool.is_empty():
+-		_enemy_bolts_made += 1
+-		b = EnemyProjectile.new()
+-		b.game = self
+-		projectile_layer.add_child(b)
+-	else:
+-		b = _enemy_proj_pool.pop_back()   # RECYCLE : pas de new/queue_free dans la boucle chaude
++	var b: EnemyProjectile = _pool_ebolt.acquire() as EnemyProjectile
++	_ebolt_live += 1
++	b.game = self
+ 	b.tint = color
+ 	b.size = bolt_size
+ 	b.missile = is_missile               # tirs lourds = missile (sprite ogive + trainee)
+@@ -1554,15 +1605,36 @@
+ 	b.setup(pos, dir, dmg, bolt_speed)
+ 
+ func recycle_enemy_bolt(b: EnemyProjectile) -> void:
+-	_enemy_proj_pool.append(b)
+-
+-## Zone AoE telegraphiee au sol (boss a ogives) : cercle rouge -> delai -> explosion.
+-func spawn_ground_zone(pos: Vector2, radius: float, delay: float, dmg: float, color: Color = Color(1.0, 0.45, 0.12), fx_kind: String = "decor_hit") -> void:
+-	var z: GroundZone = GroundZone.new()
+-	z.radius = radius; z.delay = delay; z.damage = dmg; z.color = color; z.fx_kind = fx_kind
+-	z.game = self; z.player = player
+-	enemy_layer.add_child(z)   # meme espace-monde que les ennemis ; z_index -2 = au sol
+-	z.global_position = pos
++	_ensure_pools()
++	_ebolt_live = maxi(0, _ebolt_live - 1)
++	_pool_ebolt.release(b)
++
++## Zone AoE telegraphiee au sol. shape "circle" = pool ; "line" = noeud frais (visuel bake).
++func spawn_ground_zone(pos: Vector2, radius: float, delay: float, dmg: float, color: Color = Color(1.0, 0.45, 0.12), fx_kind: String = "decor_hit", shape: String = "circle", line_from: Vector2 = Vector2.ZERO, line_to: Vector2 = Vector2.ZERO) -> void:
++	if shape == "line":
++		var zl: GroundZone = GroundZone.new()
++		zl.shape = "line"
++		zl.line_from = line_from
++		zl.line_to = line_to
++		zl.radius = radius
++		zl.delay = delay
++		zl.damage = dmg
++		zl.color = color
++		zl.fx_kind = fx_kind
++		zl.game = self
++		zl.player = player
++		enemy_layer.add_child(zl)
++		zl.global_position = pos
++		return
++	_ensure_pools()
++	var z: GroundZone = _pool_zone.acquire() as GroundZone
++	z._pooled = true
++	z.game = self
++	z.arm(pos, radius, delay, dmg, color, fx_kind, self, player)
++
++func reclaim_ground_zone(z: GroundZone) -> void:
++	_ensure_pools()
++	_pool_zone.release(z)
+ 
+ # Weapon-signature impact FX: every family hits with a DISTINCT, readable look so the
+ # arsenal never feels samey. Explosive = fireball+smoke, piercing = sharp lance, energy =
+@@ -1943,20 +2015,14 @@
+ 	var tex: Texture2D = _vfx_tex[id]
+ 	if tex == null:
+ 		return
+-	var v: VfxSprite
+-	if _vfx_pool.is_empty():
+-		v = VfxSprite.new()
+-		v.game = self
+-		fx_layer.add_child(v)
+-	else:
+-		v = _vfx_pool.pop_back()
++	_ensure_pools()
++	var v: VfxSprite = _pool_vfx.acquire() as VfxSprite
++	v.game = self
+ 	v.play(tex, int(d["frames"]), float(d["fps"]), pos, rot, scl, col, stretch)
+ 
+ func reclaim_vfx(v: VfxSprite) -> void:
+-	if _vfx_pool.size() < 40:
+-		_vfx_pool.append(v)
+-	else:
+-		v.queue_free()
++	_ensure_pools()
++	_pool_vfx.release(v)
+ 
+ var _sig_vfx_tex: Dictionary = {}
+ 
+@@ -3207,6 +3273,10 @@
+ 			SaveManager.data["crystals"] = int(SaveManager.data.get("crystals", 0)) + 20
+ 			SaveManager.bank_scrap(150)   # sauvegarde cristaux + ferraille
+ 			show_banner("CHAPITRE %d TERMINE  —  +20 cristaux, +150 ferraille" % _chapter, Color(1.0, 0.85, 0.3))
++		var biome_name: String = spawner.current_biome if spawner != null else ""
++		var won: Array = SaveManager.commit_run_mastery(biome_name, GameState.run_time, GameState.mastery_boss5_ok, not GameState.mastery_ranged)
++		if not won.is_empty():
++			show_hint("Defis : " + ", ".join(won) + "  —  noyaux + plans de set.", Color(1.0, 0.85, 0.4), 5.0)
+ 	if _headless:
+ 		return
+ 	var ms: MetaScreen = MetaScreen.new()
+--- a/game/scenes/MetaScreen.gd
++++ b/game/scenes/MetaScreen.gd
+@@ -1059,9 +1059,9 @@
+ 		for wd in GameState.WEAPONS:
+ 			if String(wd["id"]) == sig_nom:
+ 				sig_nom = String(wd["name"]); break
+-		name_l.text = "%s   —   %s
+-Armes : %s      signature : %s" % [
+-			String(mech["name"]), String(mech.get("ligne", "")), ", ".join(noms), sig_nom]
++		name_l.text = "%s   —   %s\nArmes : %s      signature : %s\n%s" % [
++			String(mech["name"]), String(mech.get("ligne", "")), ", ".join(noms), sig_nom,
++			_kit_line(id)]
+ 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+ 		name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+ 		name_l.add_theme_font_size_override("font_size", Palette.fs(17))
+@@ -1090,6 +1090,11 @@
+ 	v.add_child(spacer)
+ 	_big_button(v, "RETOUR", _back, Color(0.4, 0.4, 0.5))
+ 
++func _kit_line(id: String) -> String:
++	var kit: Dictionary = GameState.chassis_kit(id)
++	return "Passif : %s    Actif : %s (%.0f s)" % [
++		String(kit.get("passif_nom", "")), String(kit.get("actif_nom", "")), float(kit.get("cd", 0.0))]
++
+ func _buy_mech(id: String, cost: int) -> void:
+ 	Audio.sfx("levelup" if SaveManager.buy_mech(id, cost) else "click")
+ 	_build_garage()
+@@ -1213,15 +1218,25 @@
+ 	return ""
+ 
+ func _part_text(p: Dictionary) -> String:
+-	return "%s niv.%d   %s" % [
++	var maker: String = String(SaveManager.MAKER_NAMES.get(String(p.get("maker", "")), ""))
++	var base: String = "%s niv.%d   %s" % [
+ 		String(SaveManager.GEAR_RARITY_NAMES.get(String(p.get("rarity", "commun")), "?")),
+ 		int(p.get("level", 1)), _bonus_text(p)]
++	if maker == "":
++		return base
++	return "%s   %s" % [maker, base]
+ 
+ func _build_gear() -> void:
+ 	_clear()
+ 	var v: VBoxContainer = _scaffold(600.0)
+ 	_title(v, "EQUIPEMENT", Color(0.75, 0.65, 1.0))
+ 	_currency_row(v)
++	var set_l: Label = Label.new()
++	set_l.text = SaveManager.set_summary()
++	set_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
++	set_l.add_theme_font_size_override("font_size", Palette.fs(16))
++	set_l.add_theme_color_override("font_color", Color(0.85, 0.78, 1.0))
++	v.add_child(set_l)
+ 	for slot: String in SaveManager.GEAR_SLOTS:
+ 		var uid: int = int(SaveManager.gear_equipped().get(slot, -1))
+ 		var p: Dictionary = SaveManager.gear_part(uid) if uid >= 0 else {}
+--- a/game/systems/EnemySpawner.gd
++++ b/game/systems/EnemySpawner.gd
+@@ -265,9 +265,71 @@
+ const SOFT_WALL_GRACE: float = 18.0
+ var _soft_wall_squad_done: Dictionary = {}
+ 
++# Phase 2 — kami / summoner. Hors BIOME_POOL (les 5 slots d'escouade restent intacts).
++var _p2_ready: bool = false
++var PHASE2_DEFS: Dictionary = {}
++var PHASE2_EXTRA: Dictionary = {}
++
++func _ensure_phase2() -> void:
++	if _p2_ready:
++		return
++	_p2_ready = true
++	for biome in BIOME_POOL.keys():
++		var pool: Array = BIOME_POOL[biome]
++		if pool.size() < 2:
++			continue
++		var base_id: String = String(pool[0])
++		if not DEFS.has(base_id):
++			continue
++		var base: Dictionary = DEFS[base_id]
++		var kami_id: String = base_id + "_kami"
++		var sum_id: String = base_id + "_summoner"
++		var kami: Dictionary = base.duplicate()
++		kami["name"] = String(base.get("name", "Kami")) + " Kamikaze"
++		kami["behavior"] = "kami"
++		kami["hp"] = float(base.get("hp", 20.0)) * 0.70
++		kami["speed"] = float(base.get("speed", 170.0)) * 1.45
++		kami["w"] = 3
++		kami["rank"] = 0
++		kami["unlock"] = 40.0
++		kami["radius"] = float(base.get("radius", 40.0)) * 0.85
++		kami["attack_dmg"] = float(base.get("attack_dmg", 8.0)) * 1.4
++		kami["bull"] = false
++		kami["archetype"] = "kami"
++		var summoner: Dictionary = base.duplicate()
++		summoner["name"] = String(base.get("name", "Invocateur")) + " Invocateur"
++		summoner["behavior"] = "summoner"
++		summoner["hp"] = float(base.get("hp", 20.0)) * 1.60
++		summoner["speed"] = float(base.get("speed", 170.0)) * 0.85
++		summoner["w"] = 2
++		summoner["rank"] = 0
++		summoner["unlock"] = 70.0
++		summoner["prefer_dist"] = 320.0
++		summoner["attack_cd"] = 2.4
++		summoner["summon_kind"] = String(pool[1])
++		summoner["bull"] = false
++		summoner["archetype"] = "summoner"
++		PHASE2_DEFS[kami_id] = kami
++		PHASE2_DEFS[sum_id] = summoner
++		PHASE2_EXTRA[String(biome)] = [kami_id, sum_id]
++
++func _has_def(k: String) -> bool:
++	_ensure_phase2()
++	return DEFS.has(k) or PHASE2_DEFS.has(k)
++
++func _raw(k: String) -> Dictionary:
++	_ensure_phase2()
++	if DEFS.has(k):
++		return DEFS[k]
++	return PHASE2_DEFS.get(k, {})
++
++func spawn_spiral_squad() -> bool:
++	return _spawn_squad(true, "spirale")
++
+ func _process(delta: float) -> void:
+ 	if not GameState.alive:
+ 		return
++	_ensure_phase2()
+ 	_drain_wave()   # spread a queued horde over frames (no spawn hitch)
+ 	_squad_tick(delta)
+ 	_t += delta
+@@ -323,7 +385,7 @@
+ 			# comme-final ici au lieu de l'endboss RECURRENT attendu plus bas.
+ 			if kind == "endboss":
+ 				kind = _final_boss_for(chapter, GameState.endless)
+-			_spawn_boss(kind)
++			_spawn_boss(kind, _bosses_fired == 0)
+ 			_bosses_fired += 1
+ 	elif GameState.endless and _bosses_fired >= BOSS_SCHEDULE.size():
+ 		# schedule the first endless boss relative to when the scripted run ran out, not to t=0
+@@ -361,7 +423,7 @@
+ 		budget -= 1
+ 		var w: Dictionary = _wave_queue.pop_front()
+ 		var kind: String = String(w["kind"])
+-		if not DEFS.has(kind):
++		if not _has_def(kind):
+ 			continue
+ 		var e: Enemy = Enemy.new()
+ 		e.global_position = player.global_position + Vector2(cos(w["ang"]), sin(w["ang"])) * float(w["dist"])
+@@ -372,12 +434,13 @@
+ ## Spawn one specific enemy at an exact spot (used by the robot carcass awakening).
+ ## Scaled like any other foe so a late-run carcass stays a real threat.
+ func spawn_kind_at(kind: String, pos: Vector2) -> Enemy:
+-	if not DEFS.has(kind) or player == null or not is_instance_valid(player):
++	if not _has_def(kind) or player == null or not is_instance_valid(player):
+ 		return null
+ 	var e: Enemy = Enemy.new()
+ 	e.global_position = pos
+ 	game.enemy_layer.add_child(e)
+-	e.setup(kind, DEFS[kind], player, game)
++	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
++	e.setup(kind, def, player, game)
+ 	_scale_enemy(e)
+ 	return e
+ 
+@@ -408,7 +471,7 @@
+ 		game.show_banner("!  ELITE  !", Color(1.0, 0.75, 0.35))
+ 	Audio.sfx("boss", 0.1)
+ 
+-func _spawn_boss(kind: String) -> void:
++func _spawn_boss(kind: String, mastery_clock: bool = false) -> void:
+ 	if not DEFS.has(kind):
+ 		return
+ 	if player == null or not is_instance_valid(player):
+@@ -421,6 +484,11 @@
+ 	game.enemy_layer.add_child(e)
+ 	e.setup(kind, DEFS[kind], player, game)
+ 	_scale_enemy(e)   # bosses scale with run time + cleared-zone bonus + difficulty, like the trash
++	if mastery_clock:
++		e.set_meta("mastery_boss5", true)
++		GameState.mastery_boss5_active = true
++		GameState.mastery_boss5_clean = true
++		GameState.mastery_boss5_ok = false
+ 	if game != null and game.has_method("spawn_vfx"):
+ 		game.spawn_vfx("shockwave", e.global_position, 0.0, 3.0, Color(1.0, 0.5, 0.4))   # menacing arrival ring
+ 	if game != null:
+@@ -440,7 +508,7 @@
+ func _kind_unlocked(k: String, t: float) -> bool:
+ 	# Survivor.io-style STAGED introduction: each archetype has its own entry time (see DEFS),
+ 	# so the player meets one new threat at a time instead of all of them at 0:00.
+-	return t >= float(DEFS[k].get("unlock", 0.0))
++	return t >= float(_raw(k).get("unlock", 0.0))
+ 
+ func _weighted_pick(fodder_only: bool = false) -> String:
+ 	var t: float = GameState.run_time
+@@ -458,6 +526,21 @@
+ 		if not _kind_unlocked(k, t):
+ 			continue
+ 		picks.append([k, w]); total += w
++	_ensure_phase2()
++	for k2 in PHASE2_EXTRA.get(current_biome, []):
++		var id2: String = String(k2)
++		if not PHASE2_DEFS.has(id2):
++			continue
++		var d2: Dictionary = PHASE2_DEFS[id2]
++		var w2: int = int(d2.get("w", 0))
++		if w2 <= 0:
++			continue
++		if fodder_only and String(d2.get("archetype", "")) == "summoner":
++			continue
++		if not _kind_unlocked(id2, t):
++			continue
++		picks.append([id2, w2])
++		total += w2
+ 	if picks.is_empty():
+ 		return ""                          # aucun ennemi defini/debloque -> rien a piocher
+ 	var r: int = randi() % maxi(1, total)
+@@ -603,6 +686,14 @@
+ 
+ ## Definition a utiliser pour CE spawn : role principal, ou secondaire selon `share`.
+ func _def_for(kind: String) -> Dictionary:
++	_ensure_phase2()
++	if PHASE2_DEFS.has(kind):
++		var d_p2: Dictionary = (PHASE2_DEFS[kind] as Dictionary).duplicate()
++		var prof_p2: Dictionary = PROFILES.get(current_biome, {})
++		var tier_p2: float = float(prof_p2.get("tier", 1))
++		d_p2["speed"] = float(d_p2.get("speed", 180.0)) * (0.95 + 0.005 * (tier_p2 - 1.0))
++		d_p2["hp"] = float(d_p2.get("hp", 20.0)) * (1.0 + 0.03 * (tier_p2 - 1.0))
++		return d_p2
+ 	var prof: Dictionary = PROFILES.get(current_biome, {})
+ 	if prof.is_empty() or not DEFS.has(kind):
+ 		return DEFS[kind] if DEFS.has(kind) else {}
+@@ -1041,7 +1132,7 @@
+ 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
+ 		return
+ 	var kind: String = _weighted_pick()
+-	if not DEFS.has(kind):
++	if not _has_def(kind):
+ 		return
+ 	var e: Enemy = Enemy.new()
+ 	var spos: Vector2 = player.global_position + _pattern_offset()
+@@ -1061,7 +1152,7 @@
+ func spawn_at(pos: Vector2, kind: String) -> void:
+ 	if player == null or not is_instance_valid(player):
+ 		return
+-	if not DEFS.has(kind):
++	if not _has_def(kind):
+ 		return
+ 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
+ 		return
+@@ -1072,7 +1163,8 @@
+ 		p.y = clampf(p.y, arena.position.y, arena.end.y)
+ 	e.global_position = p
+ 	game.enemy_layer.add_child(e)
+-	e.setup(kind, DEFS[kind], player, game)
++	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
++	e.setup(kind, def, player, game)
+ 	_scale_enemy(e)
+ 
+ # Scale a fresh enemy, per stat (not uniformly):
+--- a/game/systems/ObjectPool.gd
++++ b/game/systems/ObjectPool.gd
+@@ -0,0 +1,60 @@
++extends RefCounted
++class_name ObjectPool
++## Pool generique (Phase 2). Le chemin chaud fait acquire / release + reset().
++## queue_free n'est jamais appele ici : l'excedent reste parque, invisible.
++
++var _free: Array[Node] = []
++var _overflow: Array[Node] = []
++var _make: Callable = Callable()
++var _parent: Node = null
++var _cap: int = 32
++
++func setup(make: Callable, cap: int) -> void:
++	_make = make
++	_cap = maxi(1, cap)
++
++## Cree `n` noeuds (bornes par le cap), enfants de `parent`, deja en reserve.
++func prewarm(n: int, parent: Node) -> void:
++	_parent = parent
++	var count: int = mini(maxi(0, n), _cap)
++	for _i in count:
++		var node: Node = _make.call()
++		if node.get_parent() == null:
++			parent.add_child(node)
++		_reset_node(node)
++		_free.append(node)
++
++func acquire() -> Node:
++	var node: Node
++	if not _free.is_empty():
++		node = _free.pop_back()
++	elif not _overflow.is_empty():
++		node = _overflow.pop_back()
++	else:
++		node = _make.call()
++		if _parent != null and node.get_parent() == null:
++			_parent.add_child(node)
++	return node
++
++func release(node: Node) -> void:
++	if node == null or not is_instance_valid(node):
++		return
++	_reset_node(node)
++	if _free.size() < _cap:
++		_free.append(node)
++	else:
++		# Hors quota : on parque quand meme. Pas de queue_free sur le chemin chaud.
++		_overflow.append(node)
++
++func parked() -> int:
++	return _free.size() + _overflow.size()
++
++func _reset_node(node: Node) -> void:
++	if node.has_method("reset"):
++		node.reset()
++	elif node.has_method("deactivate"):
++		node.deactivate()
++	else:
++		node.visible = false
++		node.set_process(false)
++		node.set_physics_process(false)
