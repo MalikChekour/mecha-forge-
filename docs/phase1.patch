@@ -1,0 +1,473 @@
+--- a/Pickup.gd
++++ b/Pickup.gd
+@@ -18,6 +18,10 @@
+ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
+ 	global_position = pos
+ 	_base_y = pos.y
++	if k == "bomb":
++		k = "bombe"
++	elif k == "magnet":
++		k = "aimant"
+ 	kind = k
+ 	value = val
+ 	player = plr
+@@ -68,13 +72,17 @@
+ 		col = Color(1.0, 0.84, 0.22)          # coffre dore jackpot de boss
+ 	elif k == "scrap":
+ 		col = Palette.ACCENT
++	elif k == "bombe":
++		col = Color(1.0, 0.32, 0.12)          # charge explosive : rouge-orange, loin de l'ambre Overdrive
++	elif k == "aimant":
++		col = Color(0.15, 0.95, 1.0)          # impulsion magnetique : cyan electrique
+ 	else:
+ 		col = Palette.CYAN
+-	var big: bool = k in ["bonus", "skill", "heal", "od", "arme_volee", "coffre_boss"]
++	var big: bool = k in ["bonus", "skill", "heal", "od", "arme_volee", "coffre_boss", "bombe", "aimant"]
+ 	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 28)
+ 	# `skill` rejoint les teintes appliquees : sans ca, seul son halo prenait la couleur et la
+ 	# correction daltonisme ci-dessus n'aurait porte que sur la lueur, pas sur l'objet.
+-	_spr.modulate = col if (k in ["xp", "heal", "od", "skill", "coffre_boss"]) else Color.WHITE
++	_spr.modulate = col if (k in ["xp", "heal", "od", "skill", "coffre_boss", "bombe", "aimant"]) else Color.WHITE
+ 	var th: float = float(_spr.texture.get_height())
+ 	if th > 0.0:
+ 		var target_h: float = 42.0 if k == "coffre_boss" else (34.0 if big else 24.0)
+@@ -91,7 +99,9 @@
+ 	var to: Vector2 = player.global_position - global_position
+ 	var d: float = to.length()
+ 	var mrange: float = float(player.magnet_range) if "magnet_range" in player else 360.0
+-	if d < mrange or GameState.overdrive_active:   # Overdrive vacuums every pickup on the map
++	# Overdrive (invuln + vacuum) et l'aimant Phase 1 (vacuum seul, ~2,5 s) sont deux flags.
++	# magnet_vacuum ne pose PAS overdrive_active : pas d'invulnerabilite, pas de cooldown Overdrive.
++	if d < mrange or GameState.overdrive_active or GameState.magnet_vacuum:
+ 		_homing = true
+ 	if _homing:
+ 		# vacuum speed stays above player speed so gems catch a fleeing player
+@@ -99,6 +109,18 @@
+ 	else:
+ 		global_position.y = _base_y + sin(_t * 3.0) * 3.0
+ 	if d < 30.0:
++		if kind == "bombe":
++			var origin: Vector2 = player.global_position if is_instance_valid(player) else global_position
++			GameState.detonate_bomb(origin, game)
++			_collected()
++			return
++		if kind == "aimant":
++			GameState.activate_magnet_vacuum()
++			Audio.sfx("powerup", 0.04)
++			if game != null and game.has_method("spawn_vfx"):
++				game.spawn_vfx("energy", player.global_position, 0.0, 1.45, Color(0.15, 0.95, 1.0))
++			_collected()
++			return
+ 		Audio.sfx("scrap" if kind == "scrap" else "xp", 0.12)
+ 		if kind == "xp":
+ 			GameState.add_xp(value)
+--- a/Player.gd
++++ b/Player.gd
+@@ -554,6 +554,8 @@
+ 	add_child(_od_ring)
+ 
+ func _physics_process(delta: float) -> void:
++	_tick_hitstop()
++	GameState.tick_magnet_vacuum(delta)
+ 	_update_marker(delta)
+ 	var alive_now: bool = GameState.alive
+ 	if not alive_now:
+@@ -1038,11 +1040,13 @@
+ 		return
+ 	var target: Vector2 = Vector2.ZERO
+ 	var found: bool = false
++	var foe_hit: bool = false
+ 	var e: Node2D = _nearest_enemy()
+ 	if e != null and is_instance_valid(e) and "_body_radius" in e and "alive" in e and e.alive:
+ 		if global_position.distance_to(e.global_position) < _BODY_R + float(e._body_radius) + _SLASH_PAD:
+ 			target = e.global_position
+ 			found = true
++			foe_hit = true
+ 	if not found and "cover_list" in game:
+ 		for c in game.cover_list:
+ 			if not is_instance_valid(c):
+@@ -1065,6 +1069,59 @@
+ 		_melee_t = 0.34
+ 	game.spawn_vfx("slash", global_position + dir * 42.0, dir.angle() + PI * 0.5, 0.8,
+ 		Color(0.75, 1.0, 1.0))
++	# Hitconfirm uniquement sur un ennemi. Le decor garde le VFX, sans hitstop.
++	if foe_hit:
++		_confirm_slash_hit()
++
++## Hitstop ~40 ms reels a time_scale 0.05. Horloge murale : le delta du jeu est lui-meme
++## ralenti, un timer en delta ne rendrait la main qu'apres ~0,8 s reelles.
++const _HITSTOP_SCALE: float = 0.05
++const _HITSTOP_MS: int = 40
++var _hitstop_until_ms: int = 0
++var _hitstop_restore: float = 1.0
++var _hit_shake_frame: int = -1
++
++func _confirm_slash_hit() -> void:
++	_begin_hitstop()
++	# Events.screen_shake est scalaire dans tout le code du projet (emit(float)) : pas de
++	# vecteur axial expose. 1.6 reste un shake leger, bien sous les degats subis (6.0).
++	# Un seul shake par frame physique — partage avec le faisceau d'Overdrive.
++	_emit_hit_shake(1.6)
++	# Audio.sfx(name, pitch_var) : pitch_scale = 1 ± pitch_var. 0.04 = ±4 %.
++	# w_sabre est dans le pool ; son throttle (0.13 s) est sous le cooldown de lame (0.24 s).
++	Audio.sfx("w_sabre", 0.04)
++
++func _begin_hitstop() -> void:
++	if Engine.time_scale <= 0.01:
++		return
++	var now: int = Time.get_ticks_msec()
++	if _hitstop_until_ms > now:
++		_hitstop_until_ms = now + _HITSTOP_MS
++		return
++	_hitstop_restore = Engine.time_scale if Engine.time_scale > 0.2 else 1.0
++	Engine.time_scale = _HITSTOP_SCALE
++	_hitstop_until_ms = now + _HITSTOP_MS
++
++func _tick_hitstop() -> void:
++	if _hitstop_until_ms <= 0:
++		return
++	if Time.get_ticks_msec() >= _hitstop_until_ms or not GameState.alive:
++		_end_hitstop()
++
++func _end_hitstop() -> void:
++	if _hitstop_until_ms <= 0:
++		return
++	if is_equal_approx(Engine.time_scale, _HITSTOP_SCALE):
++		Engine.time_scale = _hitstop_restore
++	_hitstop_until_ms = 0
++
++## Un seul Events.screen_shake par frame physique (sabre + crépitement du faisceau).
++func _emit_hit_shake(amount: float) -> void:
++	var frame: int = Engine.get_physics_frames()
++	if _hit_shake_frame == frame:
++		return
++	_hit_shake_frame = frame
++	Events.screen_shake.emit(amount)
+ 
+ ## Additive Line2D used as one layer of the overdrive lance. A uniform-width, single-colour
+ ## line reads as a flat streak — so every layer gets a WIDTH CURVE (bulges at the emitter,
+@@ -1189,7 +1246,7 @@
+ 		_beam_fx_t = 0.085
+ 		game.spawn_vfx("aaa_muzzle", global_position + start, aim_dir.angle(), 0.34,
+ 			Color(0.75, 1.5, 1.9))
+-		Events.screen_shake.emit(0.5)
++		_emit_hit_shake(0.5)
+ 
+ 	var gs: Vector2 = global_position + start
+ 	var ge: Vector2 = global_position + end
+@@ -1391,6 +1448,8 @@
+ 	_aim_stick_active = false
+ 
+ func _notification(what: int) -> void:
++	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_PREDELETE:
++		_end_hitstop()
+ 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_PAUSED:
+ 		reset_input_state()
+ 
+--- a/Enemy.gd
++++ b/Enemy.gd
+@@ -2238,6 +2238,9 @@
+ 				var rn: String = String(SaveManager.GEAR_RARITY_NAMES.get(plan.get("rarity", ""), ""))
+ 				game.show_hint("Plan obtenu : %s %s — forgez-le depuis Équipement." % [rn, sn],
+ 					Color(0.85, 0.75, 1.0), 5.0)
++		# PHASE 1 : tirage rare bombe / aimant. Le marquage elite est pose par EnemySpawner
++		# (_maybe_elite -> grade "elite", _spawn_elite -> meta "phase1_elite").
++		GameState.roll_phase1_drop(self)
+ 	if is_final:
+ 		# SANS FIN: the endboss is a milestone, not an ending — the run rolls on, harder.
+ 		if GameState.endless and game != null and game.has_method("endless_boss_down"):
+--- a/EnemySpawner.gd
++++ b/EnemySpawner.gd
+@@ -257,6 +257,14 @@
+ ]
+ var _elites_fired: int = 0
+ 
++# PHASE 1 — murs soft. Fenetres inclusives a gauche, exclusives a droite : [180,200) et [480,500).
++# Le plancher multiplie est floor_pop APRES la grace existante (ligne mini(..., 2+3*grace)).
++# Tant que _t ou run_time < 18 s, aucune fenetre ne s'applique, meme si les bornes changent.
++const SOFT_WALLS: Array[Vector2] = [Vector2(180.0, 200.0), Vector2(480.0, 500.0)]
++const SOFT_WALL_MULT: float = 1.6
++const SOFT_WALL_GRACE: float = 18.0
++var _soft_wall_squad_done: Dictionary = {}
++
+ func _process(delta: float) -> void:
+ 	if not GameState.alive:
+ 		return
+@@ -287,6 +295,7 @@
+ 		# aucun effet passe ce cap, ni sur la vague scriptee (38s), ni sur le sans-fin.
+ 		var grace: float = clampf(_t / 18.0, 0.0, 1.0)
+ 		floor_pop = clampi(mini(floor_pop, 2 + int(3.0 * grace)), 2, 24)
++		floor_pop = _apply_soft_wall_pressure(floor_pop)
+ 		if live < floor_pop:
+ 			var deficit: float = float(floor_pop - live) / float(floor_pop)
+ 			rate /= (1.0 + 3.0 * deficit * lerpf(0.4, 1.0, grace))
+@@ -330,6 +339,7 @@
+ 	if _wave_t <= 0.0:
+ 		_wave_t = WAVE_INTERVAL
+ 		_spawn_wave()
++	_pulse_soft_wall_squad()
+ 
+ ## Hold off spawning for `s` seconds (used by the run-start teleport intro).
+ func delay_spawns(s: float) -> void:
+@@ -391,6 +401,7 @@
+ 	e.hp_max *= 2.4          # "takes longer to kill" — a real speed bump between bosses
+ 	e.hp = e.hp_max
+ 	e.contact_dmg *= 1.2
++	e.set_meta("phase1_elite", true)   # drop rare Phase 1 a la mort (GameState.roll_phase1_drop)
+ 	if game != null and game.has_method("spawn_vfx"):
+ 		game.spawn_vfx("shockwave", e.global_position, 0.0, 2.2, Color(1.0, 0.7, 0.3))
+ 	if game != null and game.has_method("show_banner"):
+@@ -804,25 +815,26 @@
+ 	e.attack_dmg *= 1.6
+ 	e.speed = minf(e.speed * 1.1, float(player.base_speed) * 0.8) if "base_speed" in player else e.speed
+ 	e.drops_bonus = true
++	e.set_meta("phase1_elite", true)   # meme table de drop que l'elite scriptee (_spawn_elite)
+ 	e._spr.self_modulate = Color(1.5, 0.7, 1.4)
+ 	e._spr.scale *= 1.1
+ 
+-func _spawn_squad(force: bool = false) -> void:
++func _spawn_squad(force: bool = false, formation: String = "") -> bool:
+ 	var prof: Dictionary = PROFILES.get(current_biome, {})
+ 	var pool: Array = BIOME_POOL.get(current_biome, [])
+ 	if prof.is_empty() or pool.is_empty() or game == null:
+-		return
++		return false
+ 	var tier: int = int(prof["tier"])
+ 	if _squads.size() >= 1 + tier / 7 and not force:
+-		return
++		return false
+ 	var n: int = clampi(4 + tier / 3, 4, 10)
+ 	n = maxi(4, int(round(float(n) * clampf(0.5 + GameState.run_time / 240.0, 0.5, 1.0))))   # escouades d'au moins 4 membres pour les 4 rôles
+ 	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
+-		return
++		return false
+ 	var kind: String = String(pool[0])
+ 	if not DEFS.has(kind):
+-		return
+-	var form: String = _pick_formation(prof)
++		return false
++	var form: String = formation if formation != "" else _pick_formation(prof)
+ 	var p: Vector2 = player.global_position
+ 	var anchor: float = randf() * TAU
+ 	if "velocity" in player and (player.velocity as Vector2).length() > 60.0 and form in ["ligne", "colonne", "coin", "echelon", "vague", "embuscade"]:
+@@ -860,6 +872,36 @@
+ 	q.assign_ranks()
+ 	_squads.append(q)
+ 	_announce(form, "FORMATION : " + Squad.label(form), Color(1.0, 0.62, 0.3))
++	return true
++
++## Cle de la fenetre soft en cours (180 ou 480), ou -1 hors fenetre / pendant la grace t<18s.
++func _soft_wall_key(t: float) -> int:
++	if t < SOFT_WALL_GRACE or _t < SOFT_WALL_GRACE:
++		return -1
++	for span in SOFT_WALLS:
++		if t >= span.x and t < span.y:
++			return int(span.x)
++	return -1
++
++## pressure_floor du spec = floor_pop (plancher de population). x1.6 seulement dans la fenetre,
++## apres la grace, sans lever le plafond historique de 24.
++func _apply_soft_wall_pressure(floor_pop: int) -> int:
++	if _soft_wall_key(GameState.run_time) < 0:
++		return floor_pop
++	return clampi(int(ceil(float(floor_pop) * SOFT_WALL_MULT)), 2, 24)
++
++## Une escouade tenaille par fenetre. Reessaie tant que _spawn_squad echoue (plafond d'ennemis),
++## puis se tait. has_method garde le hook si la fonction etait renommee.
++func _pulse_soft_wall_squad() -> void:
++	var key: int = _soft_wall_key(GameState.run_time)
++	if key < 0 or _soft_wall_squad_done.has(key):
++		return
++	if player == null or not is_instance_valid(player):
++		return
++	if not has_method("_spawn_squad"):
++		return
++	if _spawn_squad(true, "tenaille"):
++		_soft_wall_squad_done[key] = true
+ 
+ ## ======================= HIERARCHIE D'ENNEMIS PAR NIVEAU (22/10, patron : « integrer les Mark 2, intermediaires, mini-boss, boss ») =======================
+ ## Meme modele 3D que l'ennemi de base du niveau (pas de nouvelle modelisation) ; ce qui change : taille, PV, teinte, armement, defenses.
+--- a/GameState.gd
++++ b/GameState.gd
+@@ -23,6 +23,22 @@
+ ## what actually forces stretches of vulnerable play between spikes.
+ const OVERDRIVE_COOLDOWN: float = 16.0
+ var overdrive_cd: float = 0.0
++## PHASE 1 — aimant. Vacuum global SANS invulnerabilite. Pickup teste ce flag A COTE de
++## overdrive_active ; ne jamais le fusionner avec Overdrive (pas d'i-frames, pas de jauge).
++var magnet_vacuum: bool = false
++var magnet_vacuum_t: float = 0.0
++const MAGNET_VACUUM_DUR: float = 2.5
++const BOMB_RADIUS: float = 420.0
++const BOMB_TRASH_HP_FRAC: float = 0.35   # part de hp_max, ennemis non-boss (rank < 3)
++const BOMB_BOSS_HP_FRAC: float = 0.08    # degats reduits sur boss (rank >= 3)
++const BOMB_BOSS_STUN: float = 1.2
++const BOMB_KNOCKBACK: float = 1400.0     # repli si Enemy.apply_stun est absent
++const PHASE1_GRACE: float = 18.0         # meme fenetre que la grace du spawner
++const PHASE1_BOMB_P_FODDER: float = 0.007
++const PHASE1_MAGNET_P_FODDER: float = 0.016
++const PHASE1_BOMB_P_ELITE: float = 0.08
++const PHASE1_MAGNET_P_ELITE: float = 0.12
++const PHASE1_MAGNET_P_BOSS: float = 0.10
+ var alive: bool = true
+ var score: int = 0            # run score (kills weighted by rank x difficulty) -> leaderboard/grade
+ var death_cause: String = ""  # source qui a porte le coup fatal (banc d'equilibre)
+@@ -333,6 +349,8 @@
+ 	overdrive_count = 0
+ 	overdrive_time = 0.0
+ 	overdrive_cd = 0.0
++	magnet_vacuum = false
++	magnet_vacuum_t = 0.0
+ 	alive = true
+ 	death_cause = ""
+ 	score = 0
+@@ -414,3 +432,149 @@
+ 		overdrive_cd = maxf(0.0, overdrive_cd - delta)
+ 		if overdrive_cd == 0.0:
+ 			Events.overdrive_changed.emit(overdrive)   # refresh the HUD when the gauge reopens
++
++## Appele par Player chaque frame (y compris pendant Overdrive et le hitstop). Le timer est
++## en temps de jeu : un hitstop de 40 ms ne le gele presque pas, et la fin d'Overdrive ne le coupe pas.
++func tick_magnet_vacuum(delta: float) -> void:
++	if magnet_vacuum_t <= 0.0:
++		return
++	magnet_vacuum_t = maxf(0.0, magnet_vacuum_t - delta)
++	if magnet_vacuum_t <= 0.0:
++		magnet_vacuum = false
++
++## Pickup kind "aimant". N'ecrit PAS overdrive_active / transformed / iframes.
++func activate_magnet_vacuum(duration: float = MAGNET_VACUUM_DUR) -> void:
++	magnet_vacuum = true
++	magnet_vacuum_t = maxf(magnet_vacuum_t, duration)
++
++## Pickup kind "bombe". Centre = position du joueur au ramassage (le pickup est deja a < 30 px).
++## Non-boss : 35 % de hp_max via Enemy.take_damage (bouclier et garde s'appliquent).
++## Boss (rank >= 3) : apply_stun(1.2) si la methode existe, sinon knockback fort ; degats reduits.
++func detonate_bomb(origin: Vector2, game: Node) -> void:
++	var tree: SceneTree = get_tree()
++	if tree == null:
++		return
++	var radius_sq: float = BOMB_RADIUS * BOMB_RADIUS
++	for n in tree.get_nodes_in_group("enemies"):
++		if not (n is Enemy):
++			continue
++		var e: Enemy = n as Enemy
++		if not e.alive:
++			continue
++		if origin.distance_squared_to(e.global_position) > radius_sq:
++			continue
++		if e.rank >= 3:
++			var reduced: float = e.hp_max * BOMB_BOSS_HP_FRAC
++			if e.has_method("apply_stun"):
++				e.apply_stun(BOMB_BOSS_STUN)
++			else:
++				var away: Vector2 = e.global_position - origin
++				if away.length_squared() < 4.0:
++					away = Vector2.RIGHT
++				e.velocity = away.normalized() * BOMB_KNOCKBACK
++			if reduced > 0.0:
++				e.take_damage(reduced, "", "bombe")
++		else:
++			var chunk: float = e.hp_max * BOMB_TRASH_HP_FRAC
++			if chunk > 0.0:
++				e.take_damage(chunk, "", "bombe")
++	if game != null and game.has_method("spawn_vfx"):
++		game.spawn_vfx("shockwave", origin, 0.0, 3.6, Color(1.0, 0.45, 0.12))
++		game.spawn_vfx("aaa_shockwave", origin, 0.0, 2.2, Color(1.0, 0.95, 0.75))
++	Events.screen_shake.emit(11.0)
++	Audio.sfx("explosion", 0.06)
++	_bomb_flash()
++
++func _bomb_flash() -> void:
++	var tree: SceneTree = get_tree()
++	if tree == null or tree.root == null:
++		return
++	var layer: CanvasLayer = CanvasLayer.new()
++	layer.layer = 80
++	layer.process_mode = Node.PROCESS_MODE_ALWAYS
++	tree.root.add_child(layer)
++	var rect: ColorRect = ColorRect.new()
++	rect.color = Color(1.0, 0.9, 0.62, 0.82)
++	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	layer.add_child(rect)
++	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
++	rect.offset_left = 0.0
++	rect.offset_top = 0.0
++	rect.offset_right = 0.0
++	rect.offset_bottom = 0.0
++	var tw: Tween = layer.create_tween()
++	tw.tween_property(rect, "modulate:a", 0.0, 0.18)
++	tw.tween_callback(layer.queue_free)
++
++## Hook mort : Enemy._die appelle ceci apres le butin standard (spawn_xp / spawn_bonus / coffre).
++## Marquage elite : EnemySpawner._maybe_elite (grade == "elite") et _spawn_elite (meta "phase1_elite").
++## Un kill credite a l'arme "bombe" ne relance pas le tirage — pas de chaine bombe -> bombe.
++func roll_phase1_drop(enemy: Node) -> void:
++	if enemy == null or run_time < PHASE1_GRACE:
++		return
++	var wid: Variant = enemy.get("_last_weapon_id")
++	if wid is String and String(wid) == "bombe":
++		return
++	var rank_v: Variant = enemy.get("rank")
++	var rank: int = int(rank_v) if (rank_v is int or rank_v is float) else 0
++	var elite: bool = _phase1_is_elite(enemy)
++	var bomb_p: float = 0.0
++	var magnet_p: float = 0.0
++	if rank >= 3:
++		magnet_p = PHASE1_MAGNET_P_BOSS
++	elif elite:
++		bomb_p = PHASE1_BOMB_P_ELITE
++		magnet_p = PHASE1_MAGNET_P_ELITE
++	else:
++		bomb_p = PHASE1_BOMB_P_FODDER
++		magnet_p = PHASE1_MAGNET_P_FODDER
++	var roll: float = randf()
++	var drop_kind: String = ""
++	if roll < bomb_p:
++		drop_kind = "bombe"
++	elif roll < bomb_p + magnet_p:
++		drop_kind = "aimant"
++	if drop_kind == "":
++		return
++	var pos: Vector2 = (enemy as Node2D).global_position if enemy is Node2D else Vector2.ZERO
++	var g: Node = null
++	var g_v: Variant = enemy.get("game")
++	if g_v is Node:
++		g = g_v as Node
++	var plr: Node2D = null
++	var plr_v: Variant = enemy.get("player")
++	if is_instance_valid(plr_v) and plr_v is Node2D:
++		plr = plr_v as Node2D
++	if plr == null:
++		return
++	_spawn_phase1_pickup(pos, drop_kind, g, plr)
++
++func _phase1_is_elite(enemy: Node) -> bool:
++	var grade_v: Variant = enemy.get("grade")
++	if grade_v is String and String(grade_v) == "elite":
++		return true
++	if enemy.has_meta("phase1_elite") and bool(enemy.get_meta("phase1_elite")):
++		return true
++	return false
++
++## Priorite : game.spawn_phase1_pickup(pos, kind) puis game.spawn_pickup(pos, kind, value),
++## sinon Pickup instancie a la main (reclaim_pickup le reprend au ramassage si game est renseigne).
++## Voir docs/PHASE1_INTEGRATION.md pour brancher le pool existant de spawn_xp.
++func _spawn_phase1_pickup(pos: Vector2, kind: String, game: Node, plr: Node2D) -> void:
++	if game != null and game.has_method("spawn_phase1_pickup"):
++		game.spawn_phase1_pickup(pos, kind)
++		return
++	if game != null and game.has_method("spawn_pickup"):
++		game.spawn_pickup(pos, kind, 1)
++		return
++	var parent: Node = game if game != null else (get_tree().current_scene if get_tree() != null else null)
++	if parent == null:
++		return
++	var p: Pickup = Pickup.new()
++	parent.add_child(p)
++	p.game = game
++	p.setup(pos, kind, 1, plr)
++
++## Debugger / checklist : pose une bombe ou un aimant sans attendre le tirage.
++func debug_drop_phase1(kind: String, pos: Vector2, game: Node, plr: Node2D) -> void:
++	_spawn_phase1_pickup(pos, kind, game, plr)
