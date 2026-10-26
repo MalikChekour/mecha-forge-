@@ -265,9 +265,71 @@ const SOFT_WALL_MULT: float = 1.6
 const SOFT_WALL_GRACE: float = 18.0
 var _soft_wall_squad_done: Dictionary = {}
 
+# Phase 2 — kami / summoner. Hors BIOME_POOL (les 5 slots d'escouade restent intacts).
+var _p2_ready: bool = false
+var PHASE2_DEFS: Dictionary = {}
+var PHASE2_EXTRA: Dictionary = {}
+
+func _ensure_phase2() -> void:
+	if _p2_ready:
+		return
+	_p2_ready = true
+	for biome in BIOME_POOL.keys():
+		var pool: Array = BIOME_POOL[biome]
+		if pool.size() < 2:
+			continue
+		var base_id: String = String(pool[0])
+		if not DEFS.has(base_id):
+			continue
+		var base: Dictionary = DEFS[base_id]
+		var kami_id: String = base_id + "_kami"
+		var sum_id: String = base_id + "_summoner"
+		var kami: Dictionary = base.duplicate()
+		kami["name"] = String(base.get("name", "Kami")) + " Kamikaze"
+		kami["behavior"] = "kami"
+		kami["hp"] = float(base.get("hp", 20.0)) * 0.70
+		kami["speed"] = float(base.get("speed", 170.0)) * 1.45
+		kami["w"] = 3
+		kami["rank"] = 0
+		kami["unlock"] = 40.0
+		kami["radius"] = float(base.get("radius", 40.0)) * 0.85
+		kami["attack_dmg"] = float(base.get("attack_dmg", 8.0)) * 1.4
+		kami["bull"] = false
+		kami["archetype"] = "kami"
+		var summoner: Dictionary = base.duplicate()
+		summoner["name"] = String(base.get("name", "Invocateur")) + " Invocateur"
+		summoner["behavior"] = "summoner"
+		summoner["hp"] = float(base.get("hp", 20.0)) * 1.60
+		summoner["speed"] = float(base.get("speed", 170.0)) * 0.85
+		summoner["w"] = 2
+		summoner["rank"] = 0
+		summoner["unlock"] = 70.0
+		summoner["prefer_dist"] = 320.0
+		summoner["attack_cd"] = 2.4
+		summoner["summon_kind"] = String(pool[1])
+		summoner["bull"] = false
+		summoner["archetype"] = "summoner"
+		PHASE2_DEFS[kami_id] = kami
+		PHASE2_DEFS[sum_id] = summoner
+		PHASE2_EXTRA[String(biome)] = [kami_id, sum_id]
+
+func _has_def(k: String) -> bool:
+	_ensure_phase2()
+	return DEFS.has(k) or PHASE2_DEFS.has(k)
+
+func _raw(k: String) -> Dictionary:
+	_ensure_phase2()
+	if DEFS.has(k):
+		return DEFS[k]
+	return PHASE2_DEFS.get(k, {})
+
+func spawn_spiral_squad() -> bool:
+	return _spawn_squad(true, "spirale")
+
 func _process(delta: float) -> void:
 	if not GameState.alive:
 		return
+	_ensure_phase2()
 	_drain_wave()   # spread a queued horde over frames (no spawn hitch)
 	_squad_tick(delta)
 	_t += delta
@@ -323,7 +385,7 @@ func _process(delta: float) -> void:
 			# comme-final ici au lieu de l'endboss RECURRENT attendu plus bas.
 			if kind == "endboss":
 				kind = _final_boss_for(chapter, GameState.endless)
-			_spawn_boss(kind)
+			_spawn_boss(kind, _bosses_fired == 0)
 			_bosses_fired += 1
 	elif GameState.endless and _bosses_fired >= BOSS_SCHEDULE.size():
 		# schedule the first endless boss relative to when the scripted run ran out, not to t=0
@@ -361,7 +423,7 @@ func _drain_wave() -> void:
 		budget -= 1
 		var w: Dictionary = _wave_queue.pop_front()
 		var kind: String = String(w["kind"])
-		if not DEFS.has(kind):
+		if not _has_def(kind):
 			continue
 		var e: Enemy = Enemy.new()
 		e.global_position = player.global_position + Vector2(cos(w["ang"]), sin(w["ang"])) * float(w["dist"])
@@ -372,12 +434,13 @@ func _drain_wave() -> void:
 ## Spawn one specific enemy at an exact spot (used by the robot carcass awakening).
 ## Scaled like any other foe so a late-run carcass stays a real threat.
 func spawn_kind_at(kind: String, pos: Vector2) -> Enemy:
-	if not DEFS.has(kind) or player == null or not is_instance_valid(player):
+	if not _has_def(kind) or player == null or not is_instance_valid(player):
 		return null
 	var e: Enemy = Enemy.new()
 	e.global_position = pos
 	game.enemy_layer.add_child(e)
-	e.setup(kind, DEFS[kind], player, game)
+	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
+	e.setup(kind, def, player, game)
 	_scale_enemy(e)
 	return e
 
@@ -408,7 +471,7 @@ func _spawn_elite(kind: String) -> void:
 		game.show_banner("!  ELITE  !", Color(1.0, 0.75, 0.35))
 	Audio.sfx("boss", 0.1)
 
-func _spawn_boss(kind: String) -> void:
+func _spawn_boss(kind: String, mastery_clock: bool = false) -> void:
 	if not DEFS.has(kind):
 		return
 	if player == null or not is_instance_valid(player):
@@ -421,6 +484,11 @@ func _spawn_boss(kind: String) -> void:
 	game.enemy_layer.add_child(e)
 	e.setup(kind, DEFS[kind], player, game)
 	_scale_enemy(e)   # bosses scale with run time + cleared-zone bonus + difficulty, like the trash
+	if mastery_clock:
+		e.set_meta("mastery_boss5", true)
+		GameState.mastery_boss5_active = true
+		GameState.mastery_boss5_clean = true
+		GameState.mastery_boss5_ok = false
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 3.0, Color(1.0, 0.5, 0.4))   # menacing arrival ring
 	if game != null:
@@ -440,7 +508,7 @@ func _boss_alive() -> bool:
 func _kind_unlocked(k: String, t: float) -> bool:
 	# Survivor.io-style STAGED introduction: each archetype has its own entry time (see DEFS),
 	# so the player meets one new threat at a time instead of all of them at 0:00.
-	return t >= float(DEFS[k].get("unlock", 0.0))
+	return t >= float(_raw(k).get("unlock", 0.0))
 
 func _weighted_pick(fodder_only: bool = false) -> String:
 	var t: float = GameState.run_time
@@ -458,6 +526,21 @@ func _weighted_pick(fodder_only: bool = false) -> String:
 		if not _kind_unlocked(k, t):
 			continue
 		picks.append([k, w]); total += w
+	_ensure_phase2()
+	for k2 in PHASE2_EXTRA.get(current_biome, []):
+		var id2: String = String(k2)
+		if not PHASE2_DEFS.has(id2):
+			continue
+		var d2: Dictionary = PHASE2_DEFS[id2]
+		var w2: int = int(d2.get("w", 0))
+		if w2 <= 0:
+			continue
+		if fodder_only and String(d2.get("archetype", "")) == "summoner":
+			continue
+		if not _kind_unlocked(id2, t):
+			continue
+		picks.append([id2, w2])
+		total += w2
 	if picks.is_empty():
 		return ""                          # aucun ennemi defini/debloque -> rien a piocher
 	var r: int = randi() % maxi(1, total)
@@ -603,6 +686,14 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 
 ## Definition a utiliser pour CE spawn : role principal, ou secondaire selon `share`.
 func _def_for(kind: String) -> Dictionary:
+	_ensure_phase2()
+	if PHASE2_DEFS.has(kind):
+		var d_p2: Dictionary = (PHASE2_DEFS[kind] as Dictionary).duplicate()
+		var prof_p2: Dictionary = PROFILES.get(current_biome, {})
+		var tier_p2: float = float(prof_p2.get("tier", 1))
+		d_p2["speed"] = float(d_p2.get("speed", 180.0)) * (0.95 + 0.005 * (tier_p2 - 1.0))
+		d_p2["hp"] = float(d_p2.get("hp", 20.0)) * (1.0 + 0.03 * (tier_p2 - 1.0))
+		return d_p2
 	var prof: Dictionary = PROFILES.get(current_biome, {})
 	if prof.is_empty() or not DEFS.has(kind):
 		return DEFS[kind] if DEFS.has(kind) else {}
@@ -1041,7 +1132,7 @@ func _spawn() -> void:
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
 	var kind: String = _weighted_pick()
-	if not DEFS.has(kind):
+	if not _has_def(kind):
 		return
 	var e: Enemy = Enemy.new()
 	var spos: Vector2 = player.global_position + _pattern_offset()
@@ -1061,7 +1152,7 @@ func _spawn() -> void:
 func spawn_at(pos: Vector2, kind: String) -> void:
 	if player == null or not is_instance_valid(player):
 		return
-	if not DEFS.has(kind):
+	if not _has_def(kind):
 		return
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
@@ -1072,7 +1163,8 @@ func spawn_at(pos: Vector2, kind: String) -> void:
 		p.y = clampf(p.y, arena.position.y, arena.end.y)
 	e.global_position = p
 	game.enemy_layer.add_child(e)
-	e.setup(kind, DEFS[kind], player, game)
+	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
+	e.setup(kind, def, player, game)
 	_scale_enemy(e)
 
 # Scale a fresh enemy, per stat (not uniformly):

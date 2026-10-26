@@ -190,6 +190,12 @@ var _kamikaze_arming: bool = false         # KAMIKAZE (29/09, bestiaire elargi)
 var _kamikaze_fuse: float = 0.0
 const KAMIKAZE_RANGE: float = 90.0
 const KAMIKAZE_FUSE_TIME: float = 0.6
+## Phase 2 — kami reutilise la meche ; l'anneau GroundZone (0,6 s) est pose a l'armement.
+var _summon_cd: float = 2.0               # invocateur : premiere vague pas instantanee
+var summon_kind: String = ""
+var _band_cd: float = 0.0                 # telegraphe elite/boss, une bande a la fois
+var _p2_palette_done: bool = false
+var _p2_spiral_done: bool = false
 var _spr: Sprite2D
 var _mat: ShaderMaterial
 ## 🚨 tente le 26/09 ("trop de lag") : un ShaderMaterial PARTAGE entre tous les ennemis (batching)
@@ -448,6 +454,8 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	protecteur = bool(def.get("protecteur", false))
 	zone_shift = bool(def.get("zone_shift", true))
 	_prot_cd = randf_range(0.0, 0.5)
+	summon_kind = String(def.get("summon_kind", ""))
+	_summon_cd = 2.0
 	esquive = bool(def.get("esquive", false))
 	_esq_cd = randf_range(1.0, 3.0)
 	_garde_cd_t = randf_range(2.0, 6.0)
@@ -1028,6 +1036,7 @@ func _fire_ogive(dir: Vector2) -> void:
 	# flash de tir a la bouche des ogives
 	if game.has_method("spawn_vfx"):
 		game.spawn_vfx("aaa_muzzle", global_position + dir * 30.0, dir.angle(), 0.75, _bolt_color)
+	_telegraph_band(dir)
 	if Events != null:
 		Events.screen_shake.emit(1.6)
 
@@ -1040,9 +1049,7 @@ func _check_boss_phase() -> void:
 	if hp_max <= 0.0:
 		return
 	var thresholds: Array = EnemySpawner.BOSS_PHASE_THRESHOLDS.get(kind, [0.5])
-	if _phase_idx >= thresholds.size():
-		return
-	if hp <= hp_max * float(thresholds[_phase_idx]):
+	if _phase_idx < thresholds.size() and hp <= hp_max * float(thresholds[_phase_idx]):
 		_phase_idx += 1
 		if game != null:
 			if game.has_method("show_banner"):
@@ -1051,6 +1058,14 @@ func _check_boss_phase() -> void:
 				game.spawn_vfx("shockwave", global_position, 0.0, _body_radius / 40.0, Color(1.0, 0.5, 0.35))
 		Events.screen_shake.emit(5.0)
 		_apply_boss_phase(_phase_idx)
+	# Phase 2 : palette a 50 % et spirale a 20 %, meme si le boss n'a qu'un seuil [0.5].
+	if rank >= 2:
+		if not _p2_palette_done and hp <= hp_max * 0.5:
+			_p2_palette_done = true
+			_phase2_palette()
+		if not _p2_spiral_done and hp <= hp_max * 0.2:
+			_p2_spiral_done = true
+			_phase2_spiral()
 
 func show_banner_phase() -> void:
 	game.show_banner("PHASE %d" % (_phase_idx + 1), Color(1.0, 0.45, 0.35))
@@ -1136,6 +1151,67 @@ func _phase_biome_boss(idx: int) -> void:
 		_boss_hazard_cd = 0.2
 
 
+## Teinte chaude a 50 % PV. N'ecrase pas le motif de phase deja applique.
+func _phase2_palette() -> void:
+	if _spr == null:
+		return
+	_spr.self_modulate = _spr.self_modulate.lerp(Color(1.35, 0.45, 0.85), 0.65)
+
+## A 20 % PV : une escouade en spirale, si le spawner expose le hook.
+func _phase2_spiral() -> void:
+	if game == null:
+		return
+	var sp: Variant = game.get("spawner")
+	if sp is Node and (sp as Node).has_method("spawn_spiral_squad"):
+		(sp as Node).call("spawn_spiral_squad")
+
+## Bande directionnelle 0,5–0,9 s + pulse au sol. Reserve aux elites et aux rangs >= 1.
+func _telegraph_band(dir: Vector2) -> void:
+	if _band_cd > 0.0 or game == null or not game.has_method("spawn_ground_zone"):
+		return
+	var marked: bool = grade == "elite" or rank >= 1
+	if not marked and has_meta("phase1_elite"):
+		marked = bool(get_meta("phase1_elite"))
+	if not marked:
+		return
+	_band_cd = 1.2
+	var aim: Vector2 = dir if dir.length() > 0.2 else Vector2.RIGHT
+	aim = aim.normalized()
+	var delay: float = randf_range(0.5, 0.9)
+	var dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg
+	game.spawn_ground_zone(global_position, 22.0, delay, dmg, Color(1.0, 0.28, 0.18), "decor_hit", "line", -aim * 36.0, aim * 280.0)
+	game.spawn_ground_zone(global_position, 48.0, delay * 0.7, dmg * 0.45, Color(1.0, 0.5, 0.16))
+
+func _living_drones() -> int:
+	var n: int = 0
+	var id: int = get_instance_id()
+	for e in _shared_enemies():
+		if e is Enemy and (e as Enemy).alive and (e as Node).has_meta("summoner_owner") and int((e as Node).get_meta("summoner_owner")) == id:
+			n += 1
+	return n
+
+func _summon_wave() -> void:
+	if summon_kind == "" or game == null:
+		return
+	var sp: Variant = game.get("spawner")
+	if not (sp is Node) or not (sp as Node).has_method("spawn_kind_at"):
+		return
+	var alive_n: int = _living_drones()
+	if alive_n >= 6:
+		return
+	if get_tree().get_nodes_in_group("enemies").size() >= EnemySpawner.ENEMY_CAP:
+		return
+	var room: int = mini(3, 6 - alive_n)
+	for i in room:
+		if get_tree().get_nodes_in_group("enemies").size() >= EnemySpawner.ENEMY_CAP:
+			return
+		var ang: float = TAU * float(i) / 3.0 + randf() * 0.35
+		var drone_v: Variant = (sp as Node).call("spawn_kind_at", summon_kind, global_position + Vector2.from_angle(ang) * 96.0)
+		if drone_v is Enemy:
+			(drone_v as Enemy).set_meta("summoner_owner", get_instance_id())
+	if game.has_method("spawn_vfx"):
+		game.spawn_vfx("shockwave", global_position, 0.0, 0.85, Color(0.62, 0.4, 1.0))
+
 func _physics_process(delta: float) -> void:
 	if not alive:
 		if _dying:
@@ -1157,6 +1233,7 @@ func _physics_process(delta: float) -> void:
 	var player_valid: bool = player != null and is_instance_valid(player) and GameState.alive
 	
 	_atk_cd -= delta
+	_band_cd = maxf(0.0, _band_cd - delta)
 	if _atk_cd < 0.0:
 		_atk_cd = 0.0
 	if rank >= 3:
@@ -1417,6 +1494,52 @@ func _physics_process(delta: float) -> void:
 						var mine_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.8
 						game.spawn_ground_zone(global_position, 110.0, 1.1, mine_dmg, Color(1.0, 0.42, 0.12))
 
+			elif behavior == "kami":
+				# KAMI (Phase 2) : rush rapide, anneau visible 0,6 s, puis explosion. Distinct du
+				# role « kamikaze » (meche shader, zone quasi instantanee) qui reste inchange.
+				if not _kamikaze_arming:
+					desired_vel = dir * speed * _speed_mult * 1.35
+					if dist <= 110.0:
+						_kamikaze_arming = true
+						_kamikaze_fuse = 0.6
+						if game != null and game.has_method("spawn_ground_zone"):
+							var boom_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 2.4
+							game.spawn_ground_zone(global_position, 100.0, 0.6, boom_dmg, Color(1.0, 0.42, 0.08))
+						if game != null and game.has_method("spawn_vfx"):
+							game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.7, Color(1.0, 0.45, 0.12))
+				else:
+					desired_vel = dir * speed * _speed_mult * 0.25
+					_kamikaze_fuse -= delta
+					var kpulse: float = absf(sin(_kamikaze_fuse * 22.0))
+					if _mat != null and _mat.shader != null:
+						_mat.set_shader_parameter("warn", kpulse)
+					if _kamikaze_fuse <= 0.0:
+						if game != null and game.has_method("spawn_vfx"):
+							game.spawn_vfx("aaa_explosion", global_position, 0.0, 0.85, Color(1.0, 0.4, 0.1))
+						Audio.sfx("explosion", 0.08)
+						take_damage(hp_max + 1.0)
+
+			elif behavior == "summoner":
+				# INVOCATEUR : tient la distance, lache 3 drones fragiles toutes les ~8 s (plafond 6).
+				var keep: float = prefer_dist if prefer_dist > 40.0 else 300.0
+				if dist > keep + 50.0:
+					desired_vel = dir * speed * _speed_mult * 0.8
+				elif dist < keep - 70.0:
+					desired_vel = -dir * speed * _speed_mult * 0.55
+				else:
+					_strafe_timer -= delta
+					if _strafe_timer <= 0.0:
+						_strafe_dir *= -1.0
+						_strafe_timer = randf_range(2.2, 3.6)
+					desired_vel = Vector2(-dir.y, dir.x) * _strafe_dir * speed * _speed_mult * 0.45
+				_summon_cd -= delta
+				if _summon_cd <= 0.0:
+					_summon_cd = 8.0
+					_summon_wave()
+				if _atk_cd <= 0.0 and dist < keep + 80.0 and game != null and game.has_method("spawn_enemy_bolt"):
+					_atk_cd = attack_cd if attack_cd > 0.2 else 2.2
+					game.spawn_enemy_bolt(global_position + dir * 18.0, dir, attack_dmg if attack_dmg > 0.0 else 6.0, Color(0.7, 0.45, 1.0), 0.9, 260.0)
+
 			elif behavior == "kamikaze":
 				# KAMIKAZE : quasi identique a "miner" (approche + GroundZone), SAUF qu'il ne
 				# recule jamais — a portee, il s'arme (meche visible) puis fonce et se detruit ;
@@ -1614,12 +1737,14 @@ func _physics_process(delta: float) -> void:
 							if _mat != null and _mat.shader != null:
 								_mat.set_shader_parameter("warn", 0.0)
 							_fire_heavy(_aim_dir(dir))
+							_telegraph_band(_aim_dir(dir))
 					elif _atk_cd <= 0.0 and dist < prefer_dist + 120.0 and Enemy._fire_ok(2.0, rank):
 						_charging = true
 						_charge_t = HEAVY_CHARGE[_palier]
 				elif _atk_cd <= 0.0 and dist < prefer_dist + 100.0 and _aim_ready() and Enemy._fire_ok(_shot_cost(), rank):
 					_atk_cd = attack_cd * ARME_CADENCE[_palier]
 					_tire_dispatch(_aim_dir(dir))
+					_telegraph_band(_aim_dir(dir))
 					
 	else:
 		desired_vel = Vector2.ZERO
@@ -2241,6 +2366,10 @@ func _die() -> void:
 		# PHASE 1 : tirage rare bombe / aimant. Le marquage elite est pose par EnemySpawner
 		# (_maybe_elite -> grade "elite", _spawn_elite -> meta "phase1_elite").
 		GameState.roll_phase1_drop(self)
+		if has_meta("mastery_boss5") and bool(get_meta("mastery_boss5")):
+			if GameState.mastery_boss5_clean:
+				GameState.mastery_boss5_ok = true
+			GameState.mastery_boss5_active = false
 	if is_final:
 		# SANS FIN: the endboss is a milestone, not an ending — the run rolls on, harder.
 		if GameState.endless and game != null and game.has_method("endless_boss_down"):

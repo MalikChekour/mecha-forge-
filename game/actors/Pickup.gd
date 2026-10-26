@@ -172,8 +172,13 @@ func _collected() -> void:
 	else:
 		queue_free()
 
+func reset() -> void:
+	deactivate()
+
 func deactivate() -> void:
 	set_physics_process(false)
 	visible = false
 	global_position = Vector2(1.0e7, 1.0e7)
 	remove_from_group("pickups")
+
+

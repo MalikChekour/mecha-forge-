@@ -28,6 +28,13 @@ var overdrive_cd: float = 0.0
 var magnet_vacuum: bool = false
 var magnet_vacuum_t: float = 0.0
 const MAGNET_VACUUM_DUR: float = 2.5
+## Phase 3 — charge Overdrive offerte par le set Anahei 4 pieces (consommee dans Player._transform_off).
+var overdrive_free_casts: int = 0
+## Defis de maitrise de la run en cours. Remis a zero dans reset().
+var mastery_boss5_active: bool = false
+var mastery_boss5_clean: bool = true
+var mastery_boss5_ok: bool = false
+var mastery_ranged: bool = false
 const BOMB_RADIUS: float = 420.0
 const BOMB_TRASH_HP_FRAC: float = 0.35   # part de hp_max, ennemis non-boss (rank < 3)
 const BOMB_BOSS_HP_FRAC: float = 0.08    # degats reduits sur boss (rank >= 3)
@@ -325,6 +332,23 @@ static func chassis_family(id: String) -> String:
 			return b
 	return id
 
+## Phase 3 — un passif permanent + un actif a cooldown, par famille de chassis.
+const CHASSIS_KITS: Dictionary = {
+	"vortex": {"passif": "damage", "pval": 0.06, "passif_nom": "Percee +6% degats", "actif": "align_burst", "actif_nom": "Salve d'alignement", "cd": 12.0},
+	"bluestrike": {"passif": "speed", "pval": 0.05, "passif_nom": "Glisse +5% vitesse", "actif": "dash", "actif_nom": "Dash de chasse", "cd": 8.0},
+	"titan": {"passif": "hp", "pval": 18.0, "passif_nom": "Blindage +18 PV", "actif": "shock", "actif_nom": "Onde de choc", "cd": 16.0},
+	"bruiser": {"passif": "damage", "pval": 0.08, "passif_nom": "Brisure +8% degats", "actif": "shock", "actif_nom": "Choc de brisure", "cd": 14.0},
+	"vanquisher": {"passif": "crit", "pval": 0.04, "passif_nom": "Visee +4% crit", "actif": "align_burst", "actif_nom": "Rafale critique", "cd": 11.0},
+	"pylone": {"passif": "damage", "pval": 0.05, "passif_nom": "Ancrage +5% degats", "actif": "shock", "actif_nom": "Impulsion d'ancre", "cd": 15.0},
+	"cerclier": {"passif": "speed", "pval": 0.04, "passif_nom": "Orbite +4% vitesse", "actif": "dash", "actif_nom": "Dash orbital", "cd": 9.0},
+}
+
+static func chassis_kit(id: String) -> Dictionary:
+	var fam: String = chassis_family(id)
+	if CHASSIS_KITS.has(fam):
+		return CHASSIS_KITS[fam]
+	return {"passif": "damage", "pval": 0.04, "passif_nom": "Signature +4% degats", "actif": "shock", "actif_nom": "Onde courte", "cd": 14.0}
+
 static func mech_def(id: String) -> Dictionary:
 	for m in MECHS:
 		if String(m["id"]) == id:
@@ -351,6 +375,11 @@ func reset() -> void:
 	overdrive_cd = 0.0
 	magnet_vacuum = false
 	magnet_vacuum_t = 0.0
+	overdrive_free_casts = 0
+	mastery_boss5_active = false
+	mastery_boss5_clean = true
+	mastery_boss5_ok = false
+	mastery_ranged = false
 	alive = true
 	death_cause = ""
 	score = 0
@@ -578,3 +607,5 @@ func _spawn_phase1_pickup(pos: Vector2, kind: String, game: Node, plr: Node2D) -
 ## Debugger / checklist : pose une bombe ou un aimant sans attendre le tirage.
 func debug_drop_phase1(kind: String, pos: Vector2, game: Node, plr: Node2D) -> void:
 	_spawn_phase1_pickup(pos, kind, game, plr)
+
+
