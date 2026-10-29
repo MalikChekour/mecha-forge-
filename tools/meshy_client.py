@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-mecha-forge — Meshy AI client (image->3D / text->3D, textured PBR GLB).
+mecha-forge â€” Meshy AI client (image->3D / text->3D, textured PBR GLB).
 
 Meshy v6 gives real hard-surface geometry + PBR textures without a local GPU.
 This client generates a textured GLB (+ texture maps) and drops it into
 tools/../meshy_in/<name>/ ready for bake_meshy.py to render into 2D sprites.
 
-Auth: reads MESHY_KEY from the environment (never hardcode — brief §8).
+Auth: reads MESHY_KEY from the environment (never hardcode â€” brief Â§8).
 Requires a paid Meshy plan (API access). Costs: preview 20 cr, textured ~30 cr.
 
 Usage:
@@ -103,7 +103,7 @@ def gen_image(image, name, pbr=False):
 
 def refine_with_retry(preview_id, name, pbr=True, tries=3):
     """Meshy refine (texturing) times out server-side fairly often. Retry, and
-    after repeated timeouts drop PBR (lighter → far more likely to succeed).
+    after repeated timeouts drop PBR (lighter â†’ far more likely to succeed).
     Base color alone still bakes into great sprites at 2D scale."""
     use_pbr = pbr
     last = None
@@ -141,11 +141,11 @@ ANIM_IDS = {"idle": 0, "walk": 30, "run": 16, "attack": 4, "hit": 178, "die": 8}
 
 
 def remesh(input_task_id, name, target=40000):
-    tid = _task_id(_req("POST", "/v2/remesh",
+    tid = _task_id(_req("POST", "/v1/remesh",
                         {"input_task_id": input_task_id, "target_polycount": target,
                          "topology": "triangle", "target_formats": ["glb"]}))
     print("REMESH %s task %s" % (name, tid), flush=True)
-    task = poll("/v2/remesh/%s" % tid, name + ":remesh")
+    task = poll("/v1/remesh/%s" % tid, name + ":remesh")
     print("REMESHED %s -> %s" % (name, task.get("id")), flush=True)
     return task.get("id")
 

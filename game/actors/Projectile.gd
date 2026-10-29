@@ -466,6 +466,10 @@ func _recycle() -> void:
 	else:
 		queue_free()
 
+## Alias pool Phase 2 : release() cherche reset() avant deactivate().
+func reset() -> void:
+	deactivate()
+
 # Park far off-screen + stop processing (monitoring stays on -> no signal-time toggle,
 # and nothing overlaps way out there). Reused via setup().
 func deactivate() -> void:

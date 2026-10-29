@@ -69,10 +69,10 @@ static func mark(e: Variant, grade: String) -> void:
 	var col: Color = Color(1.0, 0.72, 0.28) if grade == "chef" else Color(0.55, 0.85, 1.25)
 	e._spr.self_modulate = col
 	if grade == "chef":
-		e._spr.scale *= 1.30
+		pass   # 29/10 taille uniforme (badge + teinte gardes)
 		e.drops_bonus = true
 	elif grade == "lieutenant":
-		e._spr.scale *= 1.15
+		pass   # 29/10 taille uniforme (badge + teinte gardes)
 	if e.has_method("_update_rank_badge"):
 		e._update_rank_badge()
 

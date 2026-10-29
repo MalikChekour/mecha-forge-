@@ -23,6 +23,29 @@ var overdrive_time: float = 0.0   # seconds spent transformed (i.e. invincible)
 ## what actually forces stretches of vulnerable play between spikes.
 const OVERDRIVE_COOLDOWN: float = 16.0
 var overdrive_cd: float = 0.0
+## PHASE 1 — aimant. Vacuum global SANS invulnerabilite. Pickup teste ce flag A COTE de
+## overdrive_active ; ne jamais le fusionner avec Overdrive (pas d'i-frames, pas de jauge).
+var magnet_vacuum: bool = false
+var magnet_vacuum_t: float = 0.0
+const MAGNET_VACUUM_DUR: float = 2.5
+## Phase 3 — charge Overdrive offerte par le set Anahei 4 pieces (consommee dans Player._transform_off).
+var overdrive_free_casts: int = 0
+## Defis de maitrise de la run en cours. Remis a zero dans reset().
+var mastery_boss5_active: bool = false
+var mastery_boss5_clean: bool = true
+var mastery_boss5_ok: bool = false
+var mastery_ranged: bool = false
+const BOMB_RADIUS: float = 420.0
+const BOMB_TRASH_HP_FRAC: float = 0.35   # part de hp_max, ennemis non-boss (rank < 3)
+const BOMB_BOSS_HP_FRAC: float = 0.08    # degats reduits sur boss (rank >= 3)
+const BOMB_BOSS_STUN: float = 1.2
+const BOMB_KNOCKBACK: float = 1400.0     # repli si Enemy.apply_stun est absent
+const PHASE1_GRACE: float = 18.0         # meme fenetre que la grace du spawner
+const PHASE1_BOMB_P_FODDER: float = 0.007
+const PHASE1_MAGNET_P_FODDER: float = 0.016
+const PHASE1_BOMB_P_ELITE: float = 0.08
+const PHASE1_MAGNET_P_ELITE: float = 0.12
+const PHASE1_MAGNET_P_BOSS: float = 0.10
 var alive: bool = true
 var score: int = 0            # run score (kills weighted by rank x difficulty) -> leaderboard/grade
 var death_cause: String = ""  # source qui a porte le coup fatal (banc d'equilibre)
@@ -309,6 +332,23 @@ static func chassis_family(id: String) -> String:
 			return b
 	return id
 
+## Phase 3 — un passif permanent + un actif a cooldown, par famille de chassis.
+const CHASSIS_KITS: Dictionary = {
+	"vortex": {"passif": "damage", "pval": 0.06, "passif_nom": "Percee +6% degats", "actif": "align_burst", "actif_nom": "Salve d'alignement", "cd": 12.0},
+	"bluestrike": {"passif": "speed", "pval": 0.05, "passif_nom": "Glisse +5% vitesse", "actif": "dash", "actif_nom": "Dash de chasse", "cd": 8.0},
+	"titan": {"passif": "hp", "pval": 18.0, "passif_nom": "Blindage +18 PV", "actif": "shock", "actif_nom": "Onde de choc", "cd": 16.0},
+	"bruiser": {"passif": "damage", "pval": 0.08, "passif_nom": "Brisure +8% degats", "actif": "shock", "actif_nom": "Choc de brisure", "cd": 14.0},
+	"vanquisher": {"passif": "crit", "pval": 0.04, "passif_nom": "Visee +4% crit", "actif": "align_burst", "actif_nom": "Rafale critique", "cd": 11.0},
+	"pylone": {"passif": "damage", "pval": 0.05, "passif_nom": "Ancrage +5% degats", "actif": "shock", "actif_nom": "Impulsion d'ancre", "cd": 15.0},
+	"cerclier": {"passif": "speed", "pval": 0.04, "passif_nom": "Orbite +4% vitesse", "actif": "dash", "actif_nom": "Dash orbital", "cd": 9.0},
+}
+
+static func chassis_kit(id: String) -> Dictionary:
+	var fam: String = chassis_family(id)
+	if CHASSIS_KITS.has(fam):
+		return CHASSIS_KITS[fam]
+	return {"passif": "damage", "pval": 0.04, "passif_nom": "Signature +4% degats", "actif": "shock", "actif_nom": "Onde courte", "cd": 14.0}
+
 static func mech_def(id: String) -> Dictionary:
 	for m in MECHS:
 		if String(m["id"]) == id:
@@ -333,6 +373,13 @@ func reset() -> void:
 	overdrive_count = 0
 	overdrive_time = 0.0
 	overdrive_cd = 0.0
+	magnet_vacuum = false
+	magnet_vacuum_t = 0.0
+	overdrive_free_casts = 0
+	mastery_boss5_active = false
+	mastery_boss5_clean = true
+	mastery_boss5_ok = false
+	mastery_ranged = false
 	alive = true
 	death_cause = ""
 	score = 0
@@ -414,3 +461,149 @@ func tick_overdrive_cd(delta: float) -> void:
 		overdrive_cd = maxf(0.0, overdrive_cd - delta)
 		if overdrive_cd == 0.0:
 			Events.overdrive_changed.emit(overdrive)   # refresh the HUD when the gauge reopens
+
+## Appele par Player chaque frame (y compris pendant Overdrive et le hitstop). Le timer est
+## en temps de jeu : un hitstop de 40 ms ne le gele presque pas, et la fin d'Overdrive ne le coupe pas.
+func tick_magnet_vacuum(delta: float) -> void:
+	if magnet_vacuum_t <= 0.0:
+		return
+	magnet_vacuum_t = maxf(0.0, magnet_vacuum_t - delta)
+	if magnet_vacuum_t <= 0.0:
+		magnet_vacuum = false
+
+## Pickup kind "aimant". N'ecrit PAS overdrive_active / transformed / iframes.
+func activate_magnet_vacuum(duration: float = MAGNET_VACUUM_DUR) -> void:
+	magnet_vacuum = true
+	magnet_vacuum_t = maxf(magnet_vacuum_t, duration)
+
+## Pickup kind "bombe". Centre = position du joueur au ramassage (le pickup est deja a < 30 px).
+## Non-boss : 35 % de hp_max via Enemy.take_damage (bouclier et garde s'appliquent).
+## Boss (rank >= 3) : apply_stun(1.2) si la methode existe, sinon knockback fort ; degats reduits.
+func detonate_bomb(origin: Vector2, game: Node) -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	var radius_sq: float = BOMB_RADIUS * BOMB_RADIUS
+	for n in tree.get_nodes_in_group("enemies"):
+		if not (n is Enemy):
+			continue
+		var e: Enemy = n as Enemy
+		if not e.alive:
+			continue
+		if origin.distance_squared_to(e.global_position) > radius_sq:
+			continue
+		if e.rank >= 3:
+			var reduced: float = e.hp_max * BOMB_BOSS_HP_FRAC
+			if e.has_method("apply_stun"):
+				e.apply_stun(BOMB_BOSS_STUN)
+			else:
+				var away: Vector2 = e.global_position - origin
+				if away.length_squared() < 4.0:
+					away = Vector2.RIGHT
+				e.velocity = away.normalized() * BOMB_KNOCKBACK
+			if reduced > 0.0:
+				e.take_damage(reduced, "", "bombe")
+		else:
+			var chunk: float = e.hp_max * BOMB_TRASH_HP_FRAC
+			if chunk > 0.0:
+				e.take_damage(chunk, "", "bombe")
+	if game != null and game.has_method("spawn_vfx"):
+		game.spawn_vfx("shockwave", origin, 0.0, 3.6, Color(1.0, 0.45, 0.12))
+		game.spawn_vfx("aaa_shockwave", origin, 0.0, 2.2, Color(1.0, 0.95, 0.75))
+	Events.screen_shake.emit(11.0)
+	Audio.sfx("explosion", 0.06)
+	_bomb_flash()
+
+func _bomb_flash() -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return
+	var layer: CanvasLayer = CanvasLayer.new()
+	layer.layer = 80
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	tree.root.add_child(layer)
+	var rect: ColorRect = ColorRect.new()
+	rect.color = Color(1.0, 0.9, 0.62, 0.82)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(rect)
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.offset_left = 0.0
+	rect.offset_top = 0.0
+	rect.offset_right = 0.0
+	rect.offset_bottom = 0.0
+	var tw: Tween = layer.create_tween()
+	tw.tween_property(rect, "modulate:a", 0.0, 0.18)
+	tw.tween_callback(layer.queue_free)
+
+## Hook mort : Enemy._die appelle ceci apres le butin standard (spawn_xp / spawn_bonus / coffre).
+## Marquage elite : EnemySpawner._maybe_elite (grade == "elite") et _spawn_elite (meta "phase1_elite").
+## Un kill credite a l'arme "bombe" ne relance pas le tirage — pas de chaine bombe -> bombe.
+func roll_phase1_drop(enemy: Node) -> void:
+	if enemy == null or run_time < PHASE1_GRACE:
+		return
+	var wid: Variant = enemy.get("_last_weapon_id")
+	if wid is String and String(wid) == "bombe":
+		return
+	var rank_v: Variant = enemy.get("rank")
+	var rank: int = int(rank_v) if (rank_v is int or rank_v is float) else 0
+	var elite: bool = _phase1_is_elite(enemy)
+	var bomb_p: float = 0.0
+	var magnet_p: float = 0.0
+	if rank >= 3:
+		magnet_p = PHASE1_MAGNET_P_BOSS
+	elif elite:
+		bomb_p = PHASE1_BOMB_P_ELITE
+		magnet_p = PHASE1_MAGNET_P_ELITE
+	else:
+		bomb_p = PHASE1_BOMB_P_FODDER
+		magnet_p = PHASE1_MAGNET_P_FODDER
+	var roll: float = randf()
+	var drop_kind: String = ""
+	if roll < bomb_p:
+		drop_kind = "bombe"
+	elif roll < bomb_p + magnet_p:
+		drop_kind = "aimant"
+	if drop_kind == "":
+		return
+	var pos: Vector2 = (enemy as Node2D).global_position if enemy is Node2D else Vector2.ZERO
+	var g: Node = null
+	var g_v: Variant = enemy.get("game")
+	if g_v is Node:
+		g = g_v as Node
+	var plr: Node2D = null
+	var plr_v: Variant = enemy.get("player")
+	if is_instance_valid(plr_v) and plr_v is Node2D:
+		plr = plr_v as Node2D
+	if plr == null:
+		return
+	_spawn_phase1_pickup(pos, drop_kind, g, plr)
+
+func _phase1_is_elite(enemy: Node) -> bool:
+	var grade_v: Variant = enemy.get("grade")
+	if grade_v is String and String(grade_v) == "elite":
+		return true
+	if enemy.has_meta("phase1_elite") and bool(enemy.get_meta("phase1_elite")):
+		return true
+	return false
+
+## Priorite : game.spawn_phase1_pickup(pos, kind) puis game.spawn_pickup(pos, kind, value),
+## sinon Pickup instancie a la main (reclaim_pickup le reprend au ramassage si game est renseigne).
+## Voir docs/PHASE1_INTEGRATION.md pour brancher le pool existant de spawn_xp.
+func _spawn_phase1_pickup(pos: Vector2, kind: String, game: Node, plr: Node2D) -> void:
+	if game != null and game.has_method("spawn_phase1_pickup"):
+		game.spawn_phase1_pickup(pos, kind)
+		return
+	if game != null and game.has_method("spawn_pickup"):
+		game.spawn_pickup(pos, kind, 1)
+		return
+	var parent: Node = game if game != null else (get_tree().current_scene if get_tree() != null else null)
+	if parent == null:
+		return
+	var p: Pickup = Pickup.new()
+	parent.add_child(p)
+	p.game = game
+	p.setup(pos, kind, 1, plr)
+
+## Debugger / checklist : pose une bombe ou un aimant sans attendre le tirage.
+func debug_drop_phase1(kind: String, pos: Vector2, game: Node, plr: Node2D) -> void:
+	_spawn_phase1_pickup(pos, kind, game, plr)

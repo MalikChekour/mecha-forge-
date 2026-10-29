@@ -13,6 +13,15 @@ var enemy_layer: Node2D
 var projectile_layer: Node2D
 var pickup_layer: Node2D
 var fx_layer: Node2D
+## Phase 2 — pools prechauffes. Le script vit dans systems/ (miroir res://systems/).
+const _ObjectPool = preload("res://systems/ObjectPool.gd")
+var _pool_proj = null
+var _pool_ebolt = null
+var _pool_zone = null
+var _pool_vfx = null
+var _pool_pick = null
+var _pools_ready: bool = false
+var _ebolt_live: int = 0
 
 var _shake: float = 0.0
 var _dmg_active: int = 0
@@ -330,6 +339,7 @@ func _ready() -> void:
 	# painted UNDER the mech and vanished behind it. Lift the FX above the actors so they read
 	# ON the sprite. Stays below the overdrive beam (60) and the point lights (100).
 	fx_layer.z_index = 40
+	_ensure_pools()
 
 	player = Player.new()
 	player.game = self
@@ -1380,39 +1390,84 @@ func _mk_layer() -> Node2D:
 	add_child(n)
 	return n
 
+## Prechauffe : 128 projectiles joueur, 64 bolts ennemis, 32 zones, 64 etincelles, 48 pickups.
+## Les tableaux historiques (_proj_pool, etc.) restent pour ne pas casser un reclaim oublie,
+## mais le chemin chaud passe par ObjectPool.
+func _ensure_pools() -> void:
+	if _pools_ready or projectile_layer == null or fx_layer == null or enemy_layer == null or pickup_layer == null:
+		return
+	_pools_ready = true
+	_pool_proj = _ObjectPool.new()
+	_pool_proj.setup(func() -> Node:
+		var p: Projectile = Projectile.new()
+		p.game = self
+		return p
+	, 128)
+	_pool_proj.prewarm(128, projectile_layer)
+	_pool_ebolt = _ObjectPool.new()
+	_pool_ebolt.setup(func() -> Node:
+		var b: EnemyProjectile = EnemyProjectile.new()
+		b.game = self
+		return b
+	, 64)
+	_pool_ebolt.prewarm(64, projectile_layer)
+	_pool_zone = _ObjectPool.new()
+	_pool_zone.setup(func() -> Node:
+		var z: GroundZone = GroundZone.new()
+		z.radius = 110.0
+		z._pooled = true
+		z.game = self
+		return z
+	, 32)
+	_pool_zone.prewarm(32, enemy_layer)
+	_pool_vfx = _ObjectPool.new()
+	_pool_vfx.setup(func() -> Node:
+		var v: VfxSprite = VfxSprite.new()
+		v.game = self
+		return v
+	, 64)
+	_pool_vfx.prewarm(64, fx_layer)
+	_pool_pick = _ObjectPool.new()
+	_pool_pick.setup(func() -> Node:
+		var g: Pickup = Pickup.new()
+		g.game = self
+		return g
+	, 48)
+	_pool_pick.prewarm(48, pickup_layer)
+
 # ---- weapon fire (pooled: reuse instead of new/queue_free in the hot loop) ----
 func spawn_shot(muzzle: Vector2, dir: Vector2, params: Dictionary) -> void:
-	var p: Projectile
-	if _proj_pool.is_empty():
-		p = Projectile.new()
-		p.game = self
-		projectile_layer.add_child(p)
-	else:
-		p = _proj_pool.pop_back()
+	_ensure_pools()
+	# Defi melee-only : tout projectile compte. Le sabre ne passe pas par ici.
+	var wid: String = String(params.get("impact", ""))
+	if wid != "sabre":
+		GameState.mastery_ranged = true
+	var p: Projectile = _pool_proj.acquire() as Projectile
+	p.game = self
 	p.setup(muzzle, dir, params)
 	_muzzle_flash(muzzle, dir, Color(params.get("color", Palette.CYAN)))
 	Audio.sfx("shoot", 0.14)
 
 func reclaim_proj(p: Projectile) -> void:
-	p.deactivate()
-	_proj_pool.append(p)
+	_ensure_pools()
+	_pool_proj.release(p)
 
 func spawn_bolt(pos: Vector2, dir: Vector2, dmg: float) -> void:
 	spawn_shot(pos, dir, {"dmg": dmg, "pierce": player.bolt_pierce})
 
 func _spawn_pickup(pos: Vector2, kind: String, val: int) -> void:
-	var g: Pickup
-	if _pickup_pool.is_empty():
-		g = Pickup.new()
-		g.game = self
-		pickup_layer.add_child(g)
-	else:
-		g = _pickup_pool.pop_back()
+	_ensure_pools()
+	var g: Pickup = _pool_pick.acquire() as Pickup
+	g.game = self
 	g.setup(pos, kind, val, player)
 
 func reclaim_pickup(p: Pickup) -> void:
-	p.deactivate()
-	_pickup_pool.append(p)
+	_ensure_pools()
+	_pool_pick.release(p)
+
+## Phase 1 : les drops bombe/aimant passent par le meme pool que l'XP.
+func spawn_phase1_pickup(pos: Vector2, kind: String) -> void:
+	_spawn_pickup(pos, kind, 1)
 
 func spawn_xp(pos: Vector2, val: int) -> void:
 	_spawn_pickup(pos, "xp", val)
@@ -1536,16 +1591,12 @@ func grant_skill() -> void:
 	show_banner("COMPETENCE : %s" % String(_SKILL_NAME.get(id, id)), Palette.BONUS)
 
 func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Color(1.0, 0.55, 0.25), bolt_size: float = 1.0, bolt_speed: float = 300.0, is_missile: bool = false, homing: float = 0.0, style_tag: String = "bolt") -> void:
-	var b: EnemyProjectile
-	if _enemy_bolts_made - _enemy_proj_pool.size() >= ENEMY_BOLT_CAP:
+	_ensure_pools()
+	if _ebolt_live >= ENEMY_BOLT_CAP:
 		return
-	if _enemy_proj_pool.is_empty():
-		_enemy_bolts_made += 1
-		b = EnemyProjectile.new()
-		b.game = self
-		projectile_layer.add_child(b)
-	else:
-		b = _enemy_proj_pool.pop_back()   # RECYCLE : pas de new/queue_free dans la boucle chaude
+	var b: EnemyProjectile = _pool_ebolt.acquire() as EnemyProjectile
+	_ebolt_live += 1
+	b.game = self
 	b.tint = color
 	b.size = bolt_size
 	b.missile = is_missile               # tirs lourds = missile (sprite ogive + trainee)
@@ -1554,15 +1605,36 @@ func spawn_enemy_bolt(pos: Vector2, dir: Vector2, dmg: float, color: Color = Col
 	b.setup(pos, dir, dmg, bolt_speed)
 
 func recycle_enemy_bolt(b: EnemyProjectile) -> void:
-	_enemy_proj_pool.append(b)
+	_ensure_pools()
+	_ebolt_live = maxi(0, _ebolt_live - 1)
+	_pool_ebolt.release(b)
 
-## Zone AoE telegraphiee au sol (boss a ogives) : cercle rouge -> delai -> explosion.
-func spawn_ground_zone(pos: Vector2, radius: float, delay: float, dmg: float, color: Color = Color(1.0, 0.45, 0.12), fx_kind: String = "decor_hit") -> void:
-	var z: GroundZone = GroundZone.new()
-	z.radius = radius; z.delay = delay; z.damage = dmg; z.color = color; z.fx_kind = fx_kind
-	z.game = self; z.player = player
-	enemy_layer.add_child(z)   # meme espace-monde que les ennemis ; z_index -2 = au sol
-	z.global_position = pos
+## Zone AoE telegraphiee au sol. shape "circle" = pool ; "line" = noeud frais (visuel bake).
+func spawn_ground_zone(pos: Vector2, radius: float, delay: float, dmg: float, color: Color = Color(1.0, 0.45, 0.12), fx_kind: String = "decor_hit", shape: String = "circle", line_from: Vector2 = Vector2.ZERO, line_to: Vector2 = Vector2.ZERO) -> void:
+	if shape == "line":
+		var zl: GroundZone = GroundZone.new()
+		zl.shape = "line"
+		zl.line_from = line_from
+		zl.line_to = line_to
+		zl.radius = radius
+		zl.delay = delay
+		zl.damage = dmg
+		zl.color = color
+		zl.fx_kind = fx_kind
+		zl.game = self
+		zl.player = player
+		enemy_layer.add_child(zl)
+		zl.global_position = pos
+		return
+	_ensure_pools()
+	var z: GroundZone = _pool_zone.acquire() as GroundZone
+	z._pooled = true
+	z.game = self
+	z.arm(pos, radius, delay, dmg, color, fx_kind, self, player)
+
+func reclaim_ground_zone(z: GroundZone) -> void:
+	_ensure_pools()
+	_pool_zone.release(z)
 
 # Weapon-signature impact FX: every family hits with a DISTINCT, readable look so the
 # arsenal never feels samey. Explosive = fireball+smoke, piercing = sharp lance, energy =
@@ -1943,20 +2015,14 @@ func spawn_vfx(id: String, pos: Vector2, rot: float = 0.0, scl: float = 1.0, col
 	var tex: Texture2D = _vfx_tex[id]
 	if tex == null:
 		return
-	var v: VfxSprite
-	if _vfx_pool.is_empty():
-		v = VfxSprite.new()
-		v.game = self
-		fx_layer.add_child(v)
-	else:
-		v = _vfx_pool.pop_back()
+	_ensure_pools()
+	var v: VfxSprite = _pool_vfx.acquire() as VfxSprite
+	v.game = self
 	v.play(tex, int(d["frames"]), float(d["fps"]), pos, rot, scl, col, stretch)
 
 func reclaim_vfx(v: VfxSprite) -> void:
-	if _vfx_pool.size() < 40:
-		_vfx_pool.append(v)
-	else:
-		v.queue_free()
+	_ensure_pools()
+	_pool_vfx.release(v)
 
 var _sig_vfx_tex: Dictionary = {}
 
@@ -3207,6 +3273,10 @@ func _on_run_won() -> void:
 			SaveManager.data["crystals"] = int(SaveManager.data.get("crystals", 0)) + 20
 			SaveManager.bank_scrap(150)   # sauvegarde cristaux + ferraille
 			show_banner("CHAPITRE %d TERMINE  —  +20 cristaux, +150 ferraille" % _chapter, Color(1.0, 0.85, 0.3))
+		var biome_name: String = spawner.current_biome if spawner != null else ""
+		var won: Array = SaveManager.commit_run_mastery(biome_name, GameState.run_time, GameState.mastery_boss5_ok, not GameState.mastery_ranged)
+		if not won.is_empty():
+			show_hint("Defis : " + ", ".join(won) + "  —  noyaux + plans de set.", Color(1.0, 0.85, 0.4), 5.0)
 	if _headless:
 		return
 	var ms: MetaScreen = MetaScreen.new()
@@ -3407,4 +3477,3 @@ func _finish_headless() -> void:
 		print("[game] SMOKE FAIL — kills=%d level=%d (level-up/draft not reached)" % [
 			GameState.kills, GameState.level])
 		get_tree().quit(1)
-

@@ -141,6 +141,11 @@ var base_chassis: String = ""
 var chassis_family: String = ""   # base_chassis ramene a sa famille (vortexmk2 -> vortex) : mecaniques propres au chassis
 const TF_DUR: float = 8.0   # Overdrive "harvester" spike: short, intense, then vulnerable again
 var _space_was: bool = false
+var _f_was: bool = false
+var _kit_cd: float = 0.0
+var _kit_cd_max: float = 12.0
+var _kit_boost_t: float = 0.0
+var _kit_id: String = ""
 
 ## VERROUILLAGE avion de chasse (patron, 25/09) : forme par chassis, pas juste une couleur —
 ## chacune colle a l'identite deja etablie du mecha (cf. GameState.MECHS "ligne"). La couleur,
@@ -320,6 +325,7 @@ func refresh_equipped_chassis() -> void:
 		start_w = sig
 	if _weapons != null:
 		_weapons.reset_loadout([start_w])
+	_apply_phase3_loadout()
 
 func _ready() -> void:
 	add_to_group("player")
@@ -345,6 +351,7 @@ func _ready() -> void:
 	add_child(mecha)
 	base_chassis = hero_id
 	chassis_family = GameState.chassis_family(hero_id)
+	_apply_phase3_loadout()
 	if mecha.has_method("set_tint"):
 		mecha.set_tint(BASE_TINT)   # heros legerement plus clair que la pietaille (voir BASE_TINT)
 
@@ -554,6 +561,8 @@ func _ready() -> void:
 	add_child(_od_ring)
 
 func _physics_process(delta: float) -> void:
+	_tick_hitstop()
+	GameState.tick_magnet_vacuum(delta)
 	_update_marker(delta)
 	var alive_now: bool = GameState.alive
 	if not alive_now:
@@ -573,6 +582,12 @@ func _physics_process(delta: float) -> void:
 	if bot_active and not transformed and GameState.overdrive >= 1.0:
 		_transform_on()
 	_space_was = edge
+	_kit_cd = maxf(0.0, _kit_cd - delta)
+	_kit_boost_t = maxf(0.0, _kit_boost_t - delta)
+	var fedge: bool = Input.is_key_pressed(KEY_F)
+	if fedge and not _f_was:
+		_cast_chassis_active()
+	_f_was = fedge
 
 	if transformed:
 		_tf_t -= delta
@@ -626,6 +641,8 @@ func _physics_process(delta: float) -> void:
 	else:
 		_thruster.color = Color(1.0, 0.6, 0.15) if jet_t > 0.0 else Palette.CYAN
 		var target_vel: Vector2 = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0) * (JET_MULT if jet_t > 0.0 else 1.0)
+		if _kit_boost_t > 0.0:
+			target_vel *= 1.45
 		var eff_inertia: float = maxf(inertia, _patch_inertia)
 		if eff_inertia > 0.0:
 			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
@@ -1038,11 +1055,13 @@ func _update_slash(delta: float) -> void:
 		return
 	var target: Vector2 = Vector2.ZERO
 	var found: bool = false
+	var foe_hit: bool = false
 	var e: Node2D = _nearest_enemy()
 	if e != null and is_instance_valid(e) and "_body_radius" in e and "alive" in e and e.alive:
 		if global_position.distance_to(e.global_position) < _BODY_R + float(e._body_radius) + _SLASH_PAD:
 			target = e.global_position
 			found = true
+			foe_hit = true
 	if not found and "cover_list" in game:
 		for c in game.cover_list:
 			if not is_instance_valid(c):
@@ -1065,6 +1084,59 @@ func _update_slash(delta: float) -> void:
 		_melee_t = 0.34
 	game.spawn_vfx("slash", global_position + dir * 42.0, dir.angle() + PI * 0.5, 0.8,
 		Color(0.75, 1.0, 1.0))
+	# Hitconfirm uniquement sur un ennemi. Le decor garde le VFX, sans hitstop.
+	if foe_hit:
+		_confirm_slash_hit()
+
+## Hitstop ~40 ms reels a time_scale 0.05. Horloge murale : le delta du jeu est lui-meme
+## ralenti, un timer en delta ne rendrait la main qu'apres ~0,8 s reelles.
+const _HITSTOP_SCALE: float = 0.05
+const _HITSTOP_MS: int = 40
+var _hitstop_until_ms: int = 0
+var _hitstop_restore: float = 1.0
+var _hit_shake_frame: int = -1
+
+func _confirm_slash_hit() -> void:
+	_begin_hitstop()
+	# Events.screen_shake est scalaire dans tout le code du projet (emit(float)) : pas de
+	# vecteur axial expose. 1.6 reste un shake leger, bien sous les degats subis (6.0).
+	# Un seul shake par frame physique — partage avec le faisceau d'Overdrive.
+	_emit_hit_shake(1.6)
+	# Audio.sfx(name, pitch_var) : pitch_scale = 1 ± pitch_var. 0.04 = ±4 %.
+	# w_sabre est dans le pool ; son throttle (0.13 s) est sous le cooldown de lame (0.24 s).
+	Audio.sfx("w_sabre", 0.04)
+
+func _begin_hitstop() -> void:
+	if Engine.time_scale <= 0.01:
+		return
+	var now: int = Time.get_ticks_msec()
+	if _hitstop_until_ms > now:
+		_hitstop_until_ms = now + _HITSTOP_MS
+		return
+	_hitstop_restore = Engine.time_scale if Engine.time_scale > 0.2 else 1.0
+	Engine.time_scale = _HITSTOP_SCALE
+	_hitstop_until_ms = now + _HITSTOP_MS
+
+func _tick_hitstop() -> void:
+	if _hitstop_until_ms <= 0:
+		return
+	if Time.get_ticks_msec() >= _hitstop_until_ms or not GameState.alive:
+		_end_hitstop()
+
+func _end_hitstop() -> void:
+	if _hitstop_until_ms <= 0:
+		return
+	if is_equal_approx(Engine.time_scale, _HITSTOP_SCALE):
+		Engine.time_scale = _hitstop_restore
+	_hitstop_until_ms = 0
+
+## Un seul Events.screen_shake par frame physique (sabre + crépitement du faisceau).
+func _emit_hit_shake(amount: float) -> void:
+	var frame: int = Engine.get_physics_frames()
+	if _hit_shake_frame == frame:
+		return
+	_hit_shake_frame = frame
+	Events.screen_shake.emit(amount)
 
 ## Additive Line2D used as one layer of the overdrive lance. A uniform-width, single-colour
 ## line reads as a flat streak — so every layer gets a WIDTH CURVE (bulges at the emitter,
@@ -1189,7 +1261,7 @@ func _process_beam(delta: float) -> void:
 		_beam_fx_t = 0.085
 		game.spawn_vfx("aaa_muzzle", global_position + start, aim_dir.angle(), 0.34,
 			Color(0.75, 1.5, 1.9))
-		Events.screen_shake.emit(0.5)
+		_emit_hit_shake(0.5)
 
 	var gs: Vector2 = global_position + start
 	var ge: Vector2 = global_position + end
@@ -1279,6 +1351,56 @@ func _tick_borrow(delta: float) -> void:
 		if game != null and game.has_method("show_hint"):
 			game.show_hint("Arme empruntee epuisee — retour a l'origine.", Color(0.72, 0.92, 1.0), 3.0)
 
+
+## Sets 2/4 pieces + kit de chassis. Appele apres le calcul d'equipement, une fois par refresh.
+func _apply_phase3_loadout() -> void:
+	var bonus: Dictionary = SaveManager.gear_set_bonus()
+	damage *= (1.0 + float(bonus.get("damage_pct", 0.0)))
+	max_hp *= (1.0 + float(bonus.get("hp_pct", 0.0)))
+	hp = max_hp
+	base_speed *= (1.0 + float(bonus.get("speed_pct", 0.0)))
+	crit_chance += float(bonus.get("crit", 0.0))
+	armor = float(bonus.get("armor", 0.0))
+	magnet_range = 165.0 + float(bonus.get("magnet", 0.0))
+	GameState.run_xp_mult = 1.0 + float(bonus.get("xp_mult", 0.0))
+	GameState.overdrive_free_casts = int(bonus.get("overdrive_charges", 0))
+	var kit: Dictionary = GameState.chassis_kit(chassis_family)
+	_kit_id = String(kit.get("actif", ""))
+	_kit_cd_max = float(kit.get("cd", 12.0))
+	match String(kit.get("passif", "")):
+		"damage":
+			damage *= (1.0 + float(kit.get("pval", 0.0)))
+		"speed":
+			base_speed *= (1.0 + float(kit.get("pval", 0.0)))
+		"hp":
+			max_hp += float(kit.get("pval", 0.0))
+			hp = max_hp
+		"crit":
+			crit_chance += float(kit.get("pval", 0.0))
+
+## Touche F : actif du chassis (dash de vitesse, onde, ou jauge Overdrive).
+func _cast_chassis_active() -> void:
+	if not GameState.alive or _kit_id == "" or _kit_cd > 0.0:
+		return
+	_kit_cd = _kit_cd_max
+	match _kit_id:
+		"dash":
+			_kit_boost_t = 0.45
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.55, Color(0.45, 0.85, 1.0))
+		"shock":
+			for n in get_tree().get_nodes_in_group("enemies"):
+				if n is Enemy and global_position.distance_to((n as Node2D).global_position) <= 180.0:
+					(n as Enemy).take_damage(damage * 1.6, chassis_family, "kit")
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("shockwave", global_position, 0.0, 1.3, Color(1.0, 0.55, 0.2))
+			Events.screen_shake.emit(4.0)
+		"align_burst":
+			GameState.add_overdrive(0.35)
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("energy", global_position, 0.0, 1.0, Color(0.55, 0.9, 1.0))
+	Audio.sfx("levelup", 0.04)
+
 func _transform_on() -> void:
 	# OVERDRIVE "HARVESTER": invincible + double speed + global XP magnet for TF_DUR seconds,
 	# plus the continuous energy beam. A huge dopamine spike, then back to vulnerable.
@@ -1299,7 +1421,14 @@ func _transform_on() -> void:
 func _transform_off() -> void:
 	transformed = false
 	GameState.overdrive_active = false
-	GameState.overdrive_cd = GameState.OVERDRIVE_COOLDOWN   # vulnerable stretch before the next spike
+	# Set Anahei 4 pieces : une charge de plus, sans laisser overdrive_active allume.
+	if GameState.overdrive_free_casts > 0:
+		GameState.overdrive_free_casts -= 1
+		GameState.overdrive = 1.0
+		GameState.overdrive_cd = 0.0
+		Events.overdrive_changed.emit(1.0)
+	else:
+		GameState.overdrive_cd = GameState.OVERDRIVE_COOLDOWN   # vulnerable stretch before the next spike
 	if mecha.has_method("set_tint"):
 		mecha.set_tint(BASE_TINT)   # on revient a la teinte du heros, pas au blanc neutre
 	if _od_aura != null:
@@ -1391,6 +1520,8 @@ func reset_aim_stick() -> void:
 	_aim_stick_active = false
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_PREDELETE:
+		_end_hitstop()
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_PAUSED:
 		reset_input_state()
 
@@ -1643,6 +1774,8 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO, source_tag: 
 	if base_chassis == "titan" and velocity.length() > 10.0:
 		amount *= 0.78   # -22%, valeur de prototypage — pas mesuree, a ajuster au playtest
 	hp -= amount
+	if GameState.mastery_boss5_active:
+		GameState.mastery_boss5_clean = false
 	var tag: String = source_tag if source_tag != "" else "inconnu"
 	damage_log[tag] = float(damage_log.get(tag, 0.0)) + amount
 	last_damage_source = tag

@@ -206,20 +206,27 @@ func _impact() -> void:
 	elif game.has_method("spawn_vfx"):
 		game.spawn_vfx("aaa_muzzle", global_position, 0.0, 0.4 * size, tint)
 
-func _recycle() -> void:
+## Remise en reserve. Les compteurs missile/fumee sont rendus ici (idempotent).
+func reset() -> void:
 	visible = false
 	monitoring = false
 	set_physics_process(false)
 	_trail_points.clear()
 	if _trail != null:
 		_trail.points = PackedVector2Array()
-	if _has_smoke:                              # rend le slot de particules
-		_smoke_active -= 1; _has_smoke = false
-	if _counted_missile:                        # rend le compteur missile
-		_active_missiles -= 1; _counted_missile = false
+	if _has_smoke:
+		_smoke_active -= 1
+		_has_smoke = false
+	if _counted_missile:
+		_active_missiles -= 1
+		_counted_missile = false
 	if _smoke_ps != null:
 		_smoke_ps.emitting = false
+	global_position = Vector2(1.0e7, 1.0e7)
+
+func _recycle() -> void:
 	if game != null and game.has_method("recycle_enemy_bolt"):
 		game.recycle_enemy_bolt(self)
 	else:
+		reset()
 		queue_free()

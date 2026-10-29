@@ -3,6 +3,13 @@ extends Node
 ## (meta tree, chassis, unlocks).
 
 const PATH: String = "user://mecha_forge_save.json"
+const SAVE_SCHEMA: int = 2
+const MAKERS: Array = ["anahei", "korr", "voss", "sena"]
+const MAKER_NAMES: Dictionary = {
+	"anahei": "ANAHEI", "korr": "KORR", "voss": "VOSS", "sena": "SENA",
+}
+const MASTERY_IDS: Array = ["nohit", "fast", "melee"]
+const MASTERY_CORES: int = 12
 
 var data: Dictionary = {
 	"meta_scrap": 0,
@@ -42,8 +49,27 @@ func load_data() -> void:
 			if d is Dictionary:
 				for k in d:
 					data[k] = d[k]
+	_migrate_schema()
 	load_visual_scales()
 	_accorde_chassis_gratuits()
+
+## Anciennes sauvegardes (schema 1) : maker stable via uid % 4, table de maitrise vide.
+func _migrate_schema() -> void:
+	if int(data.get("schema", 1)) >= SAVE_SCHEMA:
+		if not data.has("mastery"):
+			data["mastery"] = {}
+		return
+	for p in data.get("parts", []):
+		if p is Dictionary and String((p as Dictionary).get("maker", "")) == "":
+			var uid: int = int((p as Dictionary).get("uid", 0))
+			(p as Dictionary)["maker"] = String(MAKERS[posmod(uid, MAKERS.size())])
+	if not data.has("mastery"):
+		data["mastery"] = {}
+	data["schema"] = SAVE_SCHEMA
+	save_data()
+
+func _roll_maker() -> String:
+	return String(MAKERS[randi() % MAKERS.size()])
 
 ## Tout chassis dont le cout vaut 0 est POSSEDE d'office.
 ## 🚨 Sans ca, mettre un prix a 0 ne suffirait pas : l'ecran GARAGE afficherait un bouton
@@ -330,7 +356,8 @@ func forge_from_plan(index: int) -> Dictionary:
 	var plan: Dictionary = ps[index]
 	var uid: int = int(data.get("part_uid", 1))
 	data["part_uid"] = uid + 1
-	var part: Dictionary = {"uid": uid, "slot": String(plan["slot"]), "rarity": String(plan["rarity"]), "level": 1}
+	var maker: String = String(plan.get("maker", _roll_maker()))
+	var part: Dictionary = {"uid": uid, "slot": String(plan["slot"]), "rarity": String(plan["rarity"]), "level": 1, "maker": maker}
 	var parts: Array = gear_parts()
 	parts.append(part)
 	data["parts"] = parts
@@ -380,6 +407,115 @@ func gear_totals() -> Dictionary:
 			t[k] = float(t.get(k, 0.0)) + float(b[k])
 	return t
 
+func gear_set_counts() -> Dictionary:
+	var c: Dictionary = {}
+	for slot: String in GEAR_SLOTS:
+		var uid: int = int(gear_equipped().get(slot, -1))
+		if uid < 0:
+			continue
+		var p: Dictionary = gear_part(uid)
+		if p.is_empty():
+			continue
+		var m: String = String(p.get("maker", ""))
+		if m == "":
+			continue
+		c[m] = int(c.get(m, 0)) + 1
+	return c
+
+## 2 pieces : +8 % de la stat signature. 4 pieces : bonus distinct (Anahei = +1 charge Overdrive).
+func gear_set_bonus() -> Dictionary:
+	var b: Dictionary = {
+		"damage_pct": 0.0, "hp_pct": 0.0, "speed_pct": 0.0, "crit": 0.0,
+		"armor": 0.0, "magnet": 0.0, "xp_mult": 0.0, "overdrive_charges": 0,
+	}
+	var counts: Dictionary = gear_set_counts()
+	for maker in counts.keys():
+		var n: int = int(counts[maker])
+		if n >= 2:
+			match String(maker):
+				"anahei":
+					b["damage_pct"] = float(b["damage_pct"]) + 0.08
+				"korr":
+					b["hp_pct"] = float(b["hp_pct"]) + 0.08
+				"voss":
+					b["speed_pct"] = float(b["speed_pct"]) + 0.08
+				"sena":
+					b["crit"] = float(b["crit"]) + 0.08
+		if n >= 4:
+			match String(maker):
+				"anahei":
+					b["overdrive_charges"] = int(b["overdrive_charges"]) + 1
+				"korr":
+					b["armor"] = float(b["armor"]) + 0.08
+				"voss":
+					b["magnet"] = float(b["magnet"]) + 60.0
+				"sena":
+					b["xp_mult"] = float(b["xp_mult"]) + 0.08
+	return b
+
+func set_summary() -> String:
+	var counts: Dictionary = gear_set_counts()
+	if counts.is_empty():
+		return "Sets : aucune piece fabricant equipee (2 pieces = +8 %)."
+	var lines: PackedStringArray = PackedStringArray()
+	for m in MAKERS:
+		var n: int = int(counts.get(m, 0))
+		if n <= 0:
+			continue
+		var bit: String = "%s %d/4" % [String(MAKER_NAMES.get(m, m)), n]
+		if n >= 2:
+			bit += "  +8%"
+		if n >= 4:
+			match String(m):
+				"anahei":
+					bit += "  +1 charge Overdrive"
+				"korr":
+					bit += "  +8% armure"
+				"voss":
+					bit += "  aimant +60"
+				"sena":
+					bit += "  +8% XP"
+		lines.append(bit)
+	return "\n".join(lines)
+
+func mastery_done(biome: String, id: String) -> bool:
+	return bool(data.get("mastery", {}).get(biome, {}).get(id, false))
+
+## Une fois par biome et par defi. Noyaux + plan rare du fabricant.
+func record_mastery(biome: String, id: String) -> bool:
+	if biome == "" or not MASTERY_IDS.has(id):
+		return false
+	var all: Dictionary = data.get("mastery", {}).duplicate(true)
+	var row: Dictionary = all.get(biome, {})
+	if bool(row.get(id, false)):
+		return false
+	row[id] = true
+	all[biome] = row
+	data["mastery"] = all
+	data["cores"] = int(data.get("cores", 0)) + MASTERY_CORES
+	var plan: Dictionary = {
+		"slot": String(GEAR_SLOTS[randi() % GEAR_SLOTS.size()]),
+		"rarity": "rare",
+		"maker": _roll_maker(),
+		"source": "mastery",
+	}
+	var ps: Array = plans()
+	ps.append(plan)
+	data["plans"] = ps
+	save_data()
+	return true
+
+## nohit = boss 5:00 sans degat subi ; fast = victoire avant 12 min ; melee = aucun projectile.
+func commit_run_mastery(biome: String, run_time: float, boss5_ok: bool, melee_only: bool) -> Array:
+	var got: Array = []
+	if boss5_ok and record_mastery(biome, "nohit"):
+		got.append("no-hit 5:00")
+	if run_time > 1.0 and run_time < 720.0 and record_mastery(biome, "fast"):
+		got.append("clear < 12 min")
+	if melee_only and record_mastery(biome, "melee"):
+		got.append("melee-only")
+	return got
+
 func _roll_rarity() -> String:
 	var total: int = 0
 	for w in GEAR_RARITY_WEIGHT:
@@ -406,6 +542,7 @@ func gear_pull(free: bool = false) -> Dictionary:
 		"slot": String(GEAR_SLOTS[randi() % GEAR_SLOTS.size()]),
 		"rarity": _roll_rarity(),
 		"level": 1,
+		"maker": _roll_maker(),
 	}
 	var ps: Array = gear_parts()
 	ps.append(part)
@@ -518,6 +655,7 @@ func gear_merge(slot: String, rarity: String) -> Dictionary:
 		"slot": slot,
 		"rarity": next_rarity,
 		"level": max_lvl,
+		"maker": String(matching[0].get("maker", _roll_maker())),
 	}
 	ps.append(new_part)
 	data["parts"] = ps

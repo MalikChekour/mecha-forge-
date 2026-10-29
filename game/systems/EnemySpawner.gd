@@ -66,9 +66,9 @@ const DEFS: Dictionary = {
 
 	# --- ESCOUADES TRIPARTITES PAR BIOME (Pilier 1 : Diversification) ---
 	# Swarmers (drones rapides de meute, rush + zigzag, AoE requis)
-	"mech01_swarm": {"name": "Drone d'atelier", "chassis": "en01_tech", "hp": 14.0, "speed": 245.0, "dmg": 4.2, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
-	"mech02_swarm": {"name": "Scorpion des sables", "chassis": "en02_desert", "hp": 15.0, "speed": 248.0, "dmg": 4.5, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
-	"mech03_swarm": {"name": "Essaim de canopée", "chassis": "en03_jungle", "hp": 16.5, "speed": 252.0, "dmg": 4.8, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech01_swarm": {"name": "Drone d'atelier", "chassis": "en01_tech_swarm", "hp": 14.0, "speed": 245.0, "dmg": 4.2, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech02_swarm": {"name": "Scorpion des sables", "chassis": "en02_desert_swarm", "hp": 15.0, "speed": 248.0, "dmg": 4.5, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
+	"mech03_swarm": {"name": "Essaim de canopée", "chassis": "en03_jungle_swarm", "hp": 16.5, "speed": 252.0, "dmg": 4.8, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
 	"mech04_swarm": {"name": "Éclat de lave", "chassis": "en04_volcanic", "hp": 18.0, "speed": 242.0, "dmg": 5.1, "radius": 28.0, "size": 110.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
 	"mech05_swarm": {"name": "Sangsue des marais", "chassis": "en05_swamp", "hp": 19.5, "speed": 245.0, "dmg": 5.4, "radius": 28.0, "size": 112.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
 	"mech06_swarm": {"name": "Drone de givre", "chassis": "en06_cryo", "hp": 21.0, "speed": 248.0, "dmg": 5.7, "radius": 28.0, "size": 114.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
@@ -86,9 +86,9 @@ const DEFS: Dictionary = {
 	"mech18_swarm": {"name": "Légionnaire rapide", "chassis": "en18_colosseum", "hp": 39.0, "speed": 252.0, "dmg": 9.3, "radius": 28.0, "size": 116.0, "motion": "walk", "rank": 0, "w": 6, "behavior": "rush", "zigzag": 0.35, "unlock": 0.0},
 
 	# Tanks / Vanguards Blindés (châssis lourds, dôme garde, shield front, protecteur)
-	"mech01_shield": {"name": "Rempart d'avant-garde", "chassis": "en01_tech", "hp": 52.0, "speed": 136.0, "dmg": 8.5, "radius": 46.0, "size": 164.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 24.0, "protecteur": true, "attack_dmg": 4.8, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
-	"mech02_shield": {"name": "Forteresse des dunes", "chassis": "en02_desert", "hp": 56.0, "speed": 138.0, "dmg": 9.0, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 26.0, "protecteur": true, "attack_dmg": 5.2, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
-	"mech03_shield": {"name": "Colosse d'écorce", "chassis": "en03_jungle", "hp": 60.0, "speed": 140.0, "dmg": 9.5, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 28.0, "protecteur": true, "attack_dmg": 5.5, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech01_shield": {"name": "Rempart d'avant-garde", "chassis": "en01_tech_shield", "hp": 52.0, "speed": 136.0, "dmg": 8.5, "radius": 46.0, "size": 164.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 24.0, "protecteur": true, "attack_dmg": 4.8, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech02_shield": {"name": "Forteresse des dunes", "chassis": "en02_desert_shield", "hp": 56.0, "speed": 138.0, "dmg": 9.0, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 26.0, "protecteur": true, "attack_dmg": 5.2, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
+	"mech03_shield": {"name": "Colosse d'écorce", "chassis": "en03_jungle_shield", "hp": 60.0, "speed": 140.0, "dmg": 9.5, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 28.0, "protecteur": true, "attack_dmg": 5.5, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
 	"mech04_shield": {"name": "Cuirassé de magma", "chassis": "en04_volcanic", "hp": 64.0, "speed": 132.0, "dmg": 10.0, "radius": 46.0, "size": 165.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 30.0, "protecteur": true, "attack_dmg": 5.9, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
 	"mech05_shield": {"name": "Blindé des bourbiers", "chassis": "en05_swamp", "hp": 68.0, "speed": 135.0, "dmg": 10.5, "radius": 46.0, "size": 166.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 32.0, "protecteur": true, "attack_dmg": 6.3, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
 	"mech06_shield": {"name": "Bastion permafrost", "chassis": "en06_cryo", "hp": 72.0, "speed": 138.0, "dmg": 11.0, "radius": 46.0, "size": 168.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 34.0, "protecteur": true, "attack_dmg": 6.6, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
@@ -106,9 +106,9 @@ const DEFS: Dictionary = {
 	"mech18_shield": {"name": "Centurion blindé", "chassis": "en18_colosseum", "hp": 120.0, "speed": 138.0, "dmg": 17.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 58.0, "protecteur": true, "attack_dmg": 11.2, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
 
 	# Snipers / Sentinelles Laser (tir_style sniper, ligne de télégraphe Line2D, dégâts lourds)
-	"mech01_sniper": {"name": "Sentinelle Laser", "chassis": "en01_tech", "hp": 22.0, "speed": 158.0, "dmg": 5.5, "radius": 34.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 11.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
-	"mech02_sniper": {"name": "Tireur des mirages", "chassis": "en02_desert", "hp": 24.0, "speed": 160.0, "dmg": 6.0, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
-	"mech03_sniper": {"name": "Archer de sous-bois", "chassis": "en03_jungle", "hp": 26.0, "speed": 162.0, "dmg": 6.4, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.8, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech01_sniper": {"name": "Sentinelle Laser", "chassis": "en01_tech_sniper", "hp": 22.0, "speed": 158.0, "dmg": 5.5, "radius": 34.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 11.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech02_sniper": {"name": "Tireur des mirages", "chassis": "en02_desert_sniper", "hp": 24.0, "speed": 160.0, "dmg": 6.0, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech03_sniper": {"name": "Archer de sous-bois", "chassis": "en03_jungle_sniper", "hp": 26.0, "speed": 162.0, "dmg": 6.4, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.8, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech04_sniper": {"name": "Pointeur thermique", "chassis": "en04_volcanic", "hp": 28.0, "speed": 154.0, "dmg": 6.8, "radius": 34.0, "size": 135.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 13.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech05_sniper": {"name": "Guetteur de brume", "chassis": "en05_swamp", "hp": 30.0, "speed": 156.0, "dmg": 7.2, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.1, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech06_sniper": {"name": "Sniper cryogénique", "chassis": "en06_cryo", "hp": 32.0, "speed": 158.0, "dmg": 7.6, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.7, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
@@ -126,24 +126,24 @@ const DEFS: Dictionary = {
 	"mech18_sniper": {"name": "Sagittaire de l'arène", "chassis": "en18_colosseum", "hp": 56.0, "speed": 158.0, "dmg": 12.4, "radius": 34.0, "size": 142.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 22.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 
 	# --- MÉCHAS ÉLITES SUPÉRIEURS (Gundam Dual-Arms : Tir + Épée de Contact & Effets Spéciaux) ---
-	"mech01_elite": {"name": "MS-01K Vulcan-Enforcer", "chassis": "en01_tech", "hp": 75.0, "speed": 165.0, "dmg": 10.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 8.5, "attack_cd": 2.0, "prefer_dist": 220.0, "contact_sword": true, "sword_dmg": 16.0, "sword_range": 160.0, "special_vfx": "iem_slash", "unlock": 80.0},
-	"mech02_elite": {"name": "MS-02D Dust-Vanguard", "chassis": "en02_desert", "hp": 80.0, "speed": 168.0, "dmg": 10.5, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.0, "attack_cd": 2.8, "prefer_dist": 300.0, "contact_sword": true, "sword_dmg": 17.0, "sword_range": 160.0, "special_vfx": "fire_trail", "unlock": 80.0},
-	"mech03_elite": {"name": "MS-03J Jungle-Striker", "chassis": "en03_jungle", "hp": 85.0, "speed": 170.0, "dmg": 11.0, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 7.5, "attack_cd": 2.2, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 18.0, "sword_range": 160.0, "special_vfx": "tungsten_slam", "unlock": 80.0},
-	"mech04_elite": {"name": "MS-04V Magma-Executioner", "chassis": "en04_volcanic", "hp": 90.0, "speed": 162.0, "dmg": 11.5, "radius": 46.0, "size": 175.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 16.0, "attack_cd": 3.0, "prefer_dist": 250.0, "contact_sword": true, "sword_dmg": 19.0, "sword_range": 165.0, "special_vfx": "magma_wave", "unlock": 80.0},
-	"mech05_elite": {"name": "MS-05S Corrosion-Warlord", "chassis": "en05_swamp", "hp": 95.0, "speed": 164.0, "dmg": 12.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 8.0, "attack_cd": 2.3, "prefer_dist": 230.0, "contact_sword": true, "sword_dmg": 20.0, "sword_range": 160.0, "special_vfx": "acid_corrosion", "unlock": 80.0},
-	"mech06_elite": {"name": "MS-06C Frost-Paladin", "chassis": "en06_cryo", "hp": 100.0, "speed": 166.0, "dmg": 12.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 15.0, "attack_cd": 2.8, "prefer_dist": 300.0, "contact_sword": true, "sword_dmg": 21.0, "sword_range": 160.0, "special_vfx": "cryo_freeze", "unlock": 80.0},
-	"mech07_elite": {"name": "MS-07R Meltdown-Centurion", "chassis": "en07_reacteur", "hp": 105.0, "speed": 168.0, "dmg": 13.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "guide", "attack_dmg": 9.5, "attack_cd": 2.4, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 22.0, "sword_range": 160.0, "special_vfx": "radiation_aura", "unlock": 80.0},
-	"mech08_elite": {"name": "MS-08H Cell-Exterminator", "chassis": "en08_ruche", "hp": 110.0, "speed": 172.0, "dmg": 13.5, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 9.0, "attack_cd": 1.9, "prefer_dist": 230.0, "contact_sword": true, "sword_dmg": 23.0, "sword_range": 160.0, "special_vfx": "amber_cleave", "unlock": 80.0},
-	"mech09_elite": {"name": "MS-09O Citadel-Dominator", "chassis": "en09_citadelle", "hp": 115.0, "speed": 168.0, "dmg": 14.0, "radius": 46.0, "size": 178.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 18.0, "attack_cd": 2.9, "prefer_dist": 320.0, "contact_sword": true, "sword_dmg": 24.0, "sword_range": 165.0, "special_vfx": "gold_blast", "unlock": 80.0},
-	"mech10_elite": {"name": "MS-10A Trench-Colossus", "chassis": "en10_abyss", "hp": 120.0, "speed": 164.0, "dmg": 14.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 17.0, "attack_cd": 3.0, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 25.0, "sword_range": 160.0, "special_vfx": "hydro_vortex", "unlock": 80.0},
-	"mech11_elite": {"name": "MS-11E Spore-Phantom", "chassis": "en11_ether", "hp": 122.0, "speed": 174.0, "dmg": 15.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 9.2, "attack_cd": 2.1, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 26.0, "sword_range": 160.0, "special_vfx": "uv_rapier", "unlock": 80.0},
-	"mech12_elite": {"name": "MS-12T Olympus-Dreadnought", "chassis": "en12_titans", "hp": 130.0, "speed": 160.0, "dmg": 15.5, "radius": 48.0, "size": 182.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 20.0, "attack_cd": 3.2, "prefer_dist": 280.0, "contact_sword": true, "sword_dmg": 28.0, "sword_range": 170.0, "special_vfx": "titan_cleave", "unlock": 80.0},
-	"mech13_elite": {"name": "MS-13Z Zero-Interceptor", "chassis": "en13_orbit", "hp": 125.0, "speed": 175.0, "dmg": 16.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 10.5, "attack_cd": 2.0, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 27.0, "sword_range": 160.0, "special_vfx": "zero_g_dash", "unlock": 80.0},
-	"mech14_elite": {"name": "MS-14Q Tesseract-Sentinel", "chassis": "en14_quantum", "hp": 128.0, "speed": 172.0, "dmg": 16.5, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "guide", "attack_dmg": 11.0, "attack_cd": 2.4, "prefer_dist": 270.0, "contact_sword": true, "sword_dmg": 28.0, "sword_range": 160.0, "special_vfx": "phase_warp", "unlock": 80.0},
-	"mech15_elite": {"name": "MS-15O Thunder-Tempest", "chassis": "en15_ozone", "hp": 130.0, "speed": 170.0, "dmg": 17.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 11.5, "attack_cd": 2.1, "prefer_dist": 250.0, "contact_sword": true, "sword_dmg": 29.0, "sword_range": 160.0, "special_vfx": "arc_lightning", "unlock": 80.0},
-	"mech16_elite": {"name": "MS-16P Refraction-Avenger", "chassis": "en16_prism", "hp": 132.0, "speed": 168.0, "dmg": 17.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 10.0, "attack_cd": 2.2, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 30.0, "sword_range": 160.0, "special_vfx": "prismatic_burst", "unlock": 80.0},
-	"mech17_elite": {"name": "MS-17B Dread-Warhammer", "chassis": "en17_steampunk", "hp": 135.0, "speed": 165.0, "dmg": 18.0, "radius": 48.0, "size": 180.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 19.0, "attack_cd": 3.1, "prefer_dist": 270.0, "contact_sword": true, "sword_dmg": 31.0, "sword_range": 165.0, "special_vfx": "steam_burst", "unlock": 80.0},
-	"mech18_elite": {"name": "MS-18C Arena-Champion", "chassis": "en18_colosseum", "hp": 140.0, "speed": 172.0, "dmg": 18.5, "radius": 48.0, "size": 182.0, "motion": "walk", "rank": 1, "w": 2, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 12.0, "attack_cd": 1.9, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 32.0, "sword_range": 170.0, "special_vfx": "arena_execution", "unlock": 80.0},
+	"mech01_elite": {"name": "MS-01K Vulcan-Enforcer", "chassis": "en01_tech", "hp": 75.0, "speed": 165.0, "dmg": 10.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 8.5, "attack_cd": 2.0, "prefer_dist": 220.0, "contact_sword": true, "sword_dmg": 16.0, "sword_range": 160.0, "special_vfx": "iem_slash", "unlock": 15.0},
+	"mech02_elite": {"name": "MS-02D Dust-Vanguard", "chassis": "en02_desert", "hp": 80.0, "speed": 168.0, "dmg": 10.5, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 14.0, "attack_cd": 2.8, "prefer_dist": 300.0, "contact_sword": true, "sword_dmg": 17.0, "sword_range": 160.0, "special_vfx": "fire_trail", "unlock": 15.0},
+	"mech03_elite": {"name": "MS-03J Jungle-Striker", "chassis": "en03_jungle", "hp": 85.0, "speed": 170.0, "dmg": 11.0, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 7.5, "attack_cd": 2.2, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 18.0, "sword_range": 160.0, "special_vfx": "tungsten_slam", "unlock": 15.0},
+	"mech04_elite": {"name": "MS-04V Magma-Executioner", "chassis": "en04_volcanic", "hp": 90.0, "speed": 162.0, "dmg": 11.5, "radius": 46.0, "size": 175.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 16.0, "attack_cd": 3.0, "prefer_dist": 250.0, "contact_sword": true, "sword_dmg": 19.0, "sword_range": 165.0, "special_vfx": "magma_wave", "unlock": 15.0},
+	"mech05_elite": {"name": "MS-05S Corrosion-Warlord", "chassis": "en05_swamp", "hp": 95.0, "speed": 164.0, "dmg": 12.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 8.0, "attack_cd": 2.3, "prefer_dist": 230.0, "contact_sword": true, "sword_dmg": 20.0, "sword_range": 160.0, "special_vfx": "acid_corrosion", "unlock": 15.0},
+	"mech06_elite": {"name": "MS-06C Frost-Paladin", "chassis": "en06_cryo", "hp": 100.0, "speed": 166.0, "dmg": 12.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 15.0, "attack_cd": 2.8, "prefer_dist": 300.0, "contact_sword": true, "sword_dmg": 21.0, "sword_range": 160.0, "special_vfx": "cryo_freeze", "unlock": 15.0},
+	"mech07_elite": {"name": "MS-07R Meltdown-Centurion", "chassis": "en07_reacteur", "hp": 105.0, "speed": 168.0, "dmg": 13.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "guide", "attack_dmg": 9.5, "attack_cd": 2.4, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 22.0, "sword_range": 160.0, "special_vfx": "radiation_aura", "unlock": 15.0},
+	"mech08_elite": {"name": "MS-08H Cell-Exterminator", "chassis": "en08_ruche", "hp": 110.0, "speed": 172.0, "dmg": 13.5, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 9.0, "attack_cd": 1.9, "prefer_dist": 230.0, "contact_sword": true, "sword_dmg": 23.0, "sword_range": 160.0, "special_vfx": "amber_cleave", "unlock": 15.0},
+	"mech09_elite": {"name": "MS-09O Citadel-Dominator", "chassis": "en09_citadelle", "hp": 115.0, "speed": 168.0, "dmg": 14.0, "radius": 46.0, "size": 178.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 18.0, "attack_cd": 2.9, "prefer_dist": 320.0, "contact_sword": true, "sword_dmg": 24.0, "sword_range": 165.0, "special_vfx": "gold_blast", "unlock": 15.0},
+	"mech10_elite": {"name": "MS-10A Trench-Colossus", "chassis": "en10_abyss", "hp": 120.0, "speed": 164.0, "dmg": 14.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 17.0, "attack_cd": 3.0, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 25.0, "sword_range": 160.0, "special_vfx": "hydro_vortex", "unlock": 15.0},
+	"mech11_elite": {"name": "MS-11E Spore-Phantom", "chassis": "en11_ether", "hp": 122.0, "speed": 174.0, "dmg": 15.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 9.2, "attack_cd": 2.1, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 26.0, "sword_range": 160.0, "special_vfx": "uv_rapier", "unlock": 15.0},
+	"mech12_elite": {"name": "MS-12T Olympus-Dreadnought", "chassis": "en12_titans", "hp": 130.0, "speed": 160.0, "dmg": 15.5, "radius": 48.0, "size": 182.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 20.0, "attack_cd": 3.2, "prefer_dist": 280.0, "contact_sword": true, "sword_dmg": 28.0, "sword_range": 170.0, "special_vfx": "titan_cleave", "unlock": 15.0},
+	"mech13_elite": {"name": "MS-13Z Zero-Interceptor", "chassis": "en13_orbit", "hp": 125.0, "speed": 175.0, "dmg": 16.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 10.5, "attack_cd": 2.0, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 27.0, "sword_range": 160.0, "special_vfx": "zero_g_dash", "unlock": 15.0},
+	"mech14_elite": {"name": "MS-14Q Tesseract-Sentinel", "chassis": "en14_quantum", "hp": 128.0, "speed": 172.0, "dmg": 16.5, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "guide", "attack_dmg": 11.0, "attack_cd": 2.4, "prefer_dist": 270.0, "contact_sword": true, "sword_dmg": 28.0, "sword_range": 160.0, "special_vfx": "phase_warp", "unlock": 15.0},
+	"mech15_elite": {"name": "MS-15O Thunder-Tempest", "chassis": "en15_ozone", "hp": 130.0, "speed": 170.0, "dmg": 17.0, "radius": 46.0, "size": 174.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 11.5, "attack_cd": 2.1, "prefer_dist": 250.0, "contact_sword": true, "sword_dmg": 29.0, "sword_range": 160.0, "special_vfx": "arc_lightning", "unlock": 15.0},
+	"mech16_elite": {"name": "MS-16P Refraction-Avenger", "chassis": "en16_prism", "hp": 132.0, "speed": 168.0, "dmg": 17.5, "radius": 46.0, "size": 176.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "eventail", "attack_dmg": 10.0, "attack_cd": 2.2, "prefer_dist": 260.0, "contact_sword": true, "sword_dmg": 30.0, "sword_range": 160.0, "special_vfx": "prismatic_burst", "unlock": 15.0},
+	"mech17_elite": {"name": "MS-17B Dread-Warhammer", "chassis": "en17_steampunk", "hp": 135.0, "speed": 165.0, "dmg": 18.0, "radius": 48.0, "size": 180.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "orbe", "attack_dmg": 19.0, "attack_cd": 3.1, "prefer_dist": 270.0, "contact_sword": true, "sword_dmg": 31.0, "sword_range": 165.0, "special_vfx": "steam_burst", "unlock": 15.0},
+	"mech18_elite": {"name": "MS-18C Arena-Champion", "chassis": "en18_colosseum", "hp": 140.0, "speed": 172.0, "dmg": 18.5, "radius": 48.0, "size": 182.0, "motion": "walk", "rank": 1, "w": 5, "behavior": "ranged", "tir_style": "rafale", "attack_dmg": 12.0, "attack_cd": 1.9, "prefer_dist": 240.0, "contact_sword": true, "sword_dmg": 32.0, "sword_range": 170.0, "special_vfx": "arena_execution", "unlock": 15.0},
 }
 
 const BOSS_PHASE_THRESHOLDS: Dictionary = {
@@ -251,14 +251,122 @@ var _endless_next_boss: float = 0.0
 # "an elite monster will come, stronger than normal units, takes longer to kill" beat at 3:00
 # and 12:00. Distinct from the rare intermediates that trickle out of the random pool.
 const ELITE_SCHEDULE: Array = [
+	{"t": 25.0, "kind": "elite"},
 	{"t": 180.0, "kind": "crusher"},
 	{"t": 720.0, "kind": "warden"},
 ]
 var _elites_fired: int = 0
 
+# PHASE 1 — murs soft. Fenetres inclusives a gauche, exclusives a droite : [180,200) et [480,500).
+# Le plancher multiplie est floor_pop APRES la grace existante (ligne mini(..., 2+3*grace)).
+# Tant que _t ou run_time < 18 s, aucune fenetre ne s'applique, meme si les bornes changent.
+const SOFT_WALLS: Array[Vector2] = [Vector2(180.0, 200.0), Vector2(480.0, 500.0)]
+const SOFT_WALL_MULT: float = 1.6
+const SOFT_WALL_GRACE: float = 18.0
+var _soft_wall_squad_done: Dictionary = {}
+
+# Phase 2 — kami / summoner. Hors BIOME_POOL (les 5 slots d'escouade restent intacts).
+var _p2_ready: bool = false
+var PHASE2_DEFS: Dictionary = {}
+var PHASE2_EXTRA: Dictionary = {}
+
+func _ensure_phase2() -> void:
+	if _p2_ready:
+		return
+	_p2_ready = true
+	for biome in BIOME_POOL.keys():
+		var pool: Array = BIOME_POOL[biome]
+		if pool.size() < 2:
+			continue
+		var base_id: String = String(pool[0])
+		if not DEFS.has(base_id):
+			continue
+		var base: Dictionary = DEFS[base_id]
+		var kami_id: String = base_id + "_kami"
+		var sum_id: String = base_id + "_summoner"
+		var kami: Dictionary = base.duplicate()
+		kami["name"] = String(base.get("name", "Kami")) + " Kamikaze"
+		kami["behavior"] = "kami"
+		kami["hp"] = float(base.get("hp", 20.0)) * 0.70
+		kami["speed"] = float(base.get("speed", 170.0)) * 1.45
+		kami["w"] = 3
+		kami["rank"] = 0
+		kami["unlock"] = 40.0
+		kami["radius"] = float(base.get("radius", 40.0)) * 0.85
+		kami["attack_dmg"] = float(base.get("attack_dmg", 8.0)) * 1.4
+		kami["bull"] = false
+		kami["archetype"] = "kami"
+		var summoner: Dictionary = base.duplicate()
+		summoner["name"] = String(base.get("name", "Invocateur")) + " Invocateur"
+		summoner["behavior"] = "summoner"
+		summoner["hp"] = float(base.get("hp", 20.0)) * 1.60
+		summoner["speed"] = float(base.get("speed", 170.0)) * 0.85
+		summoner["w"] = 2
+		summoner["rank"] = 0
+		summoner["unlock"] = 70.0
+		summoner["prefer_dist"] = 320.0
+		summoner["attack_cd"] = 2.4
+		summoner["summon_kind"] = String(pool[1])
+		summoner["bull"] = false
+		summoner["archetype"] = "summoner"
+		# DIVERSITE (29/10) : ARTILLEUR (mortier telegraphie, EnemyDiv) et REPARATEUR (comportement "healer" existant)
+		var art_id: String = base_id + "_artillery"
+		var rep_id: String = base_id + "_repair"
+		var art: Dictionary = base.duplicate()
+		art["name"] = String(base.get("name", "Artilleur")) + " Artilleur"
+		art["role"] = "artilleur"
+		art["behavior"] = "ranged"
+		art["hp"] = float(base.get("hp", 20.0)) * 1.25
+		art["speed"] = float(base.get("speed", 170.0)) * 0.8
+		art["w"] = 3
+		art["rank"] = 0
+		art["unlock"] = 45.0
+		art["prefer_dist"] = 430.0
+		art["attack_cd"] = 999.0
+		art["tir_style"] = ""
+		art["bull"] = false
+		art["archetype"] = "artillery"
+		var repd: Dictionary = base.duplicate()
+		repd["name"] = String(base.get("name", "Reparateur")) + " Reparateur"
+		repd["role"] = "reparateur"
+		repd["behavior"] = "healer"
+		repd["hp"] = float(base.get("hp", 20.0)) * 1.1
+		repd["speed"] = float(base.get("speed", 170.0)) * 0.9
+		repd["w"] = 2
+		repd["rank"] = 0
+		repd["unlock"] = 75.0
+		repd["prefer_dist"] = 300.0
+		repd["bull"] = false
+		repd["archetype"] = "repair"
+		PHASE2_DEFS[kami_id] = kami
+		PHASE2_DEFS[sum_id] = summoner
+		PHASE2_DEFS[art_id] = art
+		PHASE2_DEFS[rep_id] = repd
+		PHASE2_EXTRA[String(biome)] = [kami_id, sum_id, art_id, rep_id]
+
+func _has_def(k: String) -> bool:
+	_ensure_phase2()
+	return DEFS.has(k) or PHASE2_DEFS.has(k)
+
+func _raw(k: String) -> Dictionary:
+	_ensure_phase2()
+	if DEFS.has(k):
+		return DEFS[k]
+	return PHASE2_DEFS.get(k, {})
+
+func spawn_spiral_squad() -> bool:
+	return _spawn_squad(true, "spirale")
+
+## DIVERSITE (29/10) : palier courant = bloc du chapitre (rang du biome dans PROFILES) + difficulte, cf. EnemyDiv.
+func _sync_div() -> int:
+	EnemyDiv.cur_chapter = int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", chapter))
+	return EnemyDiv.tier()
+
 func _process(delta: float) -> void:
 	if not GameState.alive:
 		return
+	_ensure_phase2()
+	_sync_div()
 	_drain_wave()   # spread a queued horde over frames (no spawn hitch)
 	_squad_tick(delta)
 	_t += delta
@@ -286,6 +394,7 @@ func _process(delta: float) -> void:
 		# aucun effet passe ce cap, ni sur la vague scriptee (38s), ni sur le sans-fin.
 		var grace: float = clampf(_t / 18.0, 0.0, 1.0)
 		floor_pop = clampi(mini(floor_pop, 2 + int(3.0 * grace)), 2, 24)
+		floor_pop = _apply_soft_wall_pressure(floor_pop)
 		if live < floor_pop:
 			var deficit: float = float(floor_pop - live) / float(floor_pop)
 			rate /= (1.0 + 3.0 * deficit * lerpf(0.4, 1.0, grace))
@@ -313,7 +422,7 @@ func _process(delta: float) -> void:
 			# comme-final ici au lieu de l'endboss RECURRENT attendu plus bas.
 			if kind == "endboss":
 				kind = _final_boss_for(chapter, GameState.endless)
-			_spawn_boss(kind)
+			_spawn_boss(kind, _bosses_fired == 0)
 			_bosses_fired += 1
 	elif GameState.endless and _bosses_fired >= BOSS_SCHEDULE.size():
 		# schedule the first endless boss relative to when the scripted run ran out, not to t=0
@@ -329,6 +438,7 @@ func _process(delta: float) -> void:
 	if _wave_t <= 0.0:
 		_wave_t = WAVE_INTERVAL
 		_spawn_wave()
+	_pulse_soft_wall_squad()
 
 ## Hold off spawning for `s` seconds (used by the run-start teleport intro).
 func delay_spawns(s: float) -> void:
@@ -350,7 +460,7 @@ func _drain_wave() -> void:
 		budget -= 1
 		var w: Dictionary = _wave_queue.pop_front()
 		var kind: String = String(w["kind"])
-		if not DEFS.has(kind):
+		if not _has_def(kind):
 			continue
 		var e: Enemy = Enemy.new()
 		e.global_position = player.global_position + Vector2(cos(w["ang"]), sin(w["ang"])) * float(w["dist"])
@@ -361,12 +471,14 @@ func _drain_wave() -> void:
 ## Spawn one specific enemy at an exact spot (used by the robot carcass awakening).
 ## Scaled like any other foe so a late-run carcass stays a real threat.
 func spawn_kind_at(kind: String, pos: Vector2) -> Enemy:
-	if not DEFS.has(kind) or player == null or not is_instance_valid(player):
+	if not _has_def(kind) or player == null or not is_instance_valid(player):
 		return null
+	_sync_div()
 	var e: Enemy = Enemy.new()
 	e.global_position = pos
 	game.enemy_layer.add_child(e)
-	e.setup(kind, DEFS[kind], player, game)
+	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
+	e.setup(kind, def, player, game)
 	_scale_enemy(e)
 	return e
 
@@ -390,13 +502,15 @@ func _spawn_elite(kind: String) -> void:
 	e.hp_max *= 2.4          # "takes longer to kill" — a real speed bump between bosses
 	e.hp = e.hp_max
 	e.contact_dmg *= 1.2
+	e.set_meta("phase1_elite", true)   # drop rare Phase 1 a la mort (GameState.roll_phase1_drop)
+	EnemyDiv.make_elite(e)             # cape + epee + nom + pouvoir de biome
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 2.2, Color(1.0, 0.7, 0.3))
 	if game != null and game.has_method("show_banner"):
 		game.show_banner("!  ELITE  !", Color(1.0, 0.75, 0.35))
 	Audio.sfx("boss", 0.1)
 
-func _spawn_boss(kind: String) -> void:
+func _spawn_boss(kind: String, mastery_clock: bool = false) -> void:
 	if not DEFS.has(kind):
 		return
 	if player == null or not is_instance_valid(player):
@@ -409,6 +523,11 @@ func _spawn_boss(kind: String) -> void:
 	game.enemy_layer.add_child(e)
 	e.setup(kind, DEFS[kind], player, game)
 	_scale_enemy(e)   # bosses scale with run time + cleared-zone bonus + difficulty, like the trash
+	if mastery_clock:
+		e.set_meta("mastery_boss5", true)
+		GameState.mastery_boss5_active = true
+		GameState.mastery_boss5_clean = true
+		GameState.mastery_boss5_ok = false
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 3.0, Color(1.0, 0.5, 0.4))   # menacing arrival ring
 	if game != null:
@@ -428,16 +547,19 @@ func _boss_alive() -> bool:
 func _kind_unlocked(k: String, t: float) -> bool:
 	# Survivor.io-style STAGED introduction: each archetype has its own entry time (see DEFS),
 	# so the player meets one new threat at a time instead of all of them at 0:00.
-	return t >= float(DEFS[k].get("unlock", 0.0))
+	return t >= float(_raw(k).get("unlock", 0.0))
 
 func _weighted_pick(fodder_only: bool = false) -> String:
 	var t: float = GameState.run_time
 	var picks: Array = []
 	var total: int = 0
 	var pool: Array = BIOME_POOL.get(current_biome, [])   # filtre PAR BIOME
+	var dtier: int = _sync_div()
 	for k in pool:
 		if not DEFS.has(k):
 			continue
+		if not EnemyDiv.kind_allowed(String(k), DEFS[k], dtier):
+			continue                       # DIVERSITE : les roles presents suivent le palier
 		var w: int = int(DEFS[k]["w"])
 		if w <= 0:
 			continue                       # bosses (spawned on schedule, not here)
@@ -446,6 +568,23 @@ func _weighted_pick(fodder_only: bool = false) -> String:
 		if not _kind_unlocked(k, t):
 			continue
 		picks.append([k, w]); total += w
+	_ensure_phase2()
+	for k2 in PHASE2_EXTRA.get(current_biome, []):
+		var id2: String = String(k2)
+		if not PHASE2_DEFS.has(id2):
+			continue
+		var d2: Dictionary = PHASE2_DEFS[id2]
+		var w2: int = int(d2.get("w", 0))
+		if w2 <= 0:
+			continue
+		if fodder_only and String(d2.get("archetype", "")) in ["summoner", "repair"]:
+			continue
+		if not EnemyDiv.kind_allowed(id2, d2, dtier):
+			continue
+		if not _kind_unlocked(id2, t):
+			continue
+		picks.append([id2, w2])
+		total += w2
 	if picks.is_empty():
 		return ""                          # aucun ennemi defini/debloque -> rien a piocher
 	var r: int = randi() % maxi(1, total)
@@ -591,6 +730,14 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 
 ## Definition a utiliser pour CE spawn : role principal, ou secondaire selon `share`.
 func _def_for(kind: String) -> Dictionary:
+	_ensure_phase2()
+	if PHASE2_DEFS.has(kind):
+		var d_p2: Dictionary = (PHASE2_DEFS[kind] as Dictionary).duplicate()
+		var prof_p2: Dictionary = PROFILES.get(current_biome, {})
+		var tier_p2: float = float(prof_p2.get("tier", 1))
+		d_p2["speed"] = float(d_p2.get("speed", 180.0)) * (0.95 + 0.005 * (tier_p2 - 1.0))
+		d_p2["hp"] = float(d_p2.get("hp", 20.0)) * (1.0 + 0.03 * (tier_p2 - 1.0))
+		return d_p2
 	var prof: Dictionary = PROFILES.get(current_biome, {})
 	if prof.is_empty() or not DEFS.has(kind):
 		return DEFS[kind] if DEFS.has(kind) else {}
@@ -803,25 +950,28 @@ func _maybe_elite(e: Enemy) -> void:
 	e.attack_dmg *= 1.6
 	e.speed = minf(e.speed * 1.1, float(player.base_speed) * 0.8) if "base_speed" in player else e.speed
 	e.drops_bonus = true
+	e.set_meta("phase1_elite", true)   # meme table de drop que l'elite scriptee (_spawn_elite)
 	e._spr.self_modulate = Color(1.5, 0.7, 1.4)
-	e._spr.scale *= 1.1
+	EnemyDiv.make_elite(e)   # 29/10 diversite : cape + epee + nom + pouvoir de biome (taille inchangee)
+	pass   # 29/10 (patron : meme taille pour tous sauf mini-boss/boss) : plus de grossissement elite, la teinte suffit
 
-func _spawn_squad(force: bool = false) -> void:
+func _spawn_squad(force: bool = false, formation: String = "") -> bool:
 	var prof: Dictionary = PROFILES.get(current_biome, {})
 	var pool: Array = BIOME_POOL.get(current_biome, [])
 	if prof.is_empty() or pool.is_empty() or game == null:
-		return
+		return false
 	var tier: int = int(prof["tier"])
+	var dtier: int = _sync_div()
 	if _squads.size() >= 1 + tier / 7 and not force:
-		return
+		return false
 	var n: int = clampi(4 + tier / 3, 4, 10)
 	n = maxi(4, int(round(float(n) * clampf(0.5 + GameState.run_time / 240.0, 0.5, 1.0))))   # escouades d'au moins 4 membres pour les 4 rôles
 	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
-		return
+		return false
 	var kind: String = String(pool[0])
 	if not DEFS.has(kind):
-		return
-	var form: String = _pick_formation(prof)
+		return false
+	var form: String = formation if formation != "" else _pick_formation(prof)
 	var p: Vector2 = player.global_position
 	var anchor: float = randf() * TAU
 	if "velocity" in player and (player.velocity as Vector2).length() > 60.0 and form in ["ligne", "colonne", "coin", "echelon", "vague", "embuscade"]:
@@ -837,7 +987,9 @@ func _spawn_squad(force: bool = false) -> void:
 			pos.x = clampf(pos.x, arena.position.x, arena.end.x)
 			pos.y = clampf(pos.y, arena.position.y, arena.end.y)
 		var member_kind: String = kind
-		if pool.size() >= 4 and i > 0:
+		if pool.size() >= 5 and i == 0:
+			member_kind = String(pool[4])   # Gundam Elite leads the squad
+		elif pool.size() >= 4 and i > 0:
 			if i == 1:
 				member_kind = String(pool[1])   # fast swarm skirmisher
 			elif i == 2:
@@ -848,6 +1000,13 @@ func _spawn_squad(force: bool = false) -> void:
 				member_kind = String(pool[1])   # swarm
 			else:
 				member_kind = kind              # frontline mecha
+		# DIVERSITE (29/10) : artilleur en 5e, reparateur en 6e, si le palier les autorise
+		if i == 4 and dtier >= 2 and _has_def(kind + "_artillery"):
+			member_kind = kind + "_artillery"
+		elif i == 5 and dtier >= 3 and _has_def(kind + "_repair"):
+			member_kind = kind + "_repair"
+		if not EnemyDiv.kind_allowed(member_kind, _raw(member_kind), dtier):
+			member_kind = kind
 		var e: Enemy = Enemy.new()
 		e.global_position = pos
 		game.enemy_layer.add_child(e)
@@ -857,6 +1016,36 @@ func _spawn_squad(force: bool = false) -> void:
 	q.assign_ranks()
 	_squads.append(q)
 	_announce(form, "FORMATION : " + Squad.label(form), Color(1.0, 0.62, 0.3))
+	return true
+
+## Cle de la fenetre soft en cours (180 ou 480), ou -1 hors fenetre / pendant la grace t<18s.
+func _soft_wall_key(t: float) -> int:
+	if t < SOFT_WALL_GRACE or _t < SOFT_WALL_GRACE:
+		return -1
+	for span in SOFT_WALLS:
+		if t >= span.x and t < span.y:
+			return int(span.x)
+	return -1
+
+## pressure_floor du spec = floor_pop (plancher de population). x1.6 seulement dans la fenetre,
+## apres la grace, sans lever le plafond historique de 24.
+func _apply_soft_wall_pressure(floor_pop: int) -> int:
+	if _soft_wall_key(GameState.run_time) < 0:
+		return floor_pop
+	return clampi(int(ceil(float(floor_pop) * SOFT_WALL_MULT)), 2, 24)
+
+## Une escouade tenaille par fenetre. Reessaie tant que _spawn_squad echoue (plafond d'ennemis),
+## puis se tait. has_method garde le hook si la fonction etait renommee.
+func _pulse_soft_wall_squad() -> void:
+	var key: int = _soft_wall_key(GameState.run_time)
+	if key < 0 or _soft_wall_squad_done.has(key):
+		return
+	if player == null or not is_instance_valid(player):
+		return
+	if not has_method("_spawn_squad"):
+		return
+	if _spawn_squad(true, "tenaille"):
+		_soft_wall_squad_done[key] = true
 
 ## ======================= HIERARCHIE D'ENNEMIS PAR NIVEAU (22/10, patron : « integrer les Mark 2, intermediaires, mini-boss, boss ») =======================
 ## Meme modele 3D que l'ennemi de base du niveau (pas de nouvelle modelisation) ; ce qui change : taille, PV, teinte, armement, defenses.
@@ -900,6 +1089,7 @@ func _tier_def(tier_name: String) -> Dictionary:
 	d["tint"] = tp["tint"]
 	d["speed"] = float(d["speed"]) * (0.9 if int(tp["rank"]) >= 2 else 1.0)
 	d["zone_shift"] = bool(tp.get("zone_shift", true))
+	d["tier_tag"] = tier_name          # DIVERSITE : surcouche MK2 / INTER + palier d'avance
 	if tier_name.begins_with("boss"):
 		d["ogive"] = true
 		d["final"] = (tier_name == "boss") and not GameState.endless
@@ -919,6 +1109,7 @@ func _spawn_tier(tier_name: String) -> Enemy:
 	if d.is_empty() or player == null or not is_instance_valid(player) or game == null:
 		return null
 	var pool: Array = BIOME_POOL.get(current_biome, [])
+	_sync_div()
 	var e: Enemy = Enemy.new()
 	var ang: float = randf() * TAU
 	e.global_position = player.global_position + Vector2.from_angle(ang) * 700.0
@@ -996,7 +1187,7 @@ func _spawn() -> void:
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
 	var kind: String = _weighted_pick()
-	if not DEFS.has(kind):
+	if not _has_def(kind):
 		return
 	var e: Enemy = Enemy.new()
 	var spos: Vector2 = player.global_position + _pattern_offset()
@@ -1016,7 +1207,7 @@ func _spawn() -> void:
 func spawn_at(pos: Vector2, kind: String) -> void:
 	if player == null or not is_instance_valid(player):
 		return
-	if not DEFS.has(kind):
+	if not _has_def(kind):
 		return
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
@@ -1027,7 +1218,8 @@ func spawn_at(pos: Vector2, kind: String) -> void:
 		p.y = clampf(p.y, arena.position.y, arena.end.y)
 	e.global_position = p
 	game.enemy_layer.add_child(e)
-	e.setup(kind, DEFS[kind], player, game)
+	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
+	e.setup(kind, def, player, game)
 	_scale_enemy(e)
 
 # Scale a fresh enemy, per stat (not uniformly):

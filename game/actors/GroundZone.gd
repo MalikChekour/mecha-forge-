@@ -49,6 +49,8 @@ var _hazard: Sprite2D
 var _edge_a: Line2D
 var _edge_b: Line2D
 var _band: Line2D
+## Phase 2 : les cercles chauds viennent du pool. Les bandes ("line") restent des noeuds frais.
+var _pooled: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE   # se fige avec le draft (le parent Game tourne en ALWAYS)
@@ -106,6 +108,53 @@ func _ready() -> void:
 	ramp.set_color(0, Color(0.9, 0.9, 0.94, 0.55)); ramp.set_color(1, Color(0.52, 0.52, 0.58, 0.0))
 	_smoke_ps.color_ramp = ramp
 	_missile.add_child(_smoke_ps)                # suit le missile + herite de sa rotation
+
+## Rearme une zone circulaire deja construite (pool). La forme "line" n'est pas recyclee :
+## son visuel est bake dans _ready, le reset ne le reconstruit pas.
+func arm(pos: Vector2, r: float, dly: float, dmg: float, col: Color, fx: String, g: Node, plr: Node2D) -> void:
+	shape = "circle"
+	radius = r
+	delay = maxf(0.05, dly)
+	damage = dmg
+	color = col
+	fx_kind = fx
+	game = g
+	player = plr
+	_t = 0.0
+	_exploded = false
+	visible = true
+	set_process(true)
+	global_position = pos
+	if _missile != null:
+		var show_m: bool = radius >= 100.0
+		_missile.visible = show_m
+		if show_m:
+			var a: float = deg_to_rad(-96.0 + randf_range(-22.0, 22.0))
+			_off = Vector2(cos(a), sin(a)) * (radius * 2.2 + 300.0)
+			_mscale = clampf(radius / 95.0, 0.7, 1.35) * 0.42
+			_missile.rotation = (-_off).angle()
+		if _smoke_ps != null:
+			_smoke_ps.emitting = show_m
+			if show_m:
+				_smoke_ps.restart()
+
+## Remise en reserve. N'appelle pas queue_free.
+func reset() -> void:
+	_t = 0.0
+	_exploded = false
+	visible = false
+	set_process(false)
+	global_position = Vector2(1.0e7, 1.0e7)
+	if _missile != null:
+		_missile.visible = false
+	if _smoke_ps != null:
+		_smoke_ps.emitting = false
+
+func _release_self() -> void:
+	if _pooled and game != null and game.has_method("reclaim_ground_zone"):
+		game.reclaim_ground_zone(self)
+	else:
+		queue_free()
 
 ## Forme "line" (bras presseur, laser rotatif) : bande sombre + bande d'energie qui s'epaissit
 ## + deux bords nets paralleles + halo doux. Plus de cercle parasite au centre.
@@ -244,4 +293,4 @@ func _explode() -> void:
 
 	if Events != null:
 		Events.screen_shake.emit(3.2)
-	queue_free()
+	_release_self()

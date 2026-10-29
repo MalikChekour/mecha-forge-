@@ -50,7 +50,13 @@ var _garde_cd_t: float = 3.0
 var _garde_pulse: float = 0.0
 var form_pos: Vector2 = Vector2.ZERO
 var form_w: float = 0.0            # 0 = comportement libre ; 1 = suit son emplacement de formation
-var grade: String = ""             # "" soldat | "lieutenant" | "chef"
+var grade: String = ""
+var role: String = ""              # DIVERSITE 29/10 : fantassin/essaim/bouclier/sniper/artilleur/kamikaze/invocateur/reparateur/elite (EnemyDiv)
+var dtier: int = 1                 # palier de competences 1..6 (bloc de chapitres + difficulte ; +1 pour Mk2/Inter)
+var tier_tag: String = ""          # "mk2" | "inter" | ""
+var dv: Dictionary = {}            # etat des competences de role (recharges, drapeaux, surcouches)
+var _dv_dash_t: float = 0.0        # ruee de competence (bond, charge-bouclier, assaut) : ecrase la vitesse voulue
+var _dv_dash_v: Vector2 = Vector2.ZERO             # "" soldat | "lieutenant" | "chef"
 const _DIR_NAMES: Array = ["right", "front_right", "front", "front_left", "left", "back_left", "back", "back_right"]
 const _DIR_DEG: Dictionary = {"right": 0.0, "front_right": 45.0, "front": 90.0, "front_left": 135.0, "left": 180.0, "back_left": -135.0, "back": -90.0, "back_right": -45.0}
 # >>> IA22 vars (21/10 : signatures de tir par niveau, esquive, ordre du chef)
@@ -124,6 +130,25 @@ class RankBadge extends Node2D:
 			var y0: float = bob
 			draw_line(Vector2(-9, y0 + 3), Vector2(0, y0 - 6), cyan, 2.6)
 			draw_line(Vector2(0, y0 - 6), Vector2(9, y0 + 3), cyan, 2.6)
+
+class EliteAura extends Node2D:
+	var radius: float = 46.0
+	var aura_color: Color = Color(1.0, 0.8, 0.25, 0.75)
+	var _t: float = 0.0
+	func _ready() -> void:
+		set_process(true)
+		z_index = -1
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+	func _draw() -> void:
+		var p: float = 0.82 + 0.18 * sin(_t * 5.0)
+		draw_arc(Vector2.ZERO, radius * p, 0.0, TAU, 32, aura_color, 2.5)
+		draw_circle(Vector2.ZERO, radius * 0.75 * p, Color(aura_color.r, aura_color.g, aura_color.b, 0.14 * p))
+		for i in 4:
+			var a: float = float(i) * PI * 0.5 + _t * 2.2
+			var pt: Vector2 = Vector2.from_angle(a) * (radius * p)
+			draw_circle(pt, 3.5, Color(1.0, 1.0, 0.85, 0.9 * p))
 # <<< IA22 vars
 # <<< IA21 vars
 var barrage: bool = false        # variante 10-min : salve de 3 en eventail + tir radial periodique
@@ -171,6 +196,12 @@ var _kamikaze_arming: bool = false         # KAMIKAZE (29/09, bestiaire elargi)
 var _kamikaze_fuse: float = 0.0
 const KAMIKAZE_RANGE: float = 90.0
 const KAMIKAZE_FUSE_TIME: float = 0.6
+## Phase 2 — kami reutilise la meche ; l'anneau GroundZone (0,6 s) est pose a l'armement.
+var _summon_cd: float = 2.0               # invocateur : premiere vague pas instantanee
+var summon_kind: String = ""
+var _band_cd: float = 0.0                 # telegraphe elite/boss, une bande a la fois
+var _p2_palette_done: bool = false
+var _p2_spiral_done: bool = false
 var _spr: Sprite2D
 var _mat: ShaderMaterial
 ## 🚨 tente le 26/09 ("trop de lag") : un ShaderMaterial PARTAGE entre tous les ennemis (batching)
@@ -429,6 +460,8 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	protecteur = bool(def.get("protecteur", false))
 	zone_shift = bool(def.get("zone_shift", true))
 	_prot_cd = randf_range(0.0, 0.5)
+	summon_kind = String(def.get("summon_kind", ""))
+	_summon_cd = 2.0
 	esquive = bool(def.get("esquive", false))
 	_esq_cd = randf_range(1.0, 3.0)
 	_garde_cd_t = randf_range(2.0, 6.0)
@@ -450,6 +483,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	special_vfx = String(def.get("special_vfx", ""))
 	_proc = bool(def.get("proc", false))
 	_proc_hover = _proc and String(def.get("motion", "")) == "hover"
+	EnemyDiv.pre_setup(self, def)   # role + palier + art recolore (avant le chargement des planches)
 
 	_speed_mult = randf_range(0.85, 1.15)
 	_wander_phase = randf() * TAU
@@ -520,9 +554,26 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	# Visual size bumped 1.28x (patron: mecha + enemies read too small). The `radius` hitbox is
 	# UNCHANGED, so this is purely cosmetic and collisions stay exactly as fair as before.
 	var vsize: float = float(def.get("size", 92.0)) * 1.28 * pscale
+	if contact_sword:
+		vsize *= 1.35
+		grade = "chef"
+		drops_bonus = true
 	var fh: float = float(_spr.texture.get_height())
 	if fh > 0.0:
 		_spr.scale = Vector2.ONE * (vsize / fh)
+	# TAILLE UNIFORME (29/10, patron : « les ennemis a la meme taille sauf les mini boss et boss ») :
+	# tout ennemi de rang < 2 (normal, essaim, bouclier, sniper, elite, MK2, intermediaire, kamikaze,
+	# invocateur, escouades) est ramene a la meme HAUTEUR/LARGEUR VISIBLE (bbox alpha de la planche,
+	# donc independant de la taille du cadre et du vide autour du mecha) et au meme rayon de collision.
+	# Reference = Walker d'assemblage (mech01, en01_tech) : 148.8 * 1.28 * 0.648 ~= 124 px visibles, rayon 40.
+	# Mini-boss (rang 2) et boss (rang >= 3, ogive, final) gardent leur taille de DEFS/TIERS.
+	if rank < 2 and not ogive and not is_final and not kind.contains("boss"):
+		var vf: float = _vis_frac(_spr.texture)
+		if fh > 0.0 and vf > 0.0:
+			_spr.scale = Vector2.ONE * (NORM_VIS_PX * pscale / (vf * fh))
+			vsize = _spr.scale.x * fh
+		_body_radius = NORM_RADIUS * pscale
+		c.radius = _body_radius
 	_proc_base_pos = _spr.position
 	_proc_base_scale = _spr.scale
 	# CORRUPTION du biome: teinte la carcasse (self_modulate = ce sprite seul, pas les enfants).
@@ -601,22 +652,29 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		_shield_rim.z_index = 3
 		add_child(_shield_rim)
 
-	# bosses (rank >= 3) get a floating health bar so the player sees the fight's progress
-	if rank >= 3:
-		_hp_bar_w = vsize * 1.1
+	# bosses (rank >= 3) and superior mechas (contact_sword) get a floating health bar
+	if rank >= 3 or contact_sword or tier_tag == "inter":
+		_hp_bar_w = vsize * (1.1 if rank >= 3 else 0.85)
 		_hp_bar_y = -vsize * 0.62
 		_hp_bg = Line2D.new()
-		_hp_bg.width = 9.0
+		_hp_bg.width = 9.0 if rank >= 3 else 6.0
 		_hp_bg.default_color = Color(0.0, 0.0, 0.0, 0.65)
 		_hp_bg.points = PackedVector2Array([Vector2(-_hp_bar_w * 0.5, _hp_bar_y), Vector2(_hp_bar_w * 0.5, _hp_bar_y)])
 		_hp_bg.z_index = 5
 		add_child(_hp_bg)
 		_hp_fill = Line2D.new()
-		_hp_fill.width = 6.0
-		_hp_fill.default_color = Color(1.0, 0.28, 0.22)
+		_hp_fill.width = 6.0 if rank >= 3 else 4.0
+		_hp_fill.default_color = Color(1.0, 0.28, 0.22) if rank >= 3 else Color(1.0, 0.8, 0.25)
 		_hp_fill.points = _hp_bg.points
 		_hp_fill.z_index = 6
 		add_child(_hp_fill)
+
+	if contact_sword:
+		var aura: EliteAura = EliteAura.new()
+		aura.radius = _body_radius * 1.55
+		aura.position = _visual_offset()
+		add_child(aura)
+		_spr.self_modulate = Color(1.4, 1.25, 0.95)
 
 	if def.has("tint"):
 		_tier_tint = def["tint"]
@@ -632,6 +690,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		add_child(_garde_dome)
 	if grade != "":
 		_update_rank_badge()
+	EnemyDiv.post_setup(self, def)   # insigne de role, surcouches elite/MK2/inter, reglages de palier
 
 
 func _update_rank_badge() -> void:
@@ -998,6 +1057,7 @@ func _fire_ogive(dir: Vector2) -> void:
 	# flash de tir a la bouche des ogives
 	if game.has_method("spawn_vfx"):
 		game.spawn_vfx("aaa_muzzle", global_position + dir * 30.0, dir.angle(), 0.75, _bolt_color)
+	_telegraph_band(dir)
 	if Events != null:
 		Events.screen_shake.emit(1.6)
 
@@ -1010,9 +1070,7 @@ func _check_boss_phase() -> void:
 	if hp_max <= 0.0:
 		return
 	var thresholds: Array = EnemySpawner.BOSS_PHASE_THRESHOLDS.get(kind, [0.5])
-	if _phase_idx >= thresholds.size():
-		return
-	if hp <= hp_max * float(thresholds[_phase_idx]):
+	if _phase_idx < thresholds.size() and hp <= hp_max * float(thresholds[_phase_idx]):
 		_phase_idx += 1
 		if game != null:
 			if game.has_method("show_banner"):
@@ -1021,6 +1079,14 @@ func _check_boss_phase() -> void:
 				game.spawn_vfx("shockwave", global_position, 0.0, _body_radius / 40.0, Color(1.0, 0.5, 0.35))
 		Events.screen_shake.emit(5.0)
 		_apply_boss_phase(_phase_idx)
+	# Phase 2 : palette a 50 % et spirale a 20 %, meme si le boss n'a qu'un seuil [0.5].
+	if rank >= 2:
+		if not _p2_palette_done and hp <= hp_max * 0.5:
+			_p2_palette_done = true
+			_phase2_palette()
+		if not _p2_spiral_done and hp <= hp_max * 0.2:
+			_p2_spiral_done = true
+			_phase2_spiral()
 
 func show_banner_phase() -> void:
 	game.show_banner("PHASE %d" % (_phase_idx + 1), Color(1.0, 0.45, 0.35))
@@ -1106,6 +1172,67 @@ func _phase_biome_boss(idx: int) -> void:
 		_boss_hazard_cd = 0.2
 
 
+## Teinte chaude a 50 % PV. N'ecrase pas le motif de phase deja applique.
+func _phase2_palette() -> void:
+	if _spr == null:
+		return
+	_spr.self_modulate = _spr.self_modulate.lerp(Color(1.35, 0.45, 0.85), 0.65)
+
+## A 20 % PV : une escouade en spirale, si le spawner expose le hook.
+func _phase2_spiral() -> void:
+	if game == null:
+		return
+	var sp: Variant = game.get("spawner")
+	if sp is Node and (sp as Node).has_method("spawn_spiral_squad"):
+		(sp as Node).call("spawn_spiral_squad")
+
+## Bande directionnelle 0,5–0,9 s + pulse au sol. Reserve aux elites et aux rangs >= 1.
+func _telegraph_band(dir: Vector2) -> void:
+	if _band_cd > 0.0 or game == null or not game.has_method("spawn_ground_zone"):
+		return
+	var marked: bool = grade == "elite" or rank >= 1
+	if not marked and has_meta("phase1_elite"):
+		marked = bool(get_meta("phase1_elite"))
+	if not marked:
+		return
+	_band_cd = 1.2
+	var aim: Vector2 = dir if dir.length() > 0.2 else Vector2.RIGHT
+	aim = aim.normalized()
+	var delay: float = EnemyDiv.tele(randf_range(0.5, 0.9))
+	var dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg
+	game.spawn_ground_zone(global_position, 22.0, delay, dmg, Color(1.0, 0.28, 0.18), "decor_hit", "line", -aim * 36.0, aim * 280.0)
+	game.spawn_ground_zone(global_position, 48.0, delay * 0.7, dmg * 0.45, Color(1.0, 0.5, 0.16))
+
+func _living_drones() -> int:
+	var n: int = 0
+	var id: int = get_instance_id()
+	for e in _shared_enemies():
+		if e is Enemy and (e as Enemy).alive and (e as Node).has_meta("summoner_owner") and int((e as Node).get_meta("summoner_owner")) == id:
+			n += 1
+	return n
+
+func _summon_wave() -> void:
+	if summon_kind == "" or game == null:
+		return
+	var sp: Variant = game.get("spawner")
+	if not (sp is Node) or not (sp as Node).has_method("spawn_kind_at"):
+		return
+	var alive_n: int = _living_drones()
+	if alive_n >= 6:
+		return
+	if get_tree().get_nodes_in_group("enemies").size() >= EnemySpawner.ENEMY_CAP:
+		return
+	var room: int = mini(3, 6 - alive_n)
+	for i in room:
+		if get_tree().get_nodes_in_group("enemies").size() >= EnemySpawner.ENEMY_CAP:
+			return
+		var ang: float = TAU * float(i) / 3.0 + randf() * 0.35
+		var drone_v: Variant = (sp as Node).call("spawn_kind_at", summon_kind, global_position + Vector2.from_angle(ang) * 96.0)
+		if drone_v is Enemy:
+			(drone_v as Enemy).set_meta("summoner_owner", get_instance_id())
+	if game.has_method("spawn_vfx"):
+		game.spawn_vfx("shockwave", global_position, 0.0, 0.85, Color(0.62, 0.4, 1.0))
+
 func _physics_process(delta: float) -> void:
 	if not alive:
 		if _dying:
@@ -1127,6 +1254,7 @@ func _physics_process(delta: float) -> void:
 	var player_valid: bool = player != null and is_instance_valid(player) and GameState.alive
 	
 	_atk_cd -= delta
+	_band_cd = maxf(0.0, _band_cd - delta)
 	if _atk_cd < 0.0:
 		_atk_cd = 0.0
 	if rank >= 3:
@@ -1236,6 +1364,12 @@ func _physics_process(delta: float) -> void:
 
 		if dist > 1.0:
 			var dir: Vector2 = to_player / dist
+			EnemyDiv.tick(self, delta, dist, dir)   # competences de role par palier + pouvoirs d'elite
+			if contact_sword and dist <= sword_range:
+				_sword_cd -= delta
+				if _sword_cd <= 0.0:
+					_sword_cd = 1.9
+					_trigger_sword_slash(player)
 			
 			if behavior == "ranged":
 				if _charging:
@@ -1307,7 +1441,7 @@ func _physics_process(delta: float) -> void:
 					desired_vel = dir * speed * 0.3
 					if _phase_timer <= 0.0:
 						_phase = _PH_DASH_WIND
-						_phase_timer = DASH_ARMEMENT[_palier] * (0.7 if _phase_idx >= 1 else 1.0)
+						_phase_timer = EnemyDiv.tele(DASH_ARMEMENT[_palier] * (0.7 if _phase_idx >= 1 else 1.0))
 
 			elif behavior == "healer":
 				# REPARATEUR : garde ses distances comme "ranged" (kite), soigne au lieu de tirer.
@@ -1380,7 +1514,53 @@ func _physics_process(delta: float) -> void:
 					if _mine_cd <= 0.0 and game != null and game.has_method("spawn_ground_zone"):
 						_mine_cd = MINE_COOLDOWN
 						var mine_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 1.8
-						game.spawn_ground_zone(global_position, 110.0, 1.1, mine_dmg, Color(1.0, 0.42, 0.12))
+						game.spawn_ground_zone(global_position, 110.0, EnemyDiv.tele(1.1), mine_dmg, Color(1.0, 0.42, 0.12))
+
+			elif behavior == "kami":
+				# KAMI (Phase 2) : rush rapide, anneau visible 0,6 s, puis explosion. Distinct du
+				# role « kamikaze » (meche shader, zone quasi instantanee) qui reste inchange.
+				if not _kamikaze_arming:
+					desired_vel = dir * speed * _speed_mult * 1.35
+					if dist <= 110.0:
+						_kamikaze_arming = true
+						_kamikaze_fuse = EnemyDiv.tele(0.6)
+						if game != null and game.has_method("spawn_ground_zone"):
+							var boom_dmg: float = attack_dmg if attack_dmg > 0.0 else contact_dmg * 2.4
+							game.spawn_ground_zone(global_position, 100.0, _kamikaze_fuse, boom_dmg, Color(1.0, 0.42, 0.08))
+						if game != null and game.has_method("spawn_vfx"):
+							game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.7, Color(1.0, 0.45, 0.12))
+				else:
+					desired_vel = dir * speed * _speed_mult * 0.25
+					_kamikaze_fuse -= delta
+					var kpulse: float = absf(sin(_kamikaze_fuse * 22.0))
+					if _mat != null and _mat.shader != null:
+						_mat.set_shader_parameter("warn", kpulse)
+					if _kamikaze_fuse <= 0.0:
+						if game != null and game.has_method("spawn_vfx"):
+							game.spawn_vfx("aaa_explosion", global_position, 0.0, 0.85, Color(1.0, 0.4, 0.1))
+						Audio.sfx("explosion", 0.08)
+						take_damage(hp_max + 1.0)
+
+			elif behavior == "summoner":
+				# INVOCATEUR : tient la distance, lache 3 drones fragiles toutes les ~8 s (plafond 6).
+				var keep: float = prefer_dist if prefer_dist > 40.0 else 300.0
+				if dist > keep + 50.0:
+					desired_vel = dir * speed * _speed_mult * 0.8
+				elif dist < keep - 70.0:
+					desired_vel = -dir * speed * _speed_mult * 0.55
+				else:
+					_strafe_timer -= delta
+					if _strafe_timer <= 0.0:
+						_strafe_dir *= -1.0
+						_strafe_timer = randf_range(2.2, 3.6)
+					desired_vel = Vector2(-dir.y, dir.x) * _strafe_dir * speed * _speed_mult * 0.45
+				_summon_cd -= delta
+				if _summon_cd <= 0.0:
+					_summon_cd = 8.0
+					_summon_wave()
+				if _atk_cd <= 0.0 and dist < keep + 80.0 and game != null and game.has_method("spawn_enemy_bolt"):
+					_atk_cd = attack_cd if attack_cd > 0.2 else 2.2
+					game.spawn_enemy_bolt(global_position + dir * 18.0, dir, attack_dmg if attack_dmg > 0.0 else 6.0, Color(0.7, 0.45, 1.0), 0.9, 260.0)
 
 			elif behavior == "kamikaze":
 				# KAMIKAZE : quasi identique a "miner" (approche + GroundZone), SAUF qu'il ne
@@ -1391,7 +1571,7 @@ func _physics_process(delta: float) -> void:
 					desired_vel = dir * speed * _speed_mult * 1.15   # fonce, plus vite qu'un rush normal
 					if dist <= KAMIKAZE_RANGE:
 						_kamikaze_arming = true
-						_kamikaze_fuse = KAMIKAZE_FUSE_TIME
+						_kamikaze_fuse = EnemyDiv.tele(KAMIKAZE_FUSE_TIME)
 				else:
 					desired_vel = dir * speed * _speed_mult * 0.3   # continue d'avancer pendant la meche
 					_kamikaze_fuse -= delta
@@ -1505,7 +1685,7 @@ func _physics_process(delta: float) -> void:
 						_bull_cd -= delta
 						if _bull_cd <= 0.0 and dist > 130.0 and dist < 470.0 and Enemy._bulls_charging < BULL_CAP:
 							# l'arme du bull = sa charge : elle s'arme plus vite a chaque palier
-							_bull_state = 1; _bull_t = BULL_ARMEMENT[_palier]; _bull_counted = true
+							_bull_state = 1; _bull_t = EnemyDiv.tele(BULL_ARMEMENT[_palier]); _bull_counted = true
 							_bull_mod0 = self_modulate       # memorise la teinte de base
 							Enemy._bulls_charging += 1
 
@@ -1579,16 +1759,22 @@ func _physics_process(delta: float) -> void:
 							if _mat != null and _mat.shader != null:
 								_mat.set_shader_parameter("warn", 0.0)
 							_fire_heavy(_aim_dir(dir))
+							_telegraph_band(_aim_dir(dir))
 					elif _atk_cd <= 0.0 and dist < prefer_dist + 120.0 and Enemy._fire_ok(2.0, rank):
 						_charging = true
-						_charge_t = HEAVY_CHARGE[_palier]
+						_charge_t = EnemyDiv.tele(HEAVY_CHARGE[_palier])
 				elif _atk_cd <= 0.0 and dist < prefer_dist + 100.0 and _aim_ready() and Enemy._fire_ok(_shot_cost(), rank):
 					_atk_cd = attack_cd * ARME_CADENCE[_palier]
 					_tire_dispatch(_aim_dir(dir))
+					_telegraph_band(_aim_dir(dir))
 					
 	else:
 		desired_vel = Vector2.ZERO
 
+	if _dv_dash_t > 0.0:
+		_dv_dash_t -= delta
+		velocity = _dv_dash_v
+		desired_vel = velocity
 	if _esq_t > 0.0:
 		_esq_t -= delta
 		velocity = _esq_dir * speed * 2.8
@@ -1686,6 +1872,9 @@ func _trigger_sword_slash(p: Node) -> void:
 		return
 	if p.has_method("take_damage"):
 		p.take_damage(sword_dmg, global_position, "sword")
+	Audio.sfx("hit_heavy", 0.15)
+	if Events != null:
+		Events.screen_shake.emit(0.35)
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("aaa_shockwave", global_position, (p.global_position - global_position).angle(), 0.85, Color(1.3, 0.5, 0.2))
 		game.spawn_vfx("aaa_aoe", (global_position + p.global_position) * 0.5, 0.0, 0.75, Color(1.0, 0.9, 0.4))
@@ -1760,6 +1949,29 @@ func _update_shield(delta: float) -> void:
 ## incline vers l'angle exact (+/- 0,4 rad) : le bras suit entre deux directions cuites.
 ## Le mecha cuit n'est pas centre dans son cadre (bbox ~23 px au-dessus du centre sur 176) : les boucliers se centrent sur le
 ## CENTRE VISIBLE du corps (bbox de l'alpha, mesuree une fois par chassis), pas sur l'origine du noeud.
+## Taille uniforme : fraction du cadre occupee par le mecha (plus grande dimension de la bbox alpha
+## de la 1re image), mesuree une fois par chassis.
+const NORM_VIS_PX: float = 124.0
+const NORM_RADIUS: float = 40.0
+static var _vf_cache: Dictionary = {}
+func _vis_frac(tex: Texture2D) -> float:
+	if tex == null:
+		return 0.0
+	if Enemy._vf_cache.has(chassis):
+		return float(Enemy._vf_cache[chassis])
+	var f: float = 0.0
+	var img: Image = tex.get_image()
+	if img != null and not img.is_empty():
+		if img.is_compressed():
+			img.decompress()
+		var h: int = img.get_height()
+		var fw: int = mini(img.get_width(), h)
+		var r: Rect2i = img.get_region(Rect2i(0, 0, fw, h)).get_used_rect()
+		if r.size.x > 0 and r.size.y > 0 and h > 0:
+			f = clampf(float(maxi(r.size.x, r.size.y)) / float(h), 0.25, 1.0)
+	Enemy._vf_cache[chassis] = f
+	return f
+
 static var _vc_cache: Dictionary = {}
 func _visual_offset() -> Vector2:
 	if _spr == null or _spr.texture == null:
@@ -1863,7 +2075,7 @@ func _tire_dispatch(dir: Vector2) -> void:
 		return
 	var ch: float = float(_STYLES[tir_style]["charge"])
 	if ch > 0.0:
-		_style_charge = ch
+		_style_charge = EnemyDiv.tele(ch)
 		_burst_dir = dir
 		play("attack", true)
 		return
@@ -2152,6 +2364,7 @@ func _die() -> void:
 	if _dying:
 		return
 	_dying = true
+	EnemyDiv.on_death(self)
 	# 🚨 FUITE DU TELEGRAPHE : `warn` (la teinte ROUGE d'attaque imminente) n'est remis a zero
 	# que par les deux sorties NORMALES de telegraphie. Un ennemi tue PENDANT sa charge
 	# (fonceur en phase d'elan, canon lourd en train de charger) gardait donc sa silhouette
@@ -2200,6 +2413,13 @@ func _die() -> void:
 				var rn: String = String(SaveManager.GEAR_RARITY_NAMES.get(plan.get("rarity", ""), ""))
 				game.show_hint("Plan obtenu : %s %s — forgez-le depuis Équipement." % [rn, sn],
 					Color(0.85, 0.75, 1.0), 5.0)
+		# PHASE 1 : tirage rare bombe / aimant. Le marquage elite est pose par EnemySpawner
+		# (_maybe_elite -> grade "elite", _spawn_elite -> meta "phase1_elite").
+		GameState.roll_phase1_drop(self)
+		if has_meta("mastery_boss5") and bool(get_meta("mastery_boss5")):
+			if GameState.mastery_boss5_clean:
+				GameState.mastery_boss5_ok = true
+			GameState.mastery_boss5_active = false
 	if is_final:
 		# SANS FIN: the endboss is a milestone, not an ending — the run rolls on, harder.
 		if GameState.endless and game != null and game.has_method("endless_boss_down"):
@@ -2226,4 +2446,3 @@ func apply_stun(duration: float) -> void:
 		tw.tween_property(_spr, "self_modulate", Color.WHITE, 0.25)
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("aaa_shockwave", global_position, 0.0, 0.45, Color(0.4, 0.9, 1.6))
-

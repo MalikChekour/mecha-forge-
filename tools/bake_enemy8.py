@@ -119,9 +119,10 @@ def apply_pose(arm_obj, i, n):
         p = 2 * math.pi * i / n
         L("Hips", (0, 0, -0.045 * abs(math.sin(p)) + 0.02)); W("Hips", 0.0, 0.03 * math.sin(p))
         for side, ph in (("Left", 0.0), ("Right", math.pi)):
-            pit = R(30) * math.sin(p + ph)
-            kn = R(48) * max(0.0, -math.sin(p + ph - 0.25))
-            W(side + "UpLeg", pit); W(side + "Leg", kn)
+            pit = R(34) * math.sin(p + ph)
+            kn = R(52) * max(0.0, -math.sin(p + ph - 0.25))
+            sgn = 1.0 if side == "Left" else -1.0
+            W(side + "UpLeg", pit, yaw=sgn * R(10)); W(side + "Leg", kn)
             # PIED A PLAT : la cheville annule EXACTEMENT cuisse + genou (avant : -0,6 x cuisse seulement -> pied qui pique du nez, « sur la pointe »).
             # Leger releve du talon en fin de poussee (jambe derriere) pour un pas naturel.
             heel = R(8) * max(0.0, -math.sin(p + ph))

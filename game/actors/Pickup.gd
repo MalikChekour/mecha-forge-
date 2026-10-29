@@ -18,6 +18,10 @@ var _homing: bool = false
 func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 	global_position = pos
 	_base_y = pos.y
+	if k == "bomb":
+		k = "bombe"
+	elif k == "magnet":
+		k = "aimant"
 	kind = k
 	value = val
 	player = plr
@@ -68,13 +72,17 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 		col = Color(1.0, 0.84, 0.22)          # coffre dore jackpot de boss
 	elif k == "scrap":
 		col = Palette.ACCENT
+	elif k == "bombe":
+		col = Color(1.0, 0.32, 0.12)          # charge explosive : rouge-orange, loin de l'ambre Overdrive
+	elif k == "aimant":
+		col = Color(0.15, 0.95, 1.0)          # impulsion magnetique : cyan electrique
 	else:
 		col = Palette.CYAN
-	var big: bool = k in ["bonus", "skill", "heal", "od", "arme_volee", "coffre_boss"]
+	var big: bool = k in ["bonus", "skill", "heal", "od", "arme_volee", "coffre_boss", "bombe", "aimant"]
 	_spr.texture = Tex.get_tex("res://assets/pickups/%s.png" % k, col, 28)
 	# `skill` rejoint les teintes appliquees : sans ca, seul son halo prenait la couleur et la
 	# correction daltonisme ci-dessus n'aurait porte que sur la lueur, pas sur l'objet.
-	_spr.modulate = col if (k in ["xp", "heal", "od", "skill", "coffre_boss"]) else Color.WHITE
+	_spr.modulate = col if (k in ["xp", "heal", "od", "skill", "coffre_boss", "bombe", "aimant"]) else Color.WHITE
 	var th: float = float(_spr.texture.get_height())
 	if th > 0.0:
 		var target_h: float = 42.0 if k == "coffre_boss" else (34.0 if big else 24.0)
@@ -91,7 +99,9 @@ func _physics_process(delta: float) -> void:
 	var to: Vector2 = player.global_position - global_position
 	var d: float = to.length()
 	var mrange: float = float(player.magnet_range) if "magnet_range" in player else 360.0
-	if d < mrange or GameState.overdrive_active:   # Overdrive vacuums every pickup on the map
+	# Overdrive (invuln + vacuum) et l'aimant Phase 1 (vacuum seul, ~2,5 s) sont deux flags.
+	# magnet_vacuum ne pose PAS overdrive_active : pas d'invulnerabilite, pas de cooldown Overdrive.
+	if d < mrange or GameState.overdrive_active or GameState.magnet_vacuum:
 		_homing = true
 	if _homing:
 		# vacuum speed stays above player speed so gems catch a fleeing player
@@ -99,6 +109,18 @@ func _physics_process(delta: float) -> void:
 	else:
 		global_position.y = _base_y + sin(_t * 3.0) * 3.0
 	if d < 30.0:
+		if kind == "bombe":
+			var origin: Vector2 = player.global_position if is_instance_valid(player) else global_position
+			GameState.detonate_bomb(origin, game)
+			_collected()
+			return
+		if kind == "aimant":
+			GameState.activate_magnet_vacuum()
+			Audio.sfx("powerup", 0.04)
+			if game != null and game.has_method("spawn_vfx"):
+				game.spawn_vfx("energy", player.global_position, 0.0, 1.45, Color(0.15, 0.95, 1.0))
+			_collected()
+			return
 		Audio.sfx("scrap" if kind == "scrap" else "xp", 0.12)
 		if kind == "xp":
 			GameState.add_xp(value)
@@ -149,6 +171,9 @@ func _collected() -> void:
 		game.reclaim_pickup(self)
 	else:
 		queue_free()
+
+func reset() -> void:
+	deactivate()
 
 func deactivate() -> void:
 	set_physics_process(false)

@@ -1059,9 +1059,9 @@ func _build_garage() -> void:
 		for wd in GameState.WEAPONS:
 			if String(wd["id"]) == sig_nom:
 				sig_nom = String(wd["name"]); break
-		name_l.text = "%s   —   %s
-Armes : %s      signature : %s" % [
-			String(mech["name"]), String(mech.get("ligne", "")), ", ".join(noms), sig_nom]
+		name_l.text = "%s   —   %s\nArmes : %s      signature : %s\n%s" % [
+			String(mech["name"]), String(mech.get("ligne", "")), ", ".join(noms), sig_nom,
+			_kit_line(id)]
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_l.add_theme_font_size_override("font_size", Palette.fs(17))
@@ -1089,6 +1089,11 @@ Armes : %s      signature : %s" % [
 	spacer.custom_minimum_size = Vector2(0, 10)
 	v.add_child(spacer)
 	_big_button(v, "RETOUR", _back, Color(0.4, 0.4, 0.5))
+
+func _kit_line(id: String) -> String:
+	var kit: Dictionary = GameState.chassis_kit(id)
+	return "Passif : %s    Actif : %s (%.0f s)" % [
+		String(kit.get("passif_nom", "")), String(kit.get("actif_nom", "")), float(kit.get("cd", 0.0))]
 
 func _buy_mech(id: String, cost: int) -> void:
 	Audio.sfx("levelup" if SaveManager.buy_mech(id, cost) else "click")
@@ -1213,15 +1218,25 @@ func _bonus_text(p: Dictionary) -> String:
 	return ""
 
 func _part_text(p: Dictionary) -> String:
-	return "%s niv.%d   %s" % [
+	var maker: String = String(SaveManager.MAKER_NAMES.get(String(p.get("maker", "")), ""))
+	var base: String = "%s niv.%d   %s" % [
 		String(SaveManager.GEAR_RARITY_NAMES.get(String(p.get("rarity", "commun")), "?")),
 		int(p.get("level", 1)), _bonus_text(p)]
+	if maker == "":
+		return base
+	return "%s   %s" % [maker, base]
 
 func _build_gear() -> void:
 	_clear()
 	var v: VBoxContainer = _scaffold(600.0)
 	_title(v, "EQUIPEMENT", Color(0.75, 0.65, 1.0))
 	_currency_row(v)
+	var set_l: Label = Label.new()
+	set_l.text = SaveManager.set_summary()
+	set_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	set_l.add_theme_font_size_override("font_size", Palette.fs(16))
+	set_l.add_theme_color_override("font_color", Color(0.85, 0.78, 1.0))
+	v.add_child(set_l)
 	for slot: String in SaveManager.GEAR_SLOTS:
 		var uid: int = int(SaveManager.gear_equipped().get(slot, -1))
 		var p: Dictionary = SaveManager.gear_part(uid) if uid >= 0 else {}

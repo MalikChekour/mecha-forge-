@@ -1,0 +1,12 @@
+BAL chapitre 8 (ruche) 90 s, x8
+BAL t= 21 niv= 2 pv=137/137 ennemis=  4 kills=  19 vivant=true (mur 3 s) vit_joueur=336 vit_ennemis_moy=196  
+BAL t= 81 niv= 6 pv=137/137 ennemis= 11 kills= 107 vivant=true (mur 11 s) vit_joueur=376 vit_ennemis_moy=195  [degats: contact:mech08:25, style:rafale:20, bull:mech08:11]
+BAL t= 90 niv= 7 pv=137/137 ennemis= 47 kills= 117 vivant=true (mur 12 s) vit_joueur=376 vit_ennemis_moy=194  [degats: contact:mech08:33, style:rafale:27, bull:mech08:11]
+BAL chapitre 9 (citadelle) 90 s, x8
+BAL t= 20 niv= 2 pv=118/137 ennemis=  9 kills=  16 vivant=true (mur 3 s) vit_joueur=336 vit_ennemis_moy=151  [degats: missile:mech09:11, bolt:mech09:6, decor:turret:3]
+BAL t= 80 niv= 6 pv=113/137 ennemis= 25 kills= 128 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=152  [degats: bolt:mech09:90, decor:turret:33, missile:mech09:11]
+BAL t= 90 niv= 7 pv=100/137 ennemis= 63 kills= 143 vivant=true (mur 13 s) vit_joueur=336 vit_ennemis_moy=151  [degats: bolt:mech09:114, decor:turret:48, missile:mech09:11]
+BAL chapitre 10 (abyss) 90 s, x8
+BAL t= 20 niv= 2 pv=137/137 ennemis=  5 kills=  16 vivant=true (mur 3 s) vit_joueur=336 vit_ennemis_moy=161  [degats: style:guide:27, decor:tourelle:7]
+BAL t= 80 niv= 6 pv=114/162 ennemis= 22 kills= 106 vivant=true (mur 11 s) vit_joueur=336 vit_ennemis_moy=164  [degats: style:guide:176, decor:tourelle:28]
+BAL t= 90 niv= 6 pv=132/162 ennemis= 66 kills= 114 vivant=true (mur 12 s) vit_joueur=336 vit_ennemis_moy=164  [degats: style:guide:182, decor:tourelle:28]

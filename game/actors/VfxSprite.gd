@@ -53,11 +53,15 @@ func _process(delta: float) -> void:
 			return
 	frame = _frame
 
-func _finish() -> void:
+func reset() -> void:
 	_playing = false
 	visible = false
 	set_process(false)
+	global_position = Vector2(1.0e7, 1.0e7)
+
+func _finish() -> void:
 	if game != null and game.has_method("reclaim_vfx"):
 		game.reclaim_vfx(self)
 	else:
+		reset()
 		queue_free()
