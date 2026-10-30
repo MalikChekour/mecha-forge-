@@ -178,7 +178,9 @@ func _fire() -> void:
 	Telegraph.fired_total += 1
 	var hit: bool = _player_inside()
 	var valid_p: bool = player != null and is_instance_valid(player)
-	if on_fire.is_valid():
+	var src: Variant = fx.get("src", null)
+	var src_ok: bool = src == null or (is_instance_valid(src) and not (src is Enemy and not (src as Enemy).alive))
+	if on_fire.is_valid() and src_ok:   # ennemi mort avant le declenchement -> pas de rappel
 		on_fire.call(self, hit)
 	if hit and valid_p:
 		if dmg > 0.0 and player.has_method("take_damage"):

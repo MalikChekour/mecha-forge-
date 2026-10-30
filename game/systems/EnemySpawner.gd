@@ -342,7 +342,9 @@ func _ensure_phase2() -> void:
 		PHASE2_DEFS[sum_id] = summoner
 		PHASE2_DEFS[art_id] = art
 		PHASE2_DEFS[rep_id] = repd
-		PHASE2_EXTRA[String(biome)] = [kami_id, sum_id, art_id, rep_id]
+		# 30/10 (patron : ? supprime les ennemis qui n'ont pas ete rigues ?) : kamikaze / invocateur / artilleur / reparateur
+		# n'ont pas de modele rigge propre (planches empruntees) -> retires des apparitions. Definitions gardees (reactivables).
+		PHASE2_EXTRA[String(biome)] = []
 
 func _has_def(k: String) -> bool:
 	_ensure_phase2()
@@ -470,7 +472,19 @@ func _drain_wave() -> void:
 
 ## Spawn one specific enemy at an exact spot (used by the robot carcass awakening).
 ## Scaled like any other foe so a late-run carcass stays a real threat.
+## 30/10 : Rodeur/Guepe/Belier (u_rodeur/u_guepe/u_belier) sont des planches FIXES (pas de rig). Les balises et
+## epaves qui les appelaient font maintenant apparaitre l'ennemi RIGGE du chapitre (base ou essaim).
+const NON_RIGGED_REDIRECT: Dictionary = {"brute": 0, "drone": 1, "quadshell": 0}
+func _rigged_kind(kind: String) -> String:
+	if not NON_RIGGED_REDIRECT.has(kind):
+		return kind
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	if pool.is_empty():
+		pool = BIOME_POOL["tech"]
+	return String(pool[mini(int(NON_RIGGED_REDIRECT[kind]), pool.size() - 1)])
+
 func spawn_kind_at(kind: String, pos: Vector2) -> Enemy:
+	kind = _rigged_kind(kind)
 	if not _has_def(kind) or player == null or not is_instance_valid(player):
 		return null
 	_sync_div()
@@ -503,7 +517,7 @@ func _spawn_elite(kind: String) -> void:
 	e.hp = e.hp_max
 	e.contact_dmg *= 1.2
 	e.set_meta("phase1_elite", true)   # drop rare Phase 1 a la mort (GameState.roll_phase1_drop)
-	EnemyDiv.make_elite(e)             # cape + epee + nom + pouvoir de biome
+	EnemyDiv.make_elite(e)             # pouvoir de biome (plus de surcouche visuelle)
 	if game != null and game.has_method("spawn_vfx"):
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 2.2, Color(1.0, 0.7, 0.3))
 	if game != null and game.has_method("show_banner"):
@@ -952,7 +966,7 @@ func _maybe_elite(e: Enemy) -> void:
 	e.drops_bonus = true
 	e.set_meta("phase1_elite", true)   # meme table de drop que l'elite scriptee (_spawn_elite)
 	e._spr.self_modulate = Color(1.5, 0.7, 1.4)
-	EnemyDiv.make_elite(e)   # 29/10 diversite : cape + epee + nom + pouvoir de biome (taille inchangee)
+	EnemyDiv.make_elite(e)   # pouvoir de biome (30/10 : plus de cape/epee/nom dessines)
 	pass   # 29/10 (patron : meme taille pour tous sauf mini-boss/boss) : plus de grossissement elite, la teinte suffit
 
 func _spawn_squad(force: bool = false, formation: String = "") -> bool:
@@ -1000,11 +1014,6 @@ func _spawn_squad(force: bool = false, formation: String = "") -> bool:
 				member_kind = String(pool[1])   # swarm
 			else:
 				member_kind = kind              # frontline mecha
-		# DIVERSITE (29/10) : artilleur en 5e, reparateur en 6e, si le palier les autorise
-		if i == 4 and dtier >= 2 and _has_def(kind + "_artillery"):
-			member_kind = kind + "_artillery"
-		elif i == 5 and dtier >= 3 and _has_def(kind + "_repair"):
-			member_kind = kind + "_repair"
 		if not EnemyDiv.kind_allowed(member_kind, _raw(member_kind), dtier):
 			member_kind = kind
 		var e: Enemy = Enemy.new()
@@ -1205,6 +1214,7 @@ func _spawn() -> void:
 ## Spawn one enemy at a fixed world point (beacon structures use this). Respects the enemy cap and
 ## the arena bounds, and scales the enemy like any normal spawn.
 func spawn_at(pos: Vector2, kind: String) -> void:
+	kind = _rigged_kind(kind)
 	if player == null or not is_instance_valid(player):
 		return
 	if not _has_def(kind):

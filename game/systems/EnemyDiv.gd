@@ -134,27 +134,13 @@ static func pre_setup(e, def: Dictionary) -> void:
 	if e.tier_tag == "mk2" or e.tier_tag == "inter":
 		t = mini(6, t + 1)
 	e.dtier = t
-	if e.role == "" or e.rank >= 2:
-		return
-	var art: Dictionary = art_for(e.chassis, e.role)
-	e.chassis = String(art["chassis"])
-	e.dv["hue"] = float(art["hue"])
-	e.dv["sat"] = float(art["sat"])
-	if bool(art["proc"]):
-		e._proc = true
-		e._proc_hover = false
+	# 30/10 (patron : retirer les ajouts visuels) : plus de substitution/recoloration de planche, chaque ennemi garde SON art cuit.
 
 ## Appele a la FIN de Enemy.setup : recoloration, teinte de role, reglages de palier, surcouches.
 static func post_setup(e, def: Dictionary) -> void:
 	if e.role == "" or e.rank >= 2:
 		return
 	var t: int = e.dtier
-	var col: Color = ROLE_COL.get(e.role, Color.WHITE)
-	if e._mat != null and e._mat.shader != null:
-		e._mat.set_shader_parameter("hue_shift", float(e.dv.get("hue", 0.0)))
-		e._mat.set_shader_parameter("sat_mul", float(e.dv.get("sat", 1.0)))
-	var mix: float = 0.45 if e.role in ["kamikaze", "artilleur", "reparateur"] else 0.2
-	e._spr.self_modulate = e._spr.self_modulate * Color.WHITE.lerp(col, mix)
 	e.dv["name"] = String(def.get("name", ROLE_NAME.get(e.role, "")))
 	e.dv["cd1"] = randf_range(1.5, 3.5)
 	e.dv["cd2"] = randf_range(2.5, 5.0)
@@ -173,7 +159,6 @@ static func post_setup(e, def: Dictionary) -> void:
 	var elite: bool = e.role == "elite" or e.contact_sword or e.tier_tag == "inter"
 	if elite:
 		_set_power(e, String(def.get("special_vfx", "")))
-	_build_overlays(e)
 
 static func _set_power(e, p: String) -> void:
 	if p == "" or not POWERS.has(p):
@@ -191,53 +176,14 @@ static func make_elite(e) -> void:
 	e.dv["elite"] = true
 	if not e.dv.has("power"):
 		_set_power(e, String(e.special_vfx))
-	_build_overlays(e)
-
-static func _build_overlays(e) -> void:
-	for k in ["ov_u", "ov_o"]:
-		var old: Variant = e.dv.get(k, null)
-		if old is Node and is_instance_valid(old):
-			(old as Node).queue_free()
-		e.dv.erase(k)
-	var elite: bool = e.role == "elite" or e.contact_sword or bool(e.dv.get("elite", false))
-	var center: Vector2 = e._visual_offset()
-	var bh: float = e._body_radius * 3.1
-	var u: EnemyOverlay = EnemyOverlay.new()
-	u.mode = "under"
-	u.z_index = -1
-	u.role = "elite" if elite and e.role == "fantassin" else e.role
-	u.col = ROLE_COL.get(u.role, Color.WHITE)
-	u.center = center
-	u.body_h = bh
-	u.half_w = e._body_radius * 1.1
-	u.elite = elite
-	u.dtier = e.dtier
-	var n: int = chapter_of_chassis(e.chassis)
-	if n > 0:
-		u.cape_col = Color.from_hsv(fposmod(BIOME_HUE[n - 1], 1.0), 0.75, 0.55)
-	e.add_child(u)
-	e.dv["ov_u"] = u
-	if elite or e.tier_tag != "":
-		var o: EnemyOverlay = EnemyOverlay.new()
-		o.mode = "over"
-		o.z_index = 4
-		o.role = u.role
-		o.col = u.col
-		o.center = center
-		o.body_h = bh
-		o.half_w = u.half_w
-		o.elite = elite
-		o.tier_tag = e.tier_tag
-		var nm: String = String(e.dv.get("name", ""))
-		o.label = nm if e.role == "elite" else ("ELITE  " + nm)
-		e.add_child(o)
-		e.dv["ov_o"] = o
 
 # ---------------------------------------------------------------- outils
 static func _ad(e) -> float:
 	return e.attack_dmg if e.attack_dmg > 0.0 else e.contact_dmg
 
 static func _mk(e, shp: String, pos: Vector2, base_dur: float, dmg: float, col: Color, p: Dictionary) -> Telegraph:
+	if p.has("on_fire"):
+		p["src"] = e      # rappel annule si l'ennemi meurt avant le declenchement
 	return Telegraph.make(e.game, e.player, shp, pos, tele(base_dur), dmg, col, p)
 
 static func _dash(e, d: Vector2, spd: float, dur: float) -> void:

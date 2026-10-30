@@ -653,7 +653,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 		add_child(_shield_rim)
 
 	# bosses (rank >= 3) and superior mechas (contact_sword) get a floating health bar
-	if rank >= 3 or contact_sword or tier_tag == "inter":
+	if rank >= 3 or contact_sword:
 		_hp_bar_w = vsize * (1.1 if rank >= 3 else 0.85)
 		_hp_bar_y = -vsize * 0.62
 		_hp_bg = Line2D.new()

@@ -147,10 +147,14 @@ func _ready() -> void:
 				if not roles_by_tier.has(t):
 					roles_by_tier[t] = {}
 				roles_by_tier[t][e.role] = true
-				# Ch4-18 : les roles essaim/bouclier/sniper NE reutilisent PLUS le dessin du fantassin
-				if ch > 3 and e.role in ["essaim", "bouclier", "sniper", "invocateur"]:
-					if e.chassis == String(EnemySpawner.DEFS[String(EnemySpawner.BIOME_POOL[biome][0])]["chassis"]):
-						bad.append("art %s ch%d = chassis du fantassin" % [k, ch])
+				# 30/10 : SEUL l'art rigge (planches cuites d'un rig Meshy enNN_*) apparait ; aucune recoloration shader
+				if not e.chassis.begins_with("en") or e._proc:
+					bad.append("art non rigge %s ch%d = %s" % [k, ch, e.chassis])
+				if e._mat != null and e._mat.shader != null and e._mat.get_shader_parameter("hue_shift") != null:
+					bad.append("recoloration %s" % k)
+				for c in e.get_children():
+					if c.get_script() != null and String(c.get_script().resource_path).ends_with("EnemyOverlay.gd"):
+						bad.append("surcouche %s" % k)
 				var vf: float = e._vis_frac(e._spr.texture)
 				var vis: float = e._spr.scale.x * vf * float(e._spr.texture.get_height())
 				if absf(vis - 124.0 * Protocols.enemy_scale) > 1.0:
@@ -170,8 +174,19 @@ func _ready() -> void:
 			await _clear()
 	EnemyDiv.diff_override = -1
 	_check(bad.is_empty(), "%d spawns (18 biomes x 4 difficultes x tous les types + inter + elites) : role, palier, art, taille 124 px OK %s" % [spawned, str(bad.slice(0, 8))])
-	_check(roles_seen.size() == 9, "les 9 roles ont spawne : %s" % str(roles_seen.keys()))
+	_check(roles_seen.size() == 5 and not roles_seen.has("kamikaze") and not roles_seen.has("artilleur") and not roles_seen.has("invocateur") and not roles_seen.has("reparateur"), "5 roles rigges seulement (fantassin/essaim/bouclier/sniper/elite) : %s" % str(roles_seen.keys()))
 	_check(tiers_seen.size() == 6, "les 6 paliers ont ete joues : %s" % str(tiers_seen.keys()))
+
+	# 2b) balises / epaves : les universels non rigges (brute/drone/quadshell) sont redirig?s vers l'ennemi rigge du chapitre
+	var redir_bad: Array = []
+	for ch in [1, 5, 12, 18]:
+		sp.current_biome = EnemyDiv.BIOMES[ch - 1]
+		for uk in ["brute", "drone", "quadshell"]:
+			var ue: Enemy = sp.spawn_kind_at(uk, Vector2(200, 0))
+			if ue == null or not ue.chassis.begins_with("en") or ue._proc:
+				redir_bad.append("%s ch%d -> %s" % [uk, ch, "null" if ue == null else ue.chassis])
+	await _clear()
+	_check(redir_bad.is_empty(), "balises/epaves : universels non rigges rediriges vers un ennemi rigge %s" % str(redir_bad))
 
 	# 3) roles presents selon le palier (tirage reel)
 	var gate_ok: bool = true
@@ -189,7 +204,10 @@ func _ready() -> void:
 				seen[r2] = true
 				if not EnemyDiv.role_allowed(r2, t2):
 					gate_ok = false
-			if t2 >= 3 and seen.size() < 9:
+			if seen.has("kamikaze") or seen.has("artilleur") or seen.has("invocateur") or seen.has("reparateur") or seen.has(""):
+				full_t3 = false
+				print("    ch%d d%d palier %d : %s" % [ch, d, t2, str(seen.keys())])
+			if false:
 				full_t3 = false
 				print("    ch%d d%d palier %d : %s" % [ch, d, t2, str(seen.keys())])
 			if t2 == 1 and (seen.has("kamikaze") or seen.has("artilleur") or seen.has("invocateur") or seen.has("reparateur")):
@@ -199,7 +217,7 @@ func _ready() -> void:
 	_check(sp._sync_div() == 3, "Veteran chapitre 1 = palier 3")
 	EnemyDiv.diff_override = -1
 	_check(gate_ok, "palier 1 : pas d'artilleur/kamikaze/invocateur/reparateur ; jamais de role au-dessus du palier")
-	_check(full_t3, "palier >= 3 : les 9 roles apparaissent au tirage (dont Veteran ch1)")
+	_check(full_t3, "tirage reel : jamais de role non rigge (kamikaze/artilleur/invocateur/reparateur), jamais d'ennemi universel")
 	# escouade palier 6 : artilleur + reparateur presents
 	EnemyDiv.diff_override = 3
 	sp.current_biome = "colosseum"
@@ -210,7 +228,7 @@ func _ready() -> void:
 	for e2 in g.enemy_layer.get_children():
 		if e2 is Enemy:
 			sq_roles[(e2 as Enemy).role] = true
-	_check(sq_roles.has("artilleur") and sq_roles.has("reparateur") and sq_roles.has("elite"), "escouade palier 6 : %s" % str(sq_roles.keys()))
+	_check(sq_roles.has("elite") and not sq_roles.has("artilleur") and not sq_roles.has("reparateur"), "escouade palier 6 (roles rigges) : %s" % str(sq_roles.keys()))
 	sp._squads.clear()
 	await _clear()
 
@@ -252,7 +270,7 @@ func _ready() -> void:
 	await _clear()
 	Enemy.fire_rate = 6.0
 	var want_sk: Array = ["fantassin:grenade", "fantassin:rafale", "essaim:bond", "bouclier:provocation", "bouclier:charge", "sniper:rail", "sniper:repli",
-		"artilleur:mortier", "kamikaze:sprint", "invocateur:portail", "reparateur:soin2", "reparateur:surbouclier", "reparateur:impulsion", "elite:assaut"]
+		"elite:assaut"]
 	var miss2: Array = []
 	for k3 in want_sk:
 		if int(EnemyDiv.stats.get(k3, 0)) == 0:

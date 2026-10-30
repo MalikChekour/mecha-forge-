@@ -22,26 +22,7 @@ uniform vec4 outline_color : source_color = vec4(0.04, 0.05, 0.07, 0.50);  // su
 uniform float outline_w = 1.25;    // outline width in texels (thin ink edge)
 uniform float lift = 0.10;         // raise shadows (added to opaque body)
 uniform float boost = 1.12;        // brighten body
-uniform float edge_min = 0.55;
-// RECOLORATION SANS CREDIT (29/10, diversite ennemis) : rotation de teinte YIQ (tours) + saturation,
-// pour reutiliser les planches de role Ch1-3 dans les biomes Ch4-18. 0 / 1 = planche d'origine.
-uniform float hue_shift = 0.0;
-uniform float sat_mul = 1.0;
-
-vec3 recolor(vec3 c) {
-	if (hue_shift == 0.0 && sat_mul == 1.0) {
-		return c;
-	}
-	float y = dot(c, vec3(0.299, 0.587, 0.114));
-	float i = dot(c, vec3(0.596, -0.274, -0.322));
-	float q = dot(c, vec3(0.211, -0.523, 0.312));
-	float a = -hue_shift * 6.2831853;   // signe : YIQ tourne a l'envers de la roue HSV
-	float ca = cos(a);
-	float sa = sin(a);
-	float i2 = (i * ca - q * sa) * sat_mul;
-	float q2 = (i * sa + q * ca) * sat_mul;
-	return vec3(y + 0.956 * i2 + 0.621 * q2, y - 0.272 * i2 - 0.647 * q2, y - 1.106 * i2 + 1.703 * q2);
-}     // ignore faint/antialiased alpha -> no fuzzy specks
+uniform float edge_min = 0.55;     // ignore faint/antialiased alpha -> no fuzzy specks
 
 void fragment() {
 	vec2 ps = TEXTURE_PIXEL_SIZE * outline_w;
@@ -59,7 +40,7 @@ void fragment() {
 		oc = mix(oc, warn_color.rgb, warn);
 		COLOR = vec4(oc, max(outline_color.a, warn));
 	} else {
-		vec3 body = recolor(c.rgb) * boost + lift * step(0.02, a);
+		vec3 body = c.rgb * boost + lift * step(0.02, a);
 		body = mix(body, vec3(1.0), flash);
 		body = mix(body, warn_color.rgb, warn);   // le telegraphe ecrase le flash de coup
 		COLOR = vec4(clamp(body, 0.0, 1.0), c.a);
