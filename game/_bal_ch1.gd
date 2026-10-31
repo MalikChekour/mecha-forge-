@@ -119,5 +119,11 @@ func _physics_process(delta: float) -> void:
 			var lv10: float = lvl_times[8] if lvl_times.size() > 8 else -1.0
 			print("CH1 FIN %s t=%.0f niv=%d kills=%d deg_total=%.0f soin_total=%.0f pv_min=%.0f (%.0f%% a t=%.0f) 1er_coup=%.0fs niv5=%.0fs niv10=%.0fs ttk_rang1_moy=%.1fs (n=%d) od=%.0f%% degats_par_source=%s soins_par_source=%s regen=%.1f" % [
 				"VICTOIRE" if _won else ("MORT:" + GameState.death_cause if not GameState.alive else "TEMPS"), rt, GameState.level, GameState.kills, _dmg(), heal_tot, min_hp, 100.0 * min_hp_frac, min_hp_t, first_hit_t, lv5, lv10, avg1, ttk_r1.size(), 100.0 * od_t / maxf(rt, 1.0), str(p.damage_log), str(p.heal_log), float(p.hp_regen)])
+			var sp = g.spawner
+			var aw = g.arena_wall
+			print("CH1 ANTIFUITE fuite=%.0fs (%.0f%%) loin=%.0fs (%.0f%%) interceptions=%d chasseurs=%d devant=%d mur_contact=%.1fs mur_impulsions=%d mur_degats=%.0f expires=%s tele=%s" % [
+				float(sp.ak_stats["flee_s"]), 100.0 * float(sp.ak_stats["flee_s"]) / maxf(rt, 1.0), float(sp.ak_stats["far_s"]), 100.0 * float(sp.ak_stats["far_s"]) / maxf(rt, 1.0),
+				int(sp.ak_stats["intercepts"]), int(sp.ak_stats["chasseurs"]), int(sp.ak_stats["ahead_spawns"]),
+				float(aw.touch_s) if aw != null else 0.0, int(aw.hits) if aw != null else 0, float(aw.dmg_total) if aw != null else 0.0, str(Pickup.expired), str(EnemyDiv.stats.get("chasseur:ruee", 0))])
 			Engine.time_scale = 1.0
 			get_tree().quit(0)
