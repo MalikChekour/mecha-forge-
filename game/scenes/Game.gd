@@ -7,6 +7,8 @@ extends Node2D
 
 var player: Player
 var spawner: EnemySpawner
+const ArenaWallScript = preload("res://systems/ArenaWall.gd")
+var arena_wall: Node2D = null   # 31/10 anti-fuite : champ de confinement mobile (cf. ArenaWall.gd)
 var hud: HUD
 var cam: Camera2D
 var enemy_layer: Node2D
@@ -403,6 +405,12 @@ func _ready() -> void:
 	spawner.chapter = _chapter   # SANS FIN garde 1 (defaut, jamais reecrit) ; _on_chapter_chosen() le corrige pour la campagne
 	add_child(spawner)
 	spawner.process_mode = Node.PROCESS_MODE_PAUSABLE   # no spawns behind the menu / during drafts
+	# 31/10 ANTI-FUITE : carte infinie conservee (BOUNDED = false), mur d'energie MOBILE centre sur la zone de combat.
+	# PAUSABLE : jamais de brulure pendant un tirage de cartes ou un menu.
+	arena_wall = ArenaWallScript.new()
+	add_child(arena_wall)
+	arena_wall.setup(self, player)
+	arena_wall.process_mode = Node.PROCESS_MODE_PAUSABLE
 	player.move_mult = float(_mods.get("player_speed_mult", 1.0))
 	player.biome_proj_speed = float(_mods.get("player_proj_speed", 1.0))
 	player.inertia = float(_mods.get("player_inertia", 0.0))
@@ -3417,6 +3425,12 @@ func _drive_bot() -> void:
 			move = (gem.global_position - player.global_position).normalized()
 		else:
 			move = strafe + (Vector2.ZERO - player.global_position) * 0.0006
+	# 31/10 : un joueur humain voit le champ d'energie et s'en ecarte ; le bot de banc aussi (sinon il s'y brule en boucle).
+	if arena_wall != null and arena_wall.active:
+		var aoff: Vector2 = pp - arena_wall.center
+		var ak: float = aoff.length() / maxf(arena_wall.radius, 1.0)
+		if ak > 0.72:
+			move += -aoff.normalized() * (ak - 0.72) * 6.0
 	player.bot_move = (move + strafe * 0.2).limit_length(1.0)
 
 func _pick_biome() -> int:
