@@ -1483,7 +1483,7 @@ func spawn_bonus(pos: Vector2) -> void:
 		_spawn_pickup(pos, "scrap", 4)   # cache trop rapprochee -> ferraille seulement
 		return
 	# rampe : aucun plafond avant 2:00 (le joueur apprend), plafond complet a 6:00
-	_bonus_next = now + float(GameState.diff().get("heal_cd", 6.0)) * clampf((now - 120.0) / 240.0, 0.0, 1.0)
+	_bonus_next = now + float(GameState.diff().get("heal_cd", 4.0)) * clampf((now - 120.0) / 240.0, 0.0, 1.0)
 	_spawn_pickup(pos, "bonus", 1)
 
 func spawn_skill(pos: Vector2) -> void:

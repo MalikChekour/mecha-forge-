@@ -37,6 +37,7 @@ func _ready() -> void:
 		elif a.begins_with("--scale="): scale = float(a.substr(8))
 		elif a.begins_with("--seed="): seed(int(a.substr(7)))
 	Events.run_won.connect(func() -> void: _won = true)
+	GameState.difficulty = diff   # avant add_child : Game._ready lit la difficulte
 	g = GameScene.instantiate()
 	add_child(g)
 	GameState.difficulty = diff

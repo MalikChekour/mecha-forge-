@@ -15,3 +15,5 @@
 - v7 : Normal mort 85-159 s (fenetre 60-100 s critique pour le bot, deja 9 % PV avant). v8 : debut ramene a l'original (bouclier 35 s, sniper 50 s, vague 38 s / 50 s) ; la pression ajoutee passe en milieu/fin de partie.
 - v8 : debut OK, mais 4/4 morts a 189-206 s (mini-boss + mur 3:00 + plafond soin complet). v9 : kit mini-boss x1.8/x2.2 (au lieu de 2.4/3.0), PV mini 8.5x, rampe plafond soin 1:30 -> 5:00.
 - v9 : Normal mort 85/159/246/247 s. v10 : rampe plafond soin 2:00 -> 6:00, regen +1.5 max 4.5, XP 6.8, elites lachent toujours un soin avant 1:30. Runs v10_d1_s11..15.
+- DECOUVERTE : le banc tirait des PROTOCOLES aleatoires (degats ennemis jusqu'a x1.6, spawn x2) -> variance enorme. Mesures desormais avec --no-protocols. Base 4cc6fea (base_d1_s11..14) et v10 (v10np_d1_s11..14) lancees en parallele.
+- Sans protocoles : BASE 4cc6fea Normal = 1 mort/4 (251 s), les autres a PV pleins presque tout le temps. v10 = 4 morts/4 (154-342 s) -> trop dur. v11 : heal_cd 2.5/4/6/8 s, plancher tardif plus doux (+1 par 40 s apres 3:20).

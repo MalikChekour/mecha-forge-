@@ -387,7 +387,7 @@ func _process(delta: float) -> void:
 		# est sous ce plancher, la cadence s'accelere (jusqu'a x4) ; des qu'il est atteint,
 		# on retombe exactement sur l'ancien comportement. Les pics de vague sont conserves.
 		var live: int = get_tree().get_nodes_in_group("enemies").size()
-		var floor_pop: int = clampi(5 + int(_t / 22.0) + int(maxf(0.0, _t - 150.0) / 28.0), 5, 34)   # v12.15 : 5+t/22 (max 24) -> 6+t/20 (max 28)
+		var floor_pop: int = clampi(5 + int(_t / 22.0) + int(maxf(0.0, _t - 200.0) / 40.0), 5, 34)   # v12.15 : 5+t/22 (max 24) -> 6+t/20 (max 28)
 		# 🚨 Rapport de test Manus (26/09, P0) : « mort possible en 20-30s des la difficulte
 		# Facile » — le plancher etait deja a 5 des t=0, et le rattrapage pouvait multiplier la
 		# cadence par x4 ; un joueur qui n'a pas encore appris le deplacement encaisse la pleine
