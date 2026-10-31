@@ -914,7 +914,9 @@ func _cast_pool() -> void:
 func _update_helpers(delta: float) -> void:
 	# REGEN PV (Energy Drink)
 	if hp_regen > 0.0 and hp < max_hp and GameState.alive:
+		var _hb: float = hp
 		hp = minf(max_hp, hp + hp_regen * delta)
+		heal_log["regen"] = float(heal_log.get("regen", 0.0)) + (hp - _hb)
 		Events.player_damaged.emit(hp, max_hp)
 	# SHIELD BUBBLE — charges then discharges instead of sitting there permanently. The dome dims
 	# right after a pulse (recharging) and brightens/swells as the next discharge nears (charging),
@@ -1820,10 +1822,13 @@ func _trigger_dash_escape(source_pos: Vector2) -> void:
 	else:
 		_dash_dir = Vector2.DOWN
 
-func heal(amount: float) -> void:
+var heal_log: Dictionary = {}   # banc d'equilibrage : PV reellement rendus par source
+func heal(amount: float, src: String = "autre") -> void:
 	if not GameState.alive:
 		return
+	var before: float = hp
 	hp = minf(max_hp, hp + amount)
+	heal_log[src] = float(heal_log.get(src, 0.0)) + (hp - before)
 	Events.player_damaged.emit(hp, max_hp)   # refresh the health bar
 
 func grant_invuln(t: float) -> void:

@@ -138,14 +138,14 @@ func _physics_process(delta: float) -> void:
 				game.spawn_vfx("levelup", player.global_position, 0.0, 1.8)
 		elif kind == "bonus":
 			if player.has_method("heal"):
-				player.heal(25.0)
+				player.heal(18.0 * float(GameState.diff().get("heal", 1.0)), "bonus")   # v12.15 : 25 -> 18 (x difficulte)
 			if game != null and game.has_method("spawn_vfx"):
 				game.spawn_vfx("heal", player.global_position, 0.0, 1.3)   # green rising sparkles on the player
 			GameState.add_overdrive(0.18)
 			GameState.add_scrap(6)
 		elif kind == "heal":
 			if player.has_method("heal"):
-				player.heal(30.0)
+				player.heal(24.0 * float(GameState.diff().get("heal", 1.0)), "soin")   # v12.15 : 30 -> 24 (x difficulte)
 			if game != null and game.has_method("spawn_vfx"):
 				game.spawn_vfx("heal", player.global_position, 0.0, 1.2)
 		elif kind == "od":

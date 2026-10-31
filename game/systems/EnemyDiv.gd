@@ -211,8 +211,72 @@ static func _cd(e, k: String, delta: float) -> float:
 	e.dv[k] = v
 	return v
 
+# ---------------------------------------------------------------- MINI-BOSS / BOSS (v12.15, patron : « le 1er niveau est trop facile »)
+## Banc Ch1 v12.14 : les rangs >= 2 n'avaient AUCUNE competence (tick() les ignorait) -> mini-boss 7-11 PV de degats
+## infliges sur toute la partie, boss 1 : 3,8. Kit telegraphie (lisible, appris), plus court a Difficile/Veteran (tele()).
+const BOSS_KIT_CD: Dictionary = {"mini": 4.6, "boss1": 4.2, "boss2": 3.8, "boss": 3.4}
+const BOSS_RAIN_N: Dictionary = {"boss1": 4, "boss2": 5, "boss": 6}
+
+static func _boss_tick(e, delta: float, dist: float, dir: Vector2) -> void:
+	var tag: String = String(e.tier_tag)
+	if not BOSS_KIT_CD.has(tag):
+		return
+	if not e.dv.has("bcd"):
+		e.dv["bcd"] = 2.5
+		e.dv["bn"] = 0
+	var enr: bool = e.hp < e.hp_max * 0.5
+	if enr and not e.dv.has("benr"):
+		e.dv["benr"] = true
+		e._speed_mult *= 1.15
+		if e.game.has_method("spawn_vfx"):
+			e.game.spawn_vfx("aaa_shockwave", e.global_position, 0.0, 1.4, Color(1.0, 0.3, 0.15))
+		count("boss:rage")
+	if _cd(e, "bcd", delta) > 0.0 or dist > 760.0:
+		return
+	var n: int = int(e.dv["bn"])
+	e.dv["bn"] = n + 1
+	e.dv["bcd"] = float(BOSS_KIT_CD[tag]) * (0.7 if enr else 1.0)
+	var ad: float = maxf(_ad(e), e.contact_dmg * 0.8)
+	var ppos: Vector2 = e.player.global_position
+	var pv: Vector2 = (e.player.velocity as Vector2) if "velocity" in e.player else Vector2.ZERO
+	if tag == "mini":
+		var cm: Color = Color(1.0, 0.35, 0.9)
+		if n % 2 == 0:
+			for i in 3:
+				var pp: Vector2 = ppos + pv * 0.35 * float(i) + Vector2.from_angle(randf() * TAU) * 40.0 * float(i)
+				_mk(e, "circle", pp, 1.0 + 0.15 * float(i), ad * 2.4, cm, {"radius": 85.0, "tag": "salve_mini"})
+			count("mini:salve")
+		else:
+			var L: float = dist + 140.0
+			_mk(e, "line", e.global_position, 0.85, ad * 3.0, cm, {"dir": dir, "length": L, "width": 70.0, "knock": 160.0, "tag": "charge_mini", "on_fire": _dash_cb(e, dir, L / 0.3, 0.3)})
+			count("mini:charge")
+		return
+	var cb: Color = Color(1.0, 0.3, 0.25)
+	match n % 3:
+		0:
+			_mk(e, "ring", e.global_position, 1.0, ad * 2.6, cb, {"inner": 90.0, "radius": 300.0, "follow": e, "tag": "onde_boss"})
+			if enr or tag == "boss":
+				_mk(e, "ring", e.global_position, 1.5, ad * 2.2, cb, {"inner": 300.0, "radius": 470.0, "follow": e, "tag": "onde_boss"})
+			count("boss:onde")
+		1:
+			var k: int = int(BOSS_RAIN_N.get(tag, 4))
+			for i in k:
+				var pp2: Vector2 = ppos + pv * 0.3 * float(i) + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 90.0)
+				_mk(e, "circle", pp2, 0.9 + 0.18 * float(i), ad * 2.2, cb, {"radius": 90.0, "tag": "pluie_boss"})
+			count("boss:pluie")
+		_:
+			var L2: float = dist + 180.0
+			var fx: Dictionary = {"dir": dir, "length": L2, "width": 90.0, "knock": 200.0, "tag": "charge_boss", "on_fire": _dash_cb(e, dir, L2 / 0.32, 0.32)}
+			_mk(e, "line", e.global_position, 0.9, ad * 3.4, cb, fx)
+			if tag == "boss" and e.game.has_method("spawn_enemy_bolt") and Enemy._fire_ok(3.0, e.rank):
+				for i in 12:
+					e.game.spawn_enemy_bolt(e.global_position, Vector2.from_angle(TAU * float(i) / 12.0), ad * 0.7, cb, 1.0, 260.0, false, 0.0, "boss:couronne")
+			count("boss:charge")
 # ---------------------------------------------------------------- boucle (appelee par Enemy._physics_process)
 static func tick(e, delta: float, dist: float, dir: Vector2) -> void:
+	if enabled and e.rank >= 2 and e.game != null and e.player != null:
+		_boss_tick(e, delta, dist, dir)   # v12.15 : kit mini-boss / boss
+		return
 	if not enabled or e.role == "" or e.rank >= 2 or e.game == null:
 		return
 	var t: int = e.dtier

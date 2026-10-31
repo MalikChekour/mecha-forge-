@@ -3490,7 +3490,7 @@ class Prop extends StaticBody2D:
 			elif dist < _firefly_r:
 				_firefly_life -= delta
 				if _plr.has_method("heal"):
-					_plr.heal(_heal_dps * delta)
+					_plr.heal(_heal_dps * delta, "lucioles")
 				if game != null and game.has_method("spawn_vfx") and randf() < 0.1:
 					game.spawn_vfx("heal", _plr.global_position, 0.0, 0.8)
 				if _firefly_life <= 0.0:
@@ -3583,7 +3583,7 @@ class Prop extends StaticBody2D:
 		if _builder_bot and dist < 1200.0:
 			if dist < _builder_r and _plr != null:
 				if _plr.has_method("heal"):
-					_plr.heal(_builder_heal * delta)
+					_plr.heal(_builder_heal * delta, "station")
 			_builder_pulse_t -= delta
 			if _builder_pulse_t <= 0.0:
 				_builder_pulse_t = 3.5
@@ -4292,7 +4292,7 @@ class Prop extends StaticBody2D:
 		if _plr == null or not is_instance_valid(_plr):
 			return
 		if _plr.has_method("heal") and "max_hp" in _plr:
-			_plr.heal(float(_plr.max_hp) * frac)
+			_plr.heal(float(_plr.max_hp) * frac, "vanne")
 		if game != null and game.has_method("spawn_vfx"):
 			game.spawn_vfx("heal", _plr.global_position, 0.0, 1.3)
 

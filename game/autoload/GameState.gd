@@ -57,10 +57,10 @@ const DIFFICULTY: Array = [
 	# vident la barre en quelques secondes, « une erreur ne se paie pas, elle se punit ».
 	# On adoucit les DEGATS sur ce seul palier (0.68 -> 0.56). NORMAL et au-dela inchanges.
 	# ⚠️ a reconfirmer manette/doigt en main : le testeur tournait a 2-3 im/s et le dit lui-meme.
-	{"name": "FACILE",   "hp": 0.72, "dmg": 0.56, "speed": 0.92, "spawn": 0.85, "reward": 0.8, "score": 0.7},
-	{"name": "NORMAL",   "hp": 1.00, "dmg": 1.00, "speed": 1.00, "spawn": 1.00, "reward": 1.0, "score": 1.0},
-	{"name": "DIFFICILE","hp": 1.40, "dmg": 1.28, "speed": 1.06, "spawn": 1.20, "reward": 1.3, "score": 1.6},
-	{"name": "VETERAN",  "hp": 1.85, "dmg": 1.62, "speed": 1.12, "spawn": 1.45, "reward": 1.7, "score": 2.4},
+	{"name": "FACILE",   "hp": 0.72, "dmg": 0.56, "speed": 0.92, "spawn": 0.85, "heal": 1.4, "reward": 0.8, "score": 0.7},
+	{"name": "NORMAL",   "hp": 1.00, "dmg": 1.00, "speed": 1.00, "spawn": 1.00, "heal": 1.0, "reward": 1.0, "score": 1.0},
+	{"name": "DIFFICILE","hp": 1.40, "dmg": 1.28, "speed": 1.06, "spawn": 1.20, "heal": 0.85, "reward": 1.3, "score": 1.6},
+	{"name": "VETERAN",  "hp": 1.85, "dmg": 1.62, "speed": 1.12, "spawn": 1.45, "heal": 0.7, "reward": 1.7, "score": 2.4},
 ]
 var difficulty: int = 1       # index into DIFFICULTY (default NORMAL)
 
@@ -419,7 +419,7 @@ func add_xp(amount: int) -> void:
 		if level < 6:
 			xp_to_next = 5 + (level - 1) * 7
 		else:
-			xp_to_next = 33 + int(round(pow(float(level - 5), 1.38) * 6.5))
+			xp_to_next = 33 + int(round(pow(float(level - 5), 1.38) * 7.2))   # v12.15 : 6.5 -> 7.2
 		Events.level_up.emit(level)
 
 func add_scrap(amount: int) -> void:
