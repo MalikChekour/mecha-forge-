@@ -106,7 +106,7 @@ const DEFS: Dictionary = {
 	"mech18_shield": {"name": "Centurion blindé", "chassis": "en18_colosseum", "hp": 120.0, "speed": 138.0, "dmg": 17.0, "radius": 46.0, "size": 172.0, "motion": "walk", "rank": 0, "w": 3, "behavior": "ranged", "garde": true, "shield": 58.0, "protecteur": true, "attack_dmg": 11.2, "attack_cd": 2.5, "prefer_dist": 220.0, "unlock": 35.0},
 
 	# Snipers / Sentinelles Laser (tir_style sniper, ligne de télégraphe Line2D, dégâts lourds)
-	"mech01_sniper": {"name": "Sentinelle Laser", "chassis": "en01_tech_sniper", "hp": 22.0, "speed": 158.0, "dmg": 5.5, "radius": 34.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 11.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
+	"mech01_sniper": {"name": "Sentinelle Laser", "chassis": "en01_tech_sniper", "hp": 22.0, "speed": 158.0, "dmg": 5.5, "radius": 34.0, "size": 134.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 9.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech02_sniper": {"name": "Tireur des mirages", "chassis": "en02_desert_sniper", "hp": 24.0, "speed": 160.0, "dmg": 6.0, "radius": 34.0, "size": 136.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.2, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech03_sniper": {"name": "Archer de sous-bois", "chassis": "en03_jungle_sniper", "hp": 26.0, "speed": 162.0, "dmg": 6.4, "radius": 34.0, "size": 138.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 12.8, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
 	"mech04_sniper": {"name": "Pointeur thermique", "chassis": "en04_volcanic", "hp": 28.0, "speed": 154.0, "dmg": 6.8, "radius": 34.0, "size": 135.0, "motion": "walk", "rank": 0, "w": 4, "behavior": "ranged", "tir_style": "sniper", "attack_dmg": 13.5, "attack_cd": 3.2, "prefer_dist": 380.0, "unlock": 50.0},
@@ -639,7 +639,7 @@ func _spawn_offset() -> Vector2:
 ##            dropin proche mais rare | gates deux portes cardinales | fan trois eventails | sandwich devant/derriere
 ##   roles  : tir | charge (dasher) | mine (zones au sol) | kamikaze | bull (melee a charge) | blinde (bouclier) | lourd | barrage
 const PROFILES: Dictionary = {
-	"tech":      {"tier": 1, "forms": ["ligne","colonne","tenaille","encerclement"],  "pat": "ring",     "main": ["tir"],              "alt": ["rafale", "zigzag"],    "share": 0.15},   # v12.15 : plus de profil « tir seul »
+	"tech":      {"tier": 1, "forms": ["ligne","colonne","tenaille","encerclement"],  "pat": "ring",     "main": ["tir"],              "alt": ["rafale", "zigzag"],    "share": 0.08},   # v12.15 : plus de profil « tir seul »
 	"desert":    {"tier": 2, "forms": ["tenaille","colonne","ligne"],  "pat": "pincer",   "main": ["charge", "esquive"],           "alt": ["tir", "rafale"],              "share": 0.20},
 	"jungle":    {"tier": 3, "forms": ["embuscade","tirailleurs"],  "pat": "ambush",   "main": ["eventail"],              "alt": ["bull", "garde"],             "share": 0.25},
 	"volcanic":  {"tier": 4, "forms": ["coin","feu_et_mouvement"],  "pat": "ahead",    "main": ["mine", "esquive"],             "alt": ["orbe"],              "share": 0.25},

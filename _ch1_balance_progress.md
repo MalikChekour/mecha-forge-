@@ -17,3 +17,5 @@
 - v9 : Normal mort 85/159/246/247 s. v10 : rampe plafond soin 2:00 -> 6:00, regen +1.5 max 4.5, XP 6.8, elites lachent toujours un soin avant 1:30. Runs v10_d1_s11..15.
 - DECOUVERTE : le banc tirait des PROTOCOLES aleatoires (degats ennemis jusqu'a x1.6, spawn x2) -> variance enorme. Mesures desormais avec --no-protocols. Base 4cc6fea (base_d1_s11..14) et v10 (v10np_d1_s11..14) lancees en parallele.
 - Sans protocoles : BASE 4cc6fea Normal = 1 mort/4 (251 s), les autres a PV pleins presque tout le temps. v10 = 4 morts/4 (154-342 s) -> trop dur. v11 : heal_cd 2.5/4/6/8 s, plancher tardif plus doux (+1 par 40 s apres 3:20).
+- v11 (74db123) : Normal 4/4 morts (87/276/294/398 s), Facile OK a 7 min. v12 (iteration 1/2) : heal_cd 2/3/5/7 s, sniper Ch1 11.5 -> 9.5, part rafale/zigzag Ch1 0.15 -> 0.08.
+- v12 : Normal morts 262/364/463 s, s11 vivant a 8:00 (65/205 PV) ; aucune mort avant 3:00. Facile : PV > 80 % a 7:00. v13 (iteration 2/2) : heal_cd Normal 3 -> 2.5 s.
