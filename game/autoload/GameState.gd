@@ -419,7 +419,7 @@ func add_xp(amount: int) -> void:
 		if level < 6:
 			xp_to_next = 5 + (level - 1) * 7
 		else:
-			xp_to_next = 33 + int(round(pow(float(level - 5), 1.38) * 7.2))   # v12.15 : 6.5 -> 7.2
+			xp_to_next = 33 + int(round(pow(float(level - 5), 1.38) * 6.8))   # v12.16 : 6.5 -> 6.8
 		Events.level_up.emit(level)
 
 func add_scrap(amount: int) -> void:

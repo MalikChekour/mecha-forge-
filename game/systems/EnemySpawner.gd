@@ -963,7 +963,7 @@ func _maybe_elite(e: Enemy) -> void:
 	e.contact_dmg *= 1.6
 	e.attack_dmg *= 1.6
 	e.speed = minf(e.speed * 1.1, float(player.base_speed) * 0.8) if "base_speed" in player else e.speed
-	e.drops_bonus = randf() < 0.7   # v12.16 : 70 % (la cadence est plafonnee dans Game.spawn_bonus)
+	e.drops_bonus = GameState.run_time < 90.0 or randf() < 0.7   # v12.16 : 70 % (la cadence est plafonnee dans Game.spawn_bonus)
 	e.set_meta("phase1_elite", true)   # meme table de drop que l'elite scriptee (_spawn_elite)
 	e._spr.self_modulate = Color(1.5, 0.7, 1.4)
 	EnemyDiv.make_elite(e)   # pouvoir de biome (30/10 : plus de cape/epee/nom dessines)

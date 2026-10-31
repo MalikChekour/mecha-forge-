@@ -1482,8 +1482,8 @@ func spawn_bonus(pos: Vector2) -> void:
 	if now < _bonus_next:
 		_spawn_pickup(pos, "scrap", 4)   # cache trop rapprochee -> ferraille seulement
 		return
-	# rampe : aucun plafond avant 1:30 (le joueur apprend), plafond complet a 5:00
-	_bonus_next = now + float(GameState.diff().get("heal_cd", 6.0)) * clampf((now - 90.0) / 210.0, 0.0, 1.0)
+	# rampe : aucun plafond avant 2:00 (le joueur apprend), plafond complet a 6:00
+	_bonus_next = now + float(GameState.diff().get("heal_cd", 6.0)) * clampf((now - 120.0) / 240.0, 0.0, 1.0)
 	_spawn_pickup(pos, "bonus", 1)
 
 func spawn_skill(pos: Vector2) -> void:
@@ -3151,7 +3151,7 @@ func _apply_upgrade(id: String) -> void:
 			"magnet": player.magnet_range += 105.0   # base is tiny now -> each pick is a real jump in reach
 			"he_fuel": player.size_mult = minf(1.7, player.size_mult + 0.15)
 			"ammo": player.proj_speed_mult = minf(1.6, player.proj_speed_mult + 0.12)
-			"regen": player.hp_regen = minf(4.0, player.hp_regen + 1.0)   # v12.16 : +1.5 sans plafond -> +1.0, max 4 PV/s
+			"regen": player.hp_regen = minf(4.5, player.hp_regen + 1.5)   # v12.16 : +1.5, plafond 4.5 PV/s (banc : 6 PV/s en fin de partie)
 			"w_autocannon": player.add_weapon("autocannon")
 			"w_missile": player.add_weapon("missilepod")
 			"w_railgun": player.add_weapon("railgun")

@@ -14,3 +14,4 @@
 - v6 : Normal mort 130-191 s (mur 2:00 + mur 3:00). v7 : mur 2:00 retire, soin cache 25, drop elite 70 % (cadence plafonnee). Runs v7_d1_s11..14.
 - v7 : Normal mort 85-159 s (fenetre 60-100 s critique pour le bot, deja 9 % PV avant). v8 : debut ramene a l'original (bouclier 35 s, sniper 50 s, vague 38 s / 50 s) ; la pression ajoutee passe en milieu/fin de partie.
 - v8 : debut OK, mais 4/4 morts a 189-206 s (mini-boss + mur 3:00 + plafond soin complet). v9 : kit mini-boss x1.8/x2.2 (au lieu de 2.4/3.0), PV mini 8.5x, rampe plafond soin 1:30 -> 5:00.
+- v9 : Normal mort 85/159/246/247 s. v10 : rampe plafond soin 2:00 -> 6:00, regen +1.5 max 4.5, XP 6.8, elites lachent toujours un soin avant 1:30. Runs v10_d1_s11..15.

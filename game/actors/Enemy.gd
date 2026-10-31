@@ -557,7 +557,7 @@ func setup(k: String, def: Dictionary, plr: Node2D, g: Node) -> void:
 	if contact_sword:
 		vsize *= 1.35
 		grade = "chef"
-		drops_bonus = randf() < 0.7   # v12.16 : 70 % ; cadence plafonnee dans Game.spawn_bonus (banc Ch1 : 86 % des soins venaient de la)
+		drops_bonus = GameState.run_time < 90.0 or randf() < 0.7   # v12.16 : 70 % ; cadence plafonnee dans Game.spawn_bonus (banc Ch1 : 86 % des soins venaient de la)
 	var fh: float = float(_spr.texture.get_height())
 	if fh > 0.0:
 		_spr.scale = Vector2.ONE * (vsize / fh)
