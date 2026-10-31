@@ -27,6 +27,9 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 	player = plr
 	_t = 0.0
 	_homing = false
+	if _spr != null:
+		_spr.visible = true
+		_light.visible = true
 	monitoring = false
 	monitorable = false
 	visible = true
@@ -92,10 +95,31 @@ func setup(pos: Vector2, k: String, val: int, plr: Node2D) -> void:
 	var light_mult: float = 3.6 if k == "coffre_boss" else ((2.8 if big else 1.9) * (34.0 if big else 24.0) / 64.0)
 	_light.scale = Vector2.ONE * light_mult
 
+## 31/10 ANTI-FUITE : un butin au sol ne reste pas eternellement -> rester au contact paie, fuir fait perdre l'XP.
+## XP / ferraille 9 s, arme a emprunter 10 s ; clignote pendant les BLINK dernieres secondes (de plus en plus vite).
+## Jamais d'expiration une fois aspire (_homing : aimant, Overdrive, portee de ramassage). Bombe, aimant, soins, coffre,
+## orbe de competence et cellule Overdrive ne disparaissent PAS (objets rares, lisibles, deja geres a part).
+const LIFE: Dictionary = {"xp": 9.0, "scrap": 9.0, "arme_volee": 10.0}
+const BLINK: float = 2.5
+static var expired: Dictionary = {}
+
 func _physics_process(delta: float) -> void:
 	_t += delta
 	if player == null or not is_instance_valid(player):
 		return
+	if not _homing and LIFE.has(kind):
+		var life: float = float(LIFE[kind])
+		if _t >= life:
+			Pickup.expired[kind] = int(Pickup.expired.get(kind, 0)) + 1
+			_collected()
+			return
+		if _t >= life - BLINK:
+			var u: float = (_t - (life - BLINK)) / BLINK
+			_spr.visible = fmod(_t * lerpf(4.0, 11.0, u), 1.0) < 0.62
+			_light.visible = _spr.visible
+	if _homing and not _spr.visible:
+		_spr.visible = true
+		_light.visible = true
 	var to: Vector2 = player.global_position - global_position
 	var d: float = to.length()
 	var mrange: float = float(player.magnet_range) if "magnet_range" in player else 360.0
