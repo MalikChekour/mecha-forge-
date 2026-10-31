@@ -244,11 +244,11 @@ static func _boss_tick(e, delta: float, dist: float, dir: Vector2) -> void:
 		if n % 2 == 0:
 			for i in 3:
 				var pp: Vector2 = ppos + pv * 0.35 * float(i) + Vector2.from_angle(randf() * TAU) * 40.0 * float(i)
-				_mk(e, "circle", pp, 1.0 + 0.15 * float(i), ad * 2.4, cm, {"radius": 85.0, "tag": "salve_mini"})
+				_mk(e, "circle", pp, 1.0 + 0.15 * float(i), ad * 1.8, cm, {"radius": 85.0, "tag": "salve_mini"})
 			count("mini:salve")
 		else:
 			var L: float = dist + 140.0
-			_mk(e, "line", e.global_position, 0.85, ad * 3.0, cm, {"dir": dir, "length": L, "width": 70.0, "knock": 160.0, "tag": "charge_mini", "on_fire": _dash_cb(e, dir, L / 0.3, 0.3)})
+			_mk(e, "line", e.global_position, 0.85, ad * 2.2, cm, {"dir": dir, "length": L, "width": 70.0, "knock": 160.0, "tag": "charge_mini", "on_fire": _dash_cb(e, dir, L / 0.3, 0.3)})
 			count("mini:charge")
 		return
 	var cb: Color = Color(1.0, 0.3, 0.25)

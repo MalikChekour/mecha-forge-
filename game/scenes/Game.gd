@@ -1475,8 +1475,15 @@ func spawn_xp(pos: Vector2, val: int) -> void:
 func spawn_scrap(pos: Vector2, amount: int) -> void:
 	_spawn_pickup(pos, "scrap", amount)
 
+var _bonus_next: float = -1.0   # v12.16 : cadence max des caches de soin (banc Ch1 : ~35 soins/min annulaient tous les degats)
 func spawn_bonus(pos: Vector2) -> void:
 	# a gold cache: heals + tops up overdrive + a little scrap when vacuumed up
+	var now: float = GameState.run_time
+	if now < _bonus_next:
+		_spawn_pickup(pos, "scrap", 4)   # cache trop rapprochee -> ferraille seulement
+		return
+	# rampe : aucun plafond avant 1:30 (le joueur apprend), plafond complet a 5:00
+	_bonus_next = now + float(GameState.diff().get("heal_cd", 6.0)) * clampf((now - 90.0) / 210.0, 0.0, 1.0)
 	_spawn_pickup(pos, "bonus", 1)
 
 func spawn_skill(pos: Vector2) -> void:
@@ -3144,7 +3151,7 @@ func _apply_upgrade(id: String) -> void:
 			"magnet": player.magnet_range += 105.0   # base is tiny now -> each pick is a real jump in reach
 			"he_fuel": player.size_mult = minf(1.7, player.size_mult + 0.15)
 			"ammo": player.proj_speed_mult = minf(1.6, player.proj_speed_mult + 0.12)
-			"regen": player.hp_regen += 1.5
+			"regen": player.hp_regen = minf(4.0, player.hp_regen + 1.0)   # v12.16 : +1.5 sans plafond -> +1.0, max 4 PV/s
 			"w_autocannon": player.add_weapon("autocannon")
 			"w_missile": player.add_weapon("missilepod")
 			"w_railgun": player.add_weapon("railgun")
