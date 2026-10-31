@@ -19,3 +19,4 @@
 - Sans protocoles : BASE 4cc6fea Normal = 1 mort/4 (251 s), les autres a PV pleins presque tout le temps. v10 = 4 morts/4 (154-342 s) -> trop dur. v11 : heal_cd 2.5/4/6/8 s, plancher tardif plus doux (+1 par 40 s apres 3:20).
 - v11 (74db123) : Normal 4/4 morts (87/276/294/398 s), Facile OK a 7 min. v12 (iteration 1/2) : heal_cd 2/3/5/7 s, sniper Ch1 11.5 -> 9.5, part rafale/zigzag Ch1 0.15 -> 0.08.
 - v12 : Normal morts 262/364/463 s, s11 vivant a 8:00 (65/205 PV) ; aucune mort avant 3:00. Facile : PV > 80 % a 7:00. v13 (iteration 2/2) : heal_cd Normal 3 -> 2.5 s.
+- v13 (heal_cd Normal 2.5) : 4/4 morts 294-396 s -> bruit, pas mieux. RETENU : v12 (heal_cd 3 s). Ch2 Normal (v13, s11) : mort a 48 s -> reste plus dur que Ch1. _test_div : OK (0 echec). Version 12.16.
