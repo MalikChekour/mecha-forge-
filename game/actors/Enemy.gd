@@ -1562,6 +1562,15 @@ func _physics_process(delta: float) -> void:
 					_atk_cd = attack_cd if attack_cd > 0.2 else 2.2
 					game.spawn_enemy_bolt(global_position + dir * 18.0, dir, attack_dmg if attack_dmg > 0.0 else 6.0, Color(0.7, 0.45, 1.0), 0.9, 260.0)
 
+			elif behavior == "chasseur":
+				# CHASSEUR (31/10, anti-fuite) : coupe la route DEVANT le joueur puis ruee telegraphiee (cf. EnemyDiv.chasseur_move)
+				desired_vel = EnemyDiv.chasseur_move(self, delta, dist, dir)
+				if dist < CONTACT_PORTEE[_palier] and _contact_cd <= 0.0:
+					_contact_cd = CONTACT_CAD[_palier]
+					if player.has_method("take_damage"):
+						player.take_damage(contact_dmg, global_position, "contact:" + kind)
+						play("attack", true)
+
 			elif behavior == "kamikaze":
 				# KAMIKAZE : quasi identique a "miner" (approche + GroundZone), SAUF qu'il ne
 				# recule jamais — a portee, il s'arme (meche visible) puis fonce et se detruit ;
@@ -1990,12 +1999,22 @@ func _visual_offset() -> Vector2:
 		Enemy._vc_cache[chassis] = off
 	return off * _spr.scale
 
+## 31/10 ANTI-FUITE (visee predictive) : temps de vol calcule avec la VRAIE vitesse du projectile du style (le sniper part a
+## 780 px/s, l'orbe a 175), vitesse joueur = melange instantanee / moyenne 2 s (une feinte d'une frame ne trompe pas tout le
+## monde), plus une ERREUR propre a chaque tir (_aim_jit, tiree a chaque coup) : on vise ou il VA, pas au pixel pres.
+const STYLE_BOLT_SPEED: Dictionary = {"rafale": 430.0, "eventail": 270.0, "sniper": 780.0, "guide": 230.0, "orbe": 175.0}
+var _aim_jit: Vector2 = Vector2.ZERO
 func _aim_tick(delta: float) -> void:
 	var to_p: Vector2 = player.global_position - global_position
 	var goal: Vector2 = player.global_position
 	if aim_lead > 0.0 and "velocity" in player:
-		var tof: float = to_p.length() / maxf(ARME_VITESSE[_palier], 100.0)
-		goal += (player.velocity as Vector2) * tof * aim_lead
+		var bs: float = float(STYLE_BOLT_SPEED.get(tir_style, ARME_VITESSE[_palier]))
+		var tof: float = minf(to_p.length() / maxf(bs, 100.0), 1.6)
+		var pv: Vector2 = player.velocity as Vector2
+		var sp: Variant = game.get("spawner") if game != null else null
+		if sp != null and "avg_vel" in sp:
+			pv = pv.lerp(sp.avg_vel as Vector2, 0.5)
+		goal += pv * tof * aim_lead + _aim_jit * minf(1.0, pv.length() * tof / 120.0)
 	_aim_goal = (goal - global_position).angle()
 	if not _aim_init:
 		_aim = _aim_goal
@@ -2070,6 +2089,7 @@ static func _fx_ok() -> bool:
 	return Enemy._fx_n <= 6
 
 func _tire_dispatch(dir: Vector2) -> void:
+	_aim_jit = Vector2.from_angle(randf() * TAU) * randf_range(0.0, 46.0)   # erreur du PROCHAIN tir (visee predictive)
 	if tir_style == "" or not _STYLES.has(tir_style):
 		_tire_arme(dir)
 		return

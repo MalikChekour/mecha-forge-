@@ -186,6 +186,70 @@ static func _mk(e, shp: String, pos: Vector2, base_dur: float, dmg: float, col: 
 		p["src"] = e      # rappel annule si l'ennemi meurt avant le declenchement
 	return Telegraph.make(e.game, e.player, shp, pos, tele(base_dur), dmg, col, p)
 
+## 31/10 ANTI-FUITE : position PREDITE du joueur pour un telegraphe qui part dans `t_ahead` s. Vitesse = melange instantanee /
+## moyenne 2 s (EnemySpawner.avg_vel), part `k` de l'avance (x difficulte LEAD_DIFF), + erreur aleatoire (jamais au pixel).
+## Courir en ligne droite devient dangereux ; changer de cap au dernier moment reste la parade (le telegraphe est fige).
+const LEAD_DIFF: Array[float] = [0.55, 1.0, 1.1, 1.2]
+static func lead_pos(e, t_ahead: float, k: float = 0.7) -> Vector2:
+	var ppos: Vector2 = e.player.global_position
+	var pv: Vector2 = (e.player.velocity as Vector2) if "velocity" in e.player else Vector2.ZERO
+	var sp: Variant = e.game.get("spawner") if e.game != null else null
+	if sp != null and "avg_vel" in sp:
+		pv = pv.lerp(sp.avg_vel as Vector2, 0.5)
+	var lead: Vector2 = pv * t_ahead * k * LEAD_DIFF[difficulty()]
+	var err: float = 18.0 + 0.18 * lead.length()
+	return ppos + lead + Vector2.from_angle(randf() * TAU) * randf_range(0.0, err)
+
+## CHASSEUR (31/10) : file vers un point de COUPURE devant le joueur (position + vitesse moyenne x temps d'arrivee), puis,
+## a 120-380 px, s'arrete et telegraphie une ruee en ligne vers l'endroit ou le joueur VA etre (ligne au sol, rouge cyan).
+## Recharge 3,6 s en Normal (4,6 Facile), -0,15 s / palier. Retourne la vitesse voulue.
+const CH_RUEE_CD: Array[float] = [4.6, 3.6, 3.2, 2.8]
+const CH_RUEE_TEL: float = 0.62
+static func chasseur_move(e, delta: float, dist: float, dir: Vector2) -> Vector2:
+	if e.dv.has("cw"):
+		var cw: float = float(e.dv["cw"]) - delta
+		e.dv["cw"] = cw
+		if e._mat != null and e._mat.shader != null:
+			e._mat.set_shader_parameter("warn", 0.0 if cw <= 0.0 else 0.5 + 0.5 * absf(sin(float(Time.get_ticks_msec()) / 50.0)))
+		if cw <= 0.0:
+			e.dv.erase("cw")
+		return dir * e.speed * 0.08
+	if not e.dv.has("ccd"):
+		e.dv["ccd"] = randf_range(1.2, 2.2)
+	var cd: float = _cd(e, "ccd", delta)
+	var pv: Vector2 = (e.player.velocity as Vector2) if "velocity" in e.player else Vector2.ZERO
+	var sp: Variant = e.game.get("spawner") if e.game != null else null
+	if sp != null and "avg_vel" in sp:
+		pv = sp.avg_vel as Vector2
+	if cd <= 0.0 and dist > 120.0 and dist < 380.0 and Telegraph.live < Telegraph.LIVE_CAP - 4:
+		var aim: Vector2 = lead_pos(e, tele(CH_RUEE_TEL) + 0.12, 0.8)
+		var d2: Vector2 = (aim - e.global_position).normalized()
+		if d2 == Vector2.ZERO:
+			d2 = dir
+		var L: float = e.global_position.distance_to(aim) + 120.0
+		var tg: Variant = _mk(e, "line", e.global_position, CH_RUEE_TEL, _ad(e), Color(0.45, 0.95, 1.0),
+			{"dir": d2, "length": L, "width": 46.0, "knock": 120.0, "tag": "chasseur:ruee", "on_fire": _dash_cb_w(e, d2, L / 0.24, 0.24)})
+		if tg != null:
+			e.dv["cw"] = tele(CH_RUEE_TEL)
+			e.dv["ccd"] = maxf(2.0, CH_RUEE_CD[difficulty()] - 0.15 * float(e.dtier - 1))
+			count("chasseur:ruee")
+			return Vector2.ZERO
+	var lead_t: float = clampf(dist / maxf(e.speed, 1.0), 0.25, 1.4)
+	var goal: Vector2 = e.player.global_position + pv * lead_t
+	var to: Vector2 = goal - e.global_position
+	if to.length() < 8.0:
+		return dir * e.speed
+	return to.normalized() * e.speed
+
+## Variante a reference FAIBLE : le chasseur meurt souvent pendant son telegraphe ; une capture directe d'un noeud libere
+## imprimait « Lambda capture at index 0 was freed ».
+static func _dash_cb_w(e, d: Vector2, spd: float, dur: float) -> Callable:
+	var w: WeakRef = weakref(e)
+	return func(_tg, _hit) -> void:
+		var o: Variant = w.get_ref()
+		if o != null and is_instance_valid(o) and o.alive:
+			_dash(o, d, spd, dur)
+
 static func _dash(e, d: Vector2, spd: float, dur: float) -> void:
 	e._dv_dash_t = dur
 	e._dv_dash_v = d.normalized() * spd
@@ -295,7 +359,7 @@ static func tick(e, delta: float, dist: float, dir: Vector2) -> void:
 					for i in 3:
 						_mk(e, "circle", ppos + Vector2.from_angle(a0 + TAU * float(i) / 3.0) * 70.0, 1.0, ad * 0.8, Color(1.0, 0.5, 0.2), {"radius": 60.0, "tag": "grenade"})
 				else:
-					_mk(e, "circle", ppos, 1.0, ad * 1.2, Color(1.0, 0.5, 0.2), {"radius": 70.0, "tag": "grenade"})
+					_mk(e, "circle", lead_pos(e, tele(1.0), 0.8), 1.0, ad * 1.2, Color(1.0, 0.5, 0.2), {"radius": 70.0, "tag": "grenade"})
 				count("fantassin:grenade")
 			if t >= 3 and c2 <= 0.0 and dist < 480.0 and Enemy._fire_ok(2.0, e.rank) and e.game.has_method("spawn_enemy_bolt"):
 				e.dv["cd2"] = 6.0
@@ -353,8 +417,11 @@ static func tick(e, delta: float, dist: float, dir: Vector2) -> void:
 			if t >= 3 and c1 <= 0.0 and dist < 760.0:
 				e.dv["cd1"] = 8.0 if t < 6 else 5.0
 				var n: int = 3 if t >= 5 else 1
+				var dl: Vector2 = (lead_pos(e, tele(0.9), 0.7) - e.global_position).normalized()   # rail : vise ou il VA
+				if dl == Vector2.ZERO:
+					dl = dir
 				for i in n:
-					var d2: Vector2 = dir.rotated((float(i) - float(n - 1) * 0.5) * 0.22)
+					var d2: Vector2 = dl.rotated((float(i) - float(n - 1) * 0.5) * 0.22)
 					var fx2: Dictionary = {"dir": d2, "length": 780.0, "width": 22.0, "tag": "rail"}
 					if t >= 4:
 						fx2["slow"] = 0.55
@@ -385,9 +452,7 @@ static func tick(e, delta: float, dist: float, dir: Vector2) -> void:
 				e.dv["cd1"] = 4.5 if t < 6 else 3.5
 				var vol: int = int(e.dv.get("vol", 0)) + 1
 				e.dv["vol"] = vol
-				var tgt: Vector2 = ppos
-				if t >= 4 and "velocity" in e.player:
-					tgt += (e.player.velocity as Vector2) * tele(1.2) * 0.6
+				var tgt: Vector2 = lead_pos(e, tele(1.2), 0.75 if t >= 4 else 0.5)   # 31/10 : anticipe des le palier 2 (plus fort au 4)
 				_mk(e, "circle", tgt, 1.2, ad * 1.6, col, {"radius": 85.0, "tag": "mortier"})
 				if t >= 3:
 					_mk(e, "circle", ppos + Vector2.from_angle(randf() * TAU) * 110.0, 1.35, ad * 1.2, col, {"radius": 70.0, "tag": "mortier"})
@@ -507,14 +572,14 @@ static func _power(e, p: String, dir: Vector2, dist: float, ppos: Vector2, ad: f
 			e.dv["trail_t"] = 0.0
 			_mk(e, "line", e.global_position, 0.6, ad * 0.8, Color(1.0, 0.45, 0.1), {"dir": dir, "length": dist + 120.0, "width": 44.0, "tag": p, "on_fire": _dash_cb(e, dir, (dist + 120.0) / 0.5, 0.5)})
 		"tungsten_slam":   # Ch3 jungle : bond + impact au sol, repousse
-			_mk(e, "circle", ppos, 1.0, ad * 1.8, Color(0.75, 1.0, 0.4), {"radius": 110.0, "knock": 150.0, "tag": p, "on_fire": _slam_cb(e)})
+			_mk(e, "circle", lead_pos(e, tele(1.0), 0.6), 1.0, ad * 1.8, Color(0.75, 1.0, 0.4), {"radius": 110.0, "knock": 150.0, "tag": p, "on_fire": _slam_cb(e)})
 		"magma_wave":      # Ch4 volcanique : deux anneaux de lave concentriques
 			_mk(e, "ring", e.global_position, 0.8, ad * 1.2, Color(1.0, 0.35, 0.1), {"inner": 60.0, "radius": 170.0, "follow": e, "tag": p})
 			_mk(e, "ring", e.global_position, 1.25, ad * 1.2, Color(1.0, 0.35, 0.1), {"inner": 170.0, "radius": 290.0, "follow": e, "tag": p})
 		"acid_corrosion":  # Ch5 marais : flaque d'acide persistante, ralentit
-			_mk(e, "circle", ppos, 0.9, ad * 0.6, Color(0.6, 1.0, 0.2), {"radius": 120.0, "linger": 3.5, "dps": ad * 0.5, "slow": 0.6, "tag": p})
+			_mk(e, "circle", lead_pos(e, tele(0.9), 0.6), 0.9, ad * 0.6, Color(0.6, 1.0, 0.2), {"radius": 120.0, "linger": 3.5, "dps": ad * 0.5, "slow": 0.6, "tag": p})
 		"cryo_freeze":     # Ch6 cryo : gel -> immobilise 1 s
-			_mk(e, "circle", ppos, 1.1, ad * 0.8, Color(0.55, 0.9, 1.0), {"radius": 100.0, "stun": 1.0, "tag": p})
+			_mk(e, "circle", lead_pos(e, tele(1.1), 0.6), 1.1, ad * 0.8, Color(0.55, 0.9, 1.0), {"radius": 100.0, "stun": 1.0, "tag": p})
 		"radiation_aura":  # Ch7 reacteur : aura irradiee qui suit l'elite
 			_mk(e, "circle", e.global_position, 0.8, ad * 0.4, Color(0.7, 1.0, 0.2), {"radius": 200.0, "linger": 4.0, "dps": ad * 0.6, "follow": e, "tag": p})
 		"amber_cleave":    # Ch8 ruche : fauche d'ambre, englue

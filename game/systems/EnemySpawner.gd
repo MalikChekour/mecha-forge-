@@ -370,6 +370,7 @@ func _process(delta: float) -> void:
 	_ensure_phase2()
 	_sync_div()
 	_drain_wave()   # spread a queued horde over frames (no spawn hitch)
+	_ak_tick(delta)   # 31/10 ANTI-FUITE : vitesse moyenne, detection de fuite, interception
 	_squad_tick(delta)
 	_t += delta
 	_spawn_t -= delta
@@ -620,12 +621,8 @@ const FLEE_SPEED: float = 240.0     # above this the player is running, not repo
 const AHEAD_SHARE: float = 0.62     # share of spawns placed in the flight arc
 const AHEAD_ARC: float = 1.15       # half-width of that arc (rad) — a wall, not a single point
 func _spawn_offset() -> Vector2:
-	var v: Vector2 = Vector2.ZERO
-	if "velocity" in player:
-		v = player.velocity
-	if v.length() > FLEE_SPEED and randf() < AHEAD_SHARE:
-		var a: float = v.angle() + randf_range(-AHEAD_ARC, AHEAD_ARC)
-		return Vector2(cos(a), sin(a)) * SPAWN_R
+	# 31/10 : la regle « devant la fuite » (62 % a > 240 px/s instantane) est remplacee par la couche
+	# generique AK_AHEAD_SHARE de _spawn() (vitesse MOYENNE sur ~2 s, tous motifs, juste hors ecran).
 	var ang: float = randf() * TAU
 	return Vector2(cos(ang), sin(ang)) * SPAWN_R
 
@@ -701,7 +698,7 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 	d["attack_cd"] = lerpf(2.0, 1.4, (t - 1.0) / 17.0)   # 21/10 : debuts trop faciles -> plus dur des le niveau 1
 	d["attack_dmg"] = float(d["attack_dmg"]) * lerpf(1.4, 1.0, clampf((t - 1.0) / 8.0, 0.0, 1.0))
 	d["aim_rate"] = lerpf(2.4, 5.5, (t - 1.0) / 17.0)
-	d["aim_lead"] = clampf(0.25 + 0.035 * t, 0.25, 0.85)
+	d["aim_lead"] = clampf((0.34 + 0.03 * t) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()], 0.2, 0.9)   # 31/10 anti-fuite : 0,285 -> 0,37 au niveau 1 (Normal)
 	d["prefer_dist"] = lerpf(270.0, 215.0, (t - 1.0) / 17.0)
 	for f in flags:
 		match String(f):
@@ -761,6 +758,10 @@ func _def_for(kind: String) -> Dictionary:
 		var tier_s: float = float(prof.get("tier", 1))
 		d_spec["speed"] = float(d_spec.get("speed", 180.0)) * (0.95 + 0.005 * (tier_s - 1.0))
 		d_spec["hp"] = float(d_spec.get("hp", 20.0)) * (1.0 + 0.03 * (tier_s - 1.0))
+		# 31/10 ANTI-FUITE : les specialistes a distance (sniper, bouclier...) n'anticipaient PAS (aim_lead absent = 0).
+		if String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
+			var base_l: float = 0.6 if String(d_spec.get("tir_style", "")) == "sniper" else 0.4
+			d_spec["aim_lead"] = clampf((base_l + 0.02 * (tier_s - 1.0)) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()], 0.2, 0.9)
 		return d_spec
 	if not kind.begins_with("mech"):
 		return DEFS[kind] if DEFS.has(kind) else {}
@@ -1195,11 +1196,25 @@ func _spawn() -> void:
 		return
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
+	var off: Vector2 = _pattern_offset()
+	var ahead: bool = false
+	if String((PROFILES.get(current_biome, {}) as Dictionary).get("pat", "")) != "ahead" and avg_vel.length() > _pbase() * AK_MOVE_RATIO and randf() < AK_AHEAD_SHARE:
+		var a_h: float = avg_vel.angle() + randf_range(-AK_AHEAD_ARC, AK_AHEAD_ARC)
+		off = Vector2.from_angle(a_h) * offscreen_dist(a_h)
+		ahead = true
+		ak_stats["ahead_spawns"] = int(ak_stats["ahead_spawns"]) + 1
+	# CHASSEUR en filet continu (debloque selon la difficulte, plafond de vivants)
+	if GameState.run_time >= float(CH_UNLOCK[_ak_diff()]) and _live_chasseurs() < _chasseur_cap() and randf() < CH_TRICKLE:
+		if not ahead and avg_vel.length() > _pbase() * AK_MOVE_RATIO:
+			var a_c: float = avg_vel.angle() + randf_range(-AK_AHEAD_ARC, AK_AHEAD_ARC)
+			off = Vector2.from_angle(a_c) * offscreen_dist(a_c)
+		spawn_chasseur(player.global_position + off)
+		return
 	var kind: String = _weighted_pick()
 	if not _has_def(kind):
 		return
 	var e: Enemy = Enemy.new()
-	var spos: Vector2 = player.global_position + _pattern_offset()
+	var spos: Vector2 = player.global_position + off
 	if arena_half > 0.0:
 		# Keep spawns inside the walls. Fleeing toward a wall means the ahead-spawns land ON the
 		# wall in front of you -> you get pinned, which is the whole point of the bounded arena.
@@ -1307,3 +1322,175 @@ func _spawn_wave() -> void:
 		elif game.has_method("show_banner"):
 			game.show_banner(">>>  VAGUE MASSIVE  <<<", Color(1.0, 0.55, 0.3))
 	Audio.sfx("boss", 0.1)
+
+## ======================= ANTI-FUITE (31/10, plan B valide par le patron) =======================
+## Probleme : « le mecha du joueur peut fuir indefiniment sans etre inquiete ». Quatre leviers ici :
+##  1. vitesse MOYENNE du joueur sur ~2 s (avg_vel, EMA) : AK_AHEAD_SHARE (36 %) des apparitions normales tombent dans un arc
+##     DEVANT son deplacement, juste HORS ECRAN (offscreen_dist lit le viewport reel + zoom camera -> marche en portrait mobile) ;
+##  2. detection de fuite : s'il court (> 55 % de sa vitesse) en s'eloignant de la masse ennemie pendant AK_FLEE_T s,
+##     une petite vague d'INTERCEPTION (chasseurs + essaim) surgit devant lui (recharge AK_INTERCEPT_CD) ;
+##  3. CHASSEUR (role « chasseur ») : plus rapide que le mecha, vise un point de coupure DEVANT lui, ruee telegraphiee
+##     (ligne au sol) ; planche RIGGEE de l'essaim du biome (aucun nouvel art), taille uniforme 124 px / rayon 40 ;
+##  4. mesures de banc (ak_stats) : temps de fuite, temps « loin de tout », interceptions, apparitions devant.
+const AK_AHEAD_SHARE: float = 0.36
+const AK_AHEAD_ARC: float = 0.75
+const AK_MOVE_RATIO: float = 0.45            # vitesse moyenne / vitesse de base au-dela de laquelle on « se deplace »
+const AK_FLEE_RATIO: float = 0.55
+const AK_FLEE_T: Array[float] = [5.5, 4.0, 3.2, 2.6]          # Facile / Normal / Difficile / Veteran
+const AK_INTERCEPT_CD: Array[float] = [26.0, 18.0, 15.0, 12.0]
+const AK_INTERCEPT_T0: float = 60.0          # jamais d'interception avant 1:00 (le joueur apprend)
+const AK_FAR_PX: float = 380.0               # « loin de tout » : aucun ennemi a moins de 380 px
+const CH_UNLOCK: Array[float] = [150.0, 90.0, 60.0, 45.0]
+const CH_CAP: Array[int] = [1, 2, 3, 4]
+const CH_TRICKLE: float = 0.06
+const CH_SPEED: Array[float] = [1.03, 1.08, 1.13, 1.18]        # x vitesse de base du joueur (le plafond 80 % ne s'applique PAS)
+const CH_TINT: Color = Color(0.8, 1.25, 1.6)
+var avg_vel: Vector2 = Vector2.ZERO
+var _flee_t: float = 0.0
+var _intercept_cd: float = 0.0
+var _ak_scan: float = 0.0
+var ak_stats: Dictionary = {"flee_s": 0.0, "far_s": 0.0, "intercepts": 0, "ahead_spawns": 0, "chasseurs": 0}
+
+func _ak_diff() -> int:
+	return clampi(int(GameState.difficulty), 0, 3)
+
+func _pbase() -> float:
+	if player != null and "base_speed" in player:
+		return float(player.base_speed) * (float(player.move_mult) if "move_mult" in player else 1.0)
+	return 320.0
+
+## Distance du joueur au bord de l'ecran dans la direction `ang` (+ marge) : l'apparition se fait juste hors champ.
+## Lit la taille VISIBLE (stretch expand) et le zoom camera (Game._update_cam_zoom) -> correct en paysage, portrait, mobile.
+func offscreen_dist(ang: float, margin: float = 90.0) -> float:
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var z: Vector2 = Vector2.ONE
+	if game != null and "cam" in game and game.cam != null:
+		z = (game.cam as Camera2D).zoom
+	var half: Vector2 = Vector2(vp.x / maxf(z.x, 0.01), vp.y / maxf(z.y, 0.01)) * 0.5
+	var o: Vector2 = Vector2(0.0, 84.0)          # le joueur est sous le centre de vue (Game.CAM_OFFSET = (0, -84))
+	var d: Vector2 = Vector2.from_angle(ang)
+	var tx: float = 1.0e9
+	var ty: float = 1.0e9
+	if absf(d.x) > 0.0001:
+		tx = ((half.x if d.x > 0.0 else -half.x) - o.x) / d.x
+	if absf(d.y) > 0.0001:
+		ty = ((half.y if d.y > 0.0 else -half.y) - o.y) / d.y
+	return clampf(minf(tx, ty) + margin, 430.0, 980.0)
+
+func _ak_tick(delta: float) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var v: Vector2 = (player.velocity as Vector2) if "velocity" in player else Vector2.ZERO
+	avg_vel = avg_vel.lerp(v, 1.0 - exp(-delta / 2.0))
+	_intercept_cd -= delta
+	_ak_scan -= delta
+	if _ak_scan > 0.0:
+		return
+	var step: float = 0.25
+	_ak_scan = step
+	var pp: Vector2 = player.global_position
+	var c: Vector2 = Vector2.ZERO
+	var n: int = 0
+	var near: float = 1.0e12
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not (e is Enemy) or not (e as Enemy).alive:
+			continue
+		var d2: float = pp.distance_squared_to((e as Enemy).global_position)
+		near = minf(near, d2)
+		if d2 < 1100.0 * 1100.0:
+			c += (e as Enemy).global_position
+			n += 1
+	if n > 0 and near > AK_FAR_PX * AK_FAR_PX:
+		ak_stats["far_s"] = float(ak_stats["far_s"]) + step
+	var fleeing: bool = false
+	if n >= 3 and avg_vel.length() > _pbase() * AK_FLEE_RATIO:
+		var away: Vector2 = pp - c / float(n)
+		fleeing = away.length() > 1.0 and avg_vel.normalized().dot(away.normalized()) > 0.5
+	if fleeing:
+		_flee_t += step
+		ak_stats["flee_s"] = float(ak_stats["flee_s"]) + step
+	else:
+		_flee_t = maxf(0.0, _flee_t - step * 2.0)
+	var dk: int = _ak_diff()
+	if _flee_t >= AK_FLEE_T[dk] and _intercept_cd <= 0.0 and GameState.run_time >= AK_INTERCEPT_T0:
+		_flee_t = 0.0
+		_intercept_cd = AK_INTERCEPT_CD[dk]
+		_spawn_intercept()
+
+## Vague d'INTERCEPTION : 3 a 6 ennemis en eventail serre devant la fuite, juste hors ecran (1-2 chasseurs + essaim).
+func _spawn_intercept() -> void:
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	if pool.is_empty() or game == null:
+		return
+	var dk: int = _ak_diff()
+	var n: int = 3 + dk + (1 if EnemyDiv.tier() >= 3 else 0)
+	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
+		return
+	var nch: int = 1 if dk == 0 else 2
+	var a0: float = avg_vel.angle()
+	var swarm: String = String(pool[1]) if pool.size() > 1 else String(pool[0])
+	for i in n:
+		var a: float = a0 + (float(i) - float(n - 1) * 0.5) * 0.26
+		var pos: Vector2 = player.global_position + Vector2.from_angle(a) * offscreen_dist(a, 60.0)
+		if i % 2 == 0 and nch > 0 and _live_chasseurs() < _chasseur_cap() + 2:
+			nch -= 1
+			spawn_chasseur(pos)
+		else:
+			spawn_kind_at(swarm, pos)
+	ak_stats["intercepts"] = int(ak_stats["intercepts"]) + 1
+	if game.has_method("show_banner") and _t - float(_banner_t.get("intercept", -99.0)) > 25.0:
+		_banner_t["intercept"] = _t
+		game.show_banner(">>  INTERCEPTION  <<", Color(0.55, 0.95, 1.0))
+
+func _live_chasseurs() -> int:
+	var k: int = 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e is Enemy and (e as Enemy).alive and (e as Enemy).behavior == "chasseur":
+			k += 1
+	return k
+
+func _chasseur_cap() -> int:
+	return CH_CAP[_ak_diff()] + (EnemyDiv.tier() - 1) / 2
+
+func _chasseur_def() -> Dictionary:
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	if pool.is_empty():
+		pool = BIOME_POOL["tech"]
+	var base_k: String = String(pool[1]) if pool.size() > 1 else String(pool[0])
+	if not DEFS.has(base_k):
+		return {}
+	var d: Dictionary = (DEFS[base_k] as Dictionary).duplicate()
+	var t: float = float(EnemyDiv.tier())
+	d["name"] = "Chasseur"
+	d["role"] = "chasseur"
+	d["behavior"] = "chasseur"
+	d["bull"] = false
+	d["zigzag"] = 0.0
+	d["rank"] = 0
+	d["w"] = 0
+	d["hp"] = float(d.get("hp", 14.0)) * (1.35 + 0.12 * (t - 1.0))
+	d["attack_dmg"] = float(d.get("dmg", 4.0)) * (1.7 + 0.15 * (t - 1.0))   # la ruee frappe fort, le contact reste leger
+	return d
+
+## Un chasseur : planche riggee de l'essaim du biome, teinte cyan electrique, vitesse > joueur (hors plafond 80 %).
+func spawn_chasseur(pos: Vector2) -> Enemy:
+	if player == null or not is_instance_valid(player) or game == null:
+		return null
+	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
+		return null
+	var d: Dictionary = _chasseur_def()
+	if d.is_empty():
+		return null
+	_sync_div()
+	var e: Enemy = Enemy.new()
+	e.global_position = pos
+	game.enemy_layer.add_child(e)
+	e.setup(String((BIOME_POOL.get(current_biome, ["mech01"]) as Array)[0]) + "_chasseur", d, player, game)
+	_scale_enemy(e)
+	var tb: float = 0.01 * float(EnemyDiv.tier() - 1)
+	e.speed = _pbase() * (CH_SPEED[_ak_diff()] + tb)
+	e._speed_mult = 1.0
+	if e._spr != null:
+		e._spr.self_modulate = CH_TINT
+	ak_stats["chasseurs"] = int(ak_stats["chasseurs"]) + 1
+	return e
