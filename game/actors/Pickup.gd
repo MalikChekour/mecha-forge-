@@ -107,7 +107,7 @@ func _physics_process(delta: float) -> void:
 	_t += delta
 	if player == null or not is_instance_valid(player):
 		return
-	if not _homing and LIFE.has(kind):
+	if not _homing and EnemySpawner.AK_ON and LIFE.has(kind):
 		var life: float = float(LIFE[kind])
 		if _t >= life:
 			Pickup.expired[kind] = int(Pickup.expired.get(kind, 0)) + 1

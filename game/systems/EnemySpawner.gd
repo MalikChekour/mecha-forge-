@@ -623,6 +623,9 @@ const AHEAD_ARC: float = 1.15       # half-width of that arc (rad) — a wall, n
 func _spawn_offset() -> Vector2:
 	# 31/10 : la regle « devant la fuite » (62 % a > 240 px/s instantane) est remplacee par la couche
 	# generique AK_AHEAD_SHARE de _spawn() (vitesse MOYENNE sur ~2 s, tous motifs, juste hors ecran).
+	if not AK_ON and "velocity" in player and (player.velocity as Vector2).length() > FLEE_SPEED and randf() < AHEAD_SHARE:
+		var a0: float = (player.velocity as Vector2).angle() + randf_range(-AHEAD_ARC, AHEAD_ARC)
+		return Vector2(cos(a0), sin(a0)) * SPAWN_R
 	var ang: float = randf() * TAU
 	return Vector2(cos(ang), sin(ang)) * SPAWN_R
 
@@ -698,7 +701,7 @@ func _role_def(kind: String, flags: Array, tier: int) -> Dictionary:
 	d["attack_cd"] = lerpf(2.0, 1.4, (t - 1.0) / 17.0)   # 21/10 : debuts trop faciles -> plus dur des le niveau 1
 	d["attack_dmg"] = float(d["attack_dmg"]) * lerpf(1.4, 1.0, clampf((t - 1.0) / 8.0, 0.0, 1.0))
 	d["aim_rate"] = lerpf(2.4, 5.5, (t - 1.0) / 17.0)
-	d["aim_lead"] = clampf((0.34 + 0.03 * t) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()], 0.2, 0.9)   # 31/10 anti-fuite : 0,285 -> 0,37 au niveau 1 (Normal)
+	d["aim_lead"] = clampf(0.25 + 0.035 * t, 0.25, 0.85) if not AK_ON else clampf((0.30 + 0.03 * t) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()], 0.15, 0.9)   # 31/10 anti-fuite : 0,285 -> 0,33 au niveau 1 (Normal)
 	d["prefer_dist"] = lerpf(270.0, 215.0, (t - 1.0) / 17.0)
 	for f in flags:
 		match String(f):
@@ -759,9 +762,11 @@ func _def_for(kind: String) -> Dictionary:
 		d_spec["speed"] = float(d_spec.get("speed", 180.0)) * (0.95 + 0.005 * (tier_s - 1.0))
 		d_spec["hp"] = float(d_spec.get("hp", 20.0)) * (1.0 + 0.03 * (tier_s - 1.0))
 		# 31/10 ANTI-FUITE : les specialistes a distance (sniper, bouclier...) n'anticipaient PAS (aim_lead absent = 0).
-		if String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
-			var base_l: float = 0.6 if String(d_spec.get("tir_style", "")) == "sniper" else 0.4
-			d_spec["aim_lead"] = clampf((base_l + 0.02 * (tier_s - 1.0)) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()], 0.2, 0.9)
+		if AK_ON and String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
+			# banc ak1 : 0,6 au sniper = 1re cause de mort des 1:50 (le laser suit deja la cible pendant la charge) -> 0,3
+			var base_l: float = 0.3
+			var ramp: float = clampf(GameState.run_time / 150.0, 0.25, 1.0)   # montee en charge : pleine anticipation a 2:30
+			d_spec["aim_lead"] = clampf((base_l + 0.03 * (tier_s - 1.0)) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()] * ramp, 0.05, 0.85)
 		return d_spec
 	if not kind.begins_with("mech"):
 		return DEFS[kind] if DEFS.has(kind) else {}
@@ -1198,13 +1203,13 @@ func _spawn() -> void:
 		return
 	var off: Vector2 = _pattern_offset()
 	var ahead: bool = false
-	if String((PROFILES.get(current_biome, {}) as Dictionary).get("pat", "")) != "ahead" and avg_vel.length() > _pbase() * AK_MOVE_RATIO and randf() < AK_AHEAD_SHARE:
+	if AK_ON and String((PROFILES.get(current_biome, {}) as Dictionary).get("pat", "")) != "ahead" and avg_vel.length() > _pbase() * AK_MOVE_RATIO and randf() < AK_AHEAD_SHARE:
 		var a_h: float = avg_vel.angle() + randf_range(-AK_AHEAD_ARC, AK_AHEAD_ARC)
 		off = Vector2.from_angle(a_h) * offscreen_dist(a_h)
 		ahead = true
 		ak_stats["ahead_spawns"] = int(ak_stats["ahead_spawns"]) + 1
 	# CHASSEUR en filet continu (debloque selon la difficulte, plafond de vivants)
-	if GameState.run_time >= float(CH_UNLOCK[_ak_diff()]) and _live_chasseurs() < _chasseur_cap() and randf() < CH_TRICKLE:
+	if AK_ON and GameState.run_time >= float(CH_UNLOCK[_ak_diff()]) and _live_chasseurs() < _chasseur_cap() and randf() < CH_TRICKLE:
 		if not ahead and avg_vel.length() > _pbase() * AK_MOVE_RATIO:
 			var a_c: float = avg_vel.angle() + randf_range(-AK_AHEAD_ARC, AK_AHEAD_ARC)
 			off = Vector2.from_angle(a_c) * offscreen_dist(a_c)
@@ -1332,6 +1337,7 @@ func _spawn_wave() -> void:
 ##  3. CHASSEUR (role « chasseur ») : plus rapide que le mecha, vise un point de coupure DEVANT lui, ruee telegraphiee
 ##     (ligne au sol) ; planche RIGGEE de l'essaim du biome (aucun nouvel art), taille uniforme 124 px / rayon 40 ;
 ##  4. mesures de banc (ak_stats) : temps de fuite, temps « loin de tout », interceptions, apparitions devant.
+static var AK_ON: bool = not OS.get_cmdline_user_args().has("--no-antikite")   # banc : -- --no-antikite = temoin v12.16
 const AK_AHEAD_SHARE: float = 0.36
 const AK_AHEAD_ARC: float = 0.75
 const AK_MOVE_RATIO: float = 0.45            # vitesse moyenne / vitesse de base au-dela de laquelle on « se deplace »
@@ -1412,7 +1418,7 @@ func _ak_tick(delta: float) -> void:
 	else:
 		_flee_t = maxf(0.0, _flee_t - step * 2.0)
 	var dk: int = _ak_diff()
-	if _flee_t >= AK_FLEE_T[dk] and _intercept_cd <= 0.0 and GameState.run_time >= AK_INTERCEPT_T0:
+	if AK_ON and _flee_t >= AK_FLEE_T[dk] and _intercept_cd <= 0.0 and GameState.run_time >= AK_INTERCEPT_T0:
 		_flee_t = 0.0
 		_intercept_cd = AK_INTERCEPT_CD[dk]
 		_spawn_intercept()

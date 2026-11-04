@@ -2008,6 +2008,15 @@ func _aim_tick(delta: float) -> void:
 	var to_p: Vector2 = player.global_position - global_position
 	var goal: Vector2 = player.global_position
 	if aim_lead > 0.0 and "velocity" in player:
+		if not EnemySpawner.AK_ON:
+			goal += (player.velocity as Vector2) * (to_p.length() / maxf(ARME_VITESSE[_palier], 100.0)) * aim_lead
+			_aim_goal = (goal - global_position).angle()
+			if not _aim_init:
+				_aim = _aim_goal
+				_aim_init = true
+				return
+			_aim += clampf(angle_difference(_aim, _aim_goal), -aim_rate * delta, aim_rate * delta)
+			return
 		var bs: float = float(STYLE_BOLT_SPEED.get(tir_style, ARME_VITESSE[_palier]))
 		var tof: float = minf(to_p.length() / maxf(bs, 100.0), 1.6)
 		var pv: Vector2 = player.velocity as Vector2

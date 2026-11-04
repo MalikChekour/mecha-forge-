@@ -411,6 +411,7 @@ func _ready() -> void:
 	add_child(arena_wall)
 	arena_wall.setup(self, player)
 	arena_wall.process_mode = Node.PROCESS_MODE_PAUSABLE
+	arena_wall.active = EnemySpawner.AK_ON and not OS.get_cmdline_user_args().has("--no-wall")   # banc : -- --no-wall isole le test d'interception
 	player.move_mult = float(_mods.get("player_speed_mult", 1.0))
 	player.biome_proj_speed = float(_mods.get("player_proj_speed", 1.0))
 	player.inertia = float(_mods.get("player_inertia", 0.0))
@@ -3382,6 +3383,8 @@ func _process(delta: float) -> void:
 		if _headless and _frames >= _headless_frames:
 			_finish_headless()
 
+var _kite_bot: bool = OS.get_cmdline_user_args().has("--kite")
+var _kite_dir: Vector2 = Vector2.ZERO
 func _drive_bot() -> void:
 	if _headless and _frames == 1050 and GameState.overdrive < 1.0:
 		GameState.overdrive = 1.0     # CI: force-fill LATE so normal collection/level-up runs first, then beam
@@ -3425,6 +3428,20 @@ func _drive_bot() -> void:
 			move = (gem.global_position - player.global_position).normalized()
 		else:
 			move = strafe + (Vector2.ZERO - player.global_position) * 0.0006
+	# 31/10 BANC ANTI-FUITE : `-- --kite` = bot FUYARD (le pire cas signale par le patron) : il court en permanence a l'oppose
+	# de la masse ennemie (< 1100 px), sans jamais chercher le contact ni l'XP. Mesure l'efficacite du plan B.
+	if _kite_bot:
+		var kc: Vector2 = Vector2.ZERO
+		var kn: int = 0
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if e is Node2D and pp.distance_squared_to((e as Node2D).global_position) < 1100.0 * 1100.0:
+				kc += (e as Node2D).global_position
+				kn += 1
+		if kn > 0:
+			_kite_dir = (pp - kc / float(kn)).normalized().slerp(_kite_dir, 0.85) if _kite_dir != Vector2.ZERO else (pp - kc / float(kn)).normalized()
+		elif _kite_dir == Vector2.ZERO:
+			_kite_dir = Vector2.RIGHT
+		move = _kite_dir + danger * 0.6
 	# 31/10 : un joueur humain voit le champ d'energie et s'en ecarte ; le bot de banc aussi (sinon il s'y brule en boucle).
 	if arena_wall != null and arena_wall.active:
 		var aoff: Vector2 = pp - arena_wall.center

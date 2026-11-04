@@ -192,6 +192,8 @@ static func _mk(e, shp: String, pos: Vector2, base_dur: float, dmg: float, col: 
 const LEAD_DIFF: Array[float] = [0.55, 1.0, 1.1, 1.2]
 static func lead_pos(e, t_ahead: float, k: float = 0.7) -> Vector2:
 	var ppos: Vector2 = e.player.global_position
+	if not EnemySpawner.AK_ON:
+		return ppos
 	var pv: Vector2 = (e.player.velocity as Vector2) if "velocity" in e.player else Vector2.ZERO
 	var sp: Variant = e.game.get("spawner") if e.game != null else null
 	if sp != null and "avg_vel" in sp:
