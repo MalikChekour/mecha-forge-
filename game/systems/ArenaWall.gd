@@ -180,7 +180,7 @@ func _draw() -> void:
 		var a: float = float(i) * TAU / float(segs) + tm * 0.12
 		draw_arc(center, radius + 8.0, a, a + 0.05, 4, Color(1, 1, 1, 0.45), 8.0)
 	if next_shown:
-		draw_arc(next_center, next_radius, 0.0, TAU, n, Color(1, 1, 1, 0.85), 4.0)
+		draw_arc(next_center, next_radius, 0.0, TAU, n, Color(1, 1, 1, 0.95), 7.0)
 		var dash: int = 48
 		for i in dash:
 			var a2: float = float(i) * TAU / float(dash)
@@ -235,10 +235,12 @@ class ZoneHud extends Control:
 		var st: String = _status()
 		var fs2: int = int(19.0 * k)
 		var sw: float = font.get_string_size(st, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2).x
-		var sy: float = 112.0 * k
+		# sous la minicarte, aligne a droite (le centre-haut est deja pris par les bandeaux d'evenement)
+		var sx: float = vp.x - sw - 16.0 * k
+		var sy: float = (72.0 + 2.0 * 58.0 + 26.0) * k
 		var scol: Color = Color(1, 0.55, 0.45) if zone.shrink > 0.0 and zone.shrink < 1.0 else Color(0.8, 0.92, 1.0)
-		draw_string_outline(font, Vector2((vp.x - sw) * 0.5, sy), st, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2, int(5.0 * k), Color(0, 0, 0, 0.85))
-		draw_string(font, Vector2((vp.x - sw) * 0.5, sy), st, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2, scol)
+		draw_string_outline(font, Vector2(sx, sy), st, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2, int(5.0 * k), Color(0, 0, 0, 0.85))
+		draw_string(font, Vector2(sx, sy), st, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2, scol)
 		# fleche + distance quand on est hors du cercle a atteindre
 		var dz: float = pp.distance_to(tc) - tr
 		if dz > 0.0:
@@ -251,10 +253,10 @@ class ZoneHud extends Control:
 			var dt: String = "%d m" % int(dz / 10.0)
 			draw_string_outline(font, tip - dir * 24.0 * k + Vector2(-20.0 * k, 6.0 * k), dt, HORIZONTAL_ALIGNMENT_LEFT, -1, int(17.0 * k), int(4.0 * k), Color(0, 0, 0, 0.9))
 			draw_string(font, tip - dir * 24.0 * k + Vector2(-20.0 * k, 6.0 * k), dt, HORIZONTAL_ALIGNMENT_LEFT, -1, int(17.0 * k), col)
-		# minicarte (haut droite, sous OPTIONS), centree sur le joueur, 1 px = 36 px monde
+		# minicarte (haut droite, sous OPTIONS), centree sur le joueur, 1 px = 26 px monde
 		var mr: float = 58.0 * k
 		var mc: Vector2 = Vector2(vp.x - mr - 16.0 * k, 72.0 * k + mr)
-		var sc: float = mr / 2100.0
+		var sc: float = mr / 1500.0
 		draw_circle(mc, mr, Color(0.02, 0.05, 0.1, 0.72))
 		var cc: Vector2 = mc + (zone.center - pp) * sc
 		draw_arc(cc, zone.radius * sc, 0.0, TAU, 64, Color(0.35, 0.65, 1.0, 0.95), 2.0 * k)
