@@ -125,5 +125,7 @@ func _physics_process(delta: float) -> void:
 				float(sp.ak_stats["flee_s"]), 100.0 * float(sp.ak_stats["flee_s"]) / maxf(rt, 1.0), float(sp.ak_stats["far_s"]), 100.0 * float(sp.ak_stats["far_s"]) / maxf(rt, 1.0),
 				int(sp.ak_stats["intercepts"]), int(sp.ak_stats["chasseurs"]), int(sp.ak_stats["ahead_spawns"]),
 				float(aw.touch_s) if aw != null else 0.0, int(aw.hits) if aw != null else 0, float(aw.dmg_total) if aw != null else 0.0, str(Pickup.expired), str(EnemyDiv.stats.get("chasseur:ruee", 0))])
+			if aw != null and "phase" in aw:
+				print("CH1 ZONE phase=%d rayon=%.0f hors_zone=%.0fs (%.0f%%) degats_zone=%.0f (%.0f%% des degats) ticks=%d apparitions_zone=%d" % [aw.phase, aw.radius, aw.touch_s, 100.0 * aw.touch_s / maxf(rt, 1.0), aw.dmg_total, 100.0 * aw.dmg_total / maxf(_dmg(), 1.0), aw.hits, int(sp.ak_stats.get("zone_spawns", 0))])
 			Engine.time_scale = 1.0
 			get_tree().quit(0)

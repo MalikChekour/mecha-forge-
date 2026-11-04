@@ -1210,6 +1210,13 @@ func _spawn() -> void:
 		off = Vector2.from_angle(a_h) * offscreen_dist(a_h)
 		ahead = true
 		ak_stats["ahead_spawns"] = int(ak_stats["ahead_spawns"]) + 1
+	# 05/11 ZONE PUBG : une part des apparitions vient du cote de la zone sure -> la horde converge la ou le joueur DOIT aller.
+	if not ahead and AK_ON and game != null and game.get("arena_wall") != null and game.arena_wall.active and randf() < AK_ZONE_SHARE:
+		var zv: Vector2 = game.arena_wall.target_center() - player.global_position
+		if zv.length() > game.arena_wall.target_radius() * 0.25:
+			var a_z: float = zv.angle() + randf_range(-0.6, 0.6)
+			off = Vector2.from_angle(a_z) * offscreen_dist(a_z)
+			ak_stats["zone_spawns"] = int(ak_stats.get("zone_spawns", 0)) + 1
 	# CHASSEUR en filet continu (debloque selon la difficulte, plafond de vivants)
 	if AK_ON and GameState.run_time >= float(CH_UNLOCK[_ak_diff()]) and _live_chasseurs() < _chasseur_cap() and randf() < CH_TRICKLE:
 		if not ahead and avg_vel.length() > _pbase() * AK_MOVE_RATIO:
@@ -1341,6 +1348,7 @@ func _spawn_wave() -> void:
 ##  4. mesures de banc (ak_stats) : temps de fuite, temps « loin de tout », interceptions, apparitions devant.
 static var AK_ON: bool = not OS.get_cmdline_user_args().has("--no-antikite")   # banc : -- --no-antikite = temoin v12.16
 const AK_AHEAD_SHARE: float = 0.36
+const AK_ZONE_SHARE: float = 0.30              # 05/11 zone PUBG : part des apparitions cote zone sure
 const AK_AHEAD_ARC: float = 0.75
 const AK_MOVE_RATIO: float = 0.45            # vitesse moyenne / vitesse de base au-dela de laquelle on « se deplace »
 const AK_FLEE_RATIO: float = 0.55
