@@ -764,8 +764,8 @@ func _def_for(kind: String) -> Dictionary:
 		# 31/10 ANTI-FUITE : les specialistes a distance (sniper, bouclier...) n'anticipaient PAS (aim_lead absent = 0).
 		if AK_ON and String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
 			# banc ak1 : 0,6 au sniper = 1re cause de mort des 1:50 (le laser suit deja la cible pendant la charge) -> 0,3
-			var base_l: float = 0.3
-			var ramp: float = clampf(GameState.run_time / 150.0, 0.25, 1.0)   # montee en charge : pleine anticipation a 2:30
+			var base_l: float = 0.22   # banc ak3 (04/11) : sniper encore 1re source de degats (35-45 %) -> 0,22
+			var ramp: float = clampf(GameState.run_time / 180.0, 0.25, 1.0)   # montee en charge : pleine anticipation a 3:00
 			d_spec["aim_lead"] = clampf((base_l + 0.03 * (tier_s - 1.0)) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()] * ramp, 0.05, 0.85)
 		return d_spec
 	if not kind.begins_with("mech"):
@@ -1430,7 +1430,10 @@ func _spawn_intercept() -> void:
 		return
 	var dk: int = _ak_diff()
 	var n: int = 3 + dk + (1 if EnemyDiv.tier() >= 3 else 0)
-	if get_tree().get_nodes_in_group("enemies").size() + n > ENEMY_CAP:
+	# 04/11 : un fuyard accumule la horde au plafond (220) -> l'interception etait TOUJOURS annulee (banc : interceptions=0).
+	# On libere la place en retirant les trainards loin DERRIERE la fuite (ils ne rattraperont jamais).
+	var over: int = get_tree().get_nodes_in_group("enemies").size() + n - ENEMY_CAP
+	if over > 0 and _ak_make_room(over) < over:
 		return
 	var nch: int = 1 if dk == 0 else 2
 	var a0: float = avg_vel.angle()
@@ -1447,6 +1450,30 @@ func _spawn_intercept() -> void:
 	if game.has_method("show_banner") and _t - float(_banner_t.get("intercept", -99.0)) > 25.0:
 		_banner_t["intercept"] = _t
 		game.show_banner(">>  INTERCEPTION  <<", Color(0.55, 0.95, 1.0))
+
+## Retire jusqu'a `need` ennemis ordinaires (rang 0, hors chasseurs) a plus de 1300 px et DERRIERE la fuite. Renvoie le nombre retire.
+func _ak_make_room(need: int) -> int:
+	var pp: Vector2 = player.global_position
+	var fwd: Vector2 = avg_vel.normalized()
+	var cand: Array = []
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not (e is Enemy) or not (e as Enemy).alive or (e as Enemy).rank != 0 or (e as Enemy).behavior == "chasseur":
+			continue
+		var off: Vector2 = (e as Enemy).global_position - pp
+		if off.length_squared() > 1300.0 * 1300.0 and off.dot(fwd) < 0.0:
+			cand.append([off.length_squared(), e])
+	cand.sort_custom(func(a, b): return float(a[0]) > float(b[0]))
+	var k: int = 0
+	for c in cand:
+		if k >= need:
+			break
+		var en: Enemy = c[1]
+		en.alive = false
+		en.remove_from_group("enemies")
+		en.queue_free()
+		k += 1
+	ak_stats["recycled"] = int(ak_stats.get("recycled", 0)) + k
+	return k
 
 func _live_chasseurs() -> int:
 	var k: int = 0
