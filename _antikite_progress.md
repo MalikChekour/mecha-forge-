@@ -16,3 +16,4 @@
 - ak3 (04/11) : Normal morts 357/341/535/409 s (aucune avant 4:00), sniper 35-45 % des degats ; Facile s13/s14 survivent 960 s. ak3nowall : fuyard sans mur niv 6 a 11:00, 0 degat, 220 ennemis -> interception bloquee par ENEMY_CAP. Fix + sniper 0.22/rampe 3:00 commit. ak4 lance.
 - ak4 (sniper 0.22) Normal 211/324/431/278 s : pire, sniper toujours 1er. Facile ak3 : 4/4 survivent 960 s. -> ak5 : sniper lead 0.08, autres 0.3 ; lance.
 - ak5 (sniper 0.08) Normal 350/356/279/267 s (aucune avant 4:00) ; kite 162/379 s ; ak4nowall interceptions=8 (fix OK). ACCEPTE. Etape suivante : smoke+capture, version 12.17, push.
+- smoke 150 s OK + captures qa_antikite\ak_mur_*.png. Version 12.17. Push en cours.
