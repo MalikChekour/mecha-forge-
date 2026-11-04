@@ -764,7 +764,9 @@ func _def_for(kind: String) -> Dictionary:
 		# 31/10 ANTI-FUITE : les specialistes a distance (sniper, bouclier...) n'anticipaient PAS (aim_lead absent = 0).
 		if AK_ON and String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
 			# banc ak1 : 0,6 au sniper = 1re cause de mort des 1:50 (le laser suit deja la cible pendant la charge) -> 0,3
-			var base_l: float = 0.22   # banc ak3 (04/11) : sniper encore 1re source de degats (35-45 %) -> 0,22
+			# banc ak3/ak4 (04/11) : le sniper reste la 1re source de degats (35-50 %) -> anticipation quasi nulle pour lui (son laser suit deja
+			# la cible pendant la charge) ; les autres tireurs specialistes gardent 0,3.
+			var base_l: float = 0.08 if String(d_spec.get("tir_style", "")) == "sniper" else 0.3
 			var ramp: float = clampf(GameState.run_time / 180.0, 0.25, 1.0)   # montee en charge : pleine anticipation a 3:00
 			d_spec["aim_lead"] = clampf((base_l + 0.03 * (tier_s - 1.0)) * EnemyDiv.LEAD_DIFF[EnemyDiv.difficulty()] * ramp, 0.05, 0.85)
 		return d_spec
