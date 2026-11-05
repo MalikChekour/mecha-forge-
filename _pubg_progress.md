@@ -1,9 +1,9 @@
 # Zone PUBG progress (base v12.17 52bdb68, tag pre_pubg_20261105)
 - [x] 1 ArenaWall.gd reecrit (cercle fixe, prochain cercle aleatoire, 6 phases, degats hors zone, HUD zone)
 - [x] 2 bot vers la zone + spawns cote zone
-- [ ] 3 banc Ch1 (pz1)
+- [x] 3 banc Ch1 (pz1)
 - [ ] 4 capture qa_pubg
-- [ ] 5 v12.18 push
+- [x] 5 v12.18 push
 - Note : stash nov2 NON utilise (ArenaWall reecrit de zero, seule l'idee de phases reprise).
 - smoke 250 s OK (phase 2, rayon 900 a 4:10). Banc pz1 lance (qa_antikite\pz1*_d*_s*.log).
 - [x] 4 captures qa_pubg\zone_pubg_dedans.png + zone_pubg_hors_zone.png (game\_shot_pubg.tscn). HUD : etat de zone sous la minicarte (le centre-haut est pris par les bandeaux), minicarte 1:26, prochain cercle 7 px.
@@ -11,3 +11,5 @@
 - pz2 (fix) : phases OK (log [zone] 40/90/160/210/340...). Normal 290/464/563/361 s (aucune avant 4:00), zone 0 % des degats (bot reste dedans). Facile + kite encore en cours a 01:31.
 - pz2 Facile : s11 VICTOIRE 920 s, s14 VICTOIRE 954 s (phase 6, r 380). Kite s12 mort 780 s. Flag banc --zone-blind (fuyard qui ignore la zone) : pz2blind lance. Version 12.18.
 - Facile pz2 : 4/4 survivent (V 920, s12 >936, TEMPS 960, V 954). Kite s11 mort 674. Captures refaites sur code final. PUSH 12.18 lance.
+- pz2blind s11 (fuyard qui ignore la zone) : MORT zone:pubg 339 s, 77 % du temps hors zone, zone = 71 % des degats. s12 en cours (373 s).
+- [x] PUSH 12.18 OK 05/11 ~01:55 : html5 #2301897, android #2301900. TERMINE.
