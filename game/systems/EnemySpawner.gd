@@ -768,6 +768,9 @@ func _def_for(kind: String) -> Dictionary:
 		d_spec["speed"] = float(d_spec.get("speed", 180.0)) * (0.95 + 0.005 * (tier_s - 1.0))
 		d_spec["hp"] = float(d_spec.get("hp", 20.0)) * (1.0 + 0.03 * (tier_s - 1.0))
 		# 31/10 ANTI-FUITE : les specialistes a distance (sniper, bouclier...) n'anticipaient PAS (aim_lead absent = 0).
+		# v12.19 (bancs ak4/ak5/bm1/bm2 : 1 mort Normal sur 4 vers 3:30, toujours un sniper) : snipers apparus avant 4:00 frappent a 75 %.
+		if String(d_spec.get("tir_style", "")) == "sniper" and GameState.run_time < 240.0:
+			d_spec["dmg"] = float(d_spec.get("dmg", 5.0)) * 0.75
 		if AK_ON and String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
 			# banc ak1 : 0,6 au sniper = 1re cause de mort des 1:50 (le laser suit deja la cible pendant la charge) -> 0,3
 			# banc ak3/ak4 (04/11) : le sniper reste la 1re source de degats (35-50 %) -> anticipation quasi nulle pour lui (son laser suit deja
