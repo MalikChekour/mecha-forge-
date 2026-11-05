@@ -6,8 +6,8 @@ Ne pas toucher : stash "nov2 non-antikite". Pas de Meshy. Pas de refonte Armored
 - [x] 1. Tag pre_waves_20261105 + ce fichier
 - [x] 2. Recherche (Vampire Survivors, Survivor.io, Brotato, Halls of Torment, HoloCure) -> voir section Recherche
 - [x] 3. Audit EnemySpawner (voir section Audit)
-- [ ] 4. Implementation WaveSchedule.gd (table Ch1 a la main, Ch2-18 generes) + rampe + surge pre-boss + accalmie
-- [ ] 5. Banc Ch1 Facile + Normal, ordre d'introduction dans les logs, reglage
+- [x] 4. Implementation WaveSchedule.gd (table Ch1 a la main, Ch2-18 generes) + rampe + surge pre-boss + accalmie
+- [~] 5. Banc (smoke Normal s3 400 s OK : melee@0 > swarm@92 > elite@180 > tir@180 > shield@247 > kami@365 ; banc complet wv1 en cours) Ch1 Facile + Normal, ordre d'introduction dans les logs, reglage
 - [ ] 6. Commit, v12.20, push itch (html5 + android), captures /workspace/qa_waves/
 
 ## Recherche (principes)
@@ -25,3 +25,11 @@ Ne pas toucher : stash "nov2 non-antikite". Pas de Meshy. Pas de refonte Armored
 - Deblocage actuel par 'unlock' : base 0 s, shield/elite 35 s, swarm 0 s, sniper 50 s -> tout est la avant 1 min (probleme vise).
 - Elite scriptee a 25 s, escouades (elite+essaim+bouclier+sniper) des 40 s, hordes toutes les 50 s des 38 s, Mark 2 des 1:30, intermediaires des 2:00.
 - TIER_EVENTS : mini 3:00/8:00/12:00, boss1 5:00, boss2 10:00, boss final 15:00. PV : +12 %/min (1+0,002 t), degats +4,8 %/min, vitesse +1 %/min.
+
+## Implementation (etape 4)
+- game/systems/WaveSchedule.gd : table CH1 (11 tranches), hordes chronometrees, elites 3:00 + 15 s avant chaque boss, rampe PV +8 %/min, degats +4 %/min,
+  montee pre-boss 90 s (+25 % PV, +40 % densite, bandeau SIGNAL HOSTILE DETECTE), accalmie 25 s (densite x0,3) apres mini-boss, PV boss +3 %/min d'apparition.
+  build(tier) genere Ch2-18 (introductions resserrees jusqu'a x0,7, densite +1,2 %/chapitre, Mark 2 +1,5 %/chapitre, 2 types des le depart au Ch4+).
+- EnemySpawner.gd : _wv_* (pick, substitution d'escouade, tick), nouveau type mechNN_melee (base riggee en melee), kami/invocateur reactives via la table.
+  -- --no-waves = temoin v12.19. Zone PUBG / grande carte / anti-fuite / multiplicateurs de difficulte inchanges.
+- _bal_ch1.gd : ligne CH1 VAGUES (ordre d'introduction).

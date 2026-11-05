@@ -24,6 +24,17 @@ var enemy_tint: Color = Color(1, 1, 1)   # corruption visuelle du biome, appliqu
 var _wave_t: float = 38.0
 const WAVE_INTERVAL: float = 50.0
 const ENEMY_CAP: int = 220   # weak swarm dies fast -> allow a denser horde on screen
+## 05/11 VAGUES PAR TRANCHE DE TEMPS (v12.20) : table de WaveSchedule.gd (Ch1 a la main, Ch2-18 generes). Banc : -- --no-waves = temoin v12.19.
+const WaveSchedule = preload("res://systems/WaveSchedule.gd")
+static var WV_ON: bool = not OS.get_cmdline_user_args().has("--no-waves")
+var _wv_seen: Dictionary = {}          # slot -> instant de 1re apparition (ordre d'introduction, lu par le banc)
+var _wv_slice: int = -1
+var _wv_horde_i: int = 0
+var _wv_elite_i: int = 0
+var _wv_relief_until: float = -1.0
+var _wv_surge_ann: Dictionary = {}
+var _wv_watch: Array = []              # mini-boss / boss vivants -> accalmie a leur mort
+var wv_log: PackedStringArray = []
 
 # SURVIVOR.IO DIFFICULTY MODEL. Their chapter 1 does NOT dump every archetype at once: it
 # introduces them one at a time so each new threat reads, then punctuates with scripted elites
@@ -338,6 +349,22 @@ func _ensure_phase2() -> void:
 		repd["prefer_dist"] = 300.0
 		repd["bull"] = false
 		repd["archetype"] = "repair"
+		# 05/11 VAGUES : FANTASSIN DE MELEE = l'ennemi de base du chapitre (meme modele rigge) qui fonce au contact, sans charge de
+		# taureau ; c'est le seul type des 90 premieres secondes. Kamikaze / invocateur gardent le modele rigge de base (teinte).
+		var mel: Dictionary = base.duplicate()
+		mel["name"] = String(base.get("name", "Fantassin"))
+		mel["role"] = "fantassin"
+		mel["behavior"] = "rush"
+		mel["bull"] = false
+		mel["zigzag"] = 0.15
+		mel["melee"] = true
+		mel["w"] = 0
+		mel["unlock"] = 0.0
+		mel["archetype"] = "melee"
+		PHASE2_DEFS[base_id + "_melee"] = mel
+		kami["behavior"] = "kamikaze"    # Enemy.gd attend « kamikaze » (« kami » retombait sur la charge de taureau)
+		kami["tint"] = Color(1.35, 0.75, 0.95)
+		summoner["tint"] = Color(1.05, 0.8, 1.4)
 		PHASE2_DEFS[kami_id] = kami
 		PHASE2_DEFS[sum_id] = summoner
 		PHASE2_DEFS[art_id] = art
@@ -389,6 +416,8 @@ func _process(delta: float) -> void:
 		# on retombe exactement sur l'ancien comportement. Les pics de vague sont conserves.
 		var live: int = get_tree().get_nodes_in_group("enemies").size()
 		var floor_pop: int = clampi(5 + int(_t / 22.0) + int(maxf(0.0, _t - 200.0) / 40.0), 5, 34)   # v12.15 : 5+t/22 (max 24) -> 6+t/20 (max 28)
+		if _wv_active():
+			floor_pop = clampi(int(round(float(floor_pop) * _wv_dens())), 2, 48)
 		# 🚨 Rapport de test Manus (26/09, P0) : « mort possible en 20-30s des la difficulte
 		# Facile » — le plancher etait deja a 5 des t=0, et le rattrapage pouvait multiplier la
 		# cadence par x4 ; un joueur qui n'a pas encore appris le deplacement encaisse la pleine
@@ -412,6 +441,8 @@ func _process(delta: float) -> void:
 		# pire qu'un rythme normal), puis le laisse remonter jusqu'a sa vraie valeur.
 		var full_mult: float = spawn_mult * float(GameState.diff().get("spawn", 1.0)) * Protocols.spawn_rate
 		var eff_mult: float = lerpf(minf(1.0, full_mult), full_mult, grace)
+		if _wv_active():
+			eff_mult *= _wv_dens()   # VAGUES : densite de la tranche x montee pre-boss x accalmie
 		_spawn_t = rate / maxf(0.2, eff_mult * (1.25 + 0.025 * float(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", 1)) - 1)) * _phase_rate())
 		_spawn()
 	if _bosses_fired < BOSS_SCHEDULE.size() and GameState.run_time >= float(BOSS_SCHEDULE[_bosses_fired]["t"]) * _boss_scale:
@@ -434,13 +465,16 @@ func _process(delta: float) -> void:
 		elif GameState.run_time >= _endless_next_boss and not _boss_alive():
 			_spawn_boss("endboss")
 			_endless_next_boss = GameState.run_time + ENDLESS_BOSS_INTERVAL * _boss_scale
-	if _elites_fired < ELITE_SCHEDULE.size() and GameState.run_time >= float(ELITE_SCHEDULE[_elites_fired]["t"]):
-		_spawn_elite(String(ELITE_SCHEDULE[_elites_fired]["kind"]))
-		_elites_fired += 1
-	_wave_t -= delta
-	if _wave_t <= 0.0:
-		_wave_t = WAVE_INTERVAL
-		_spawn_wave()
+	if _wv_active():
+		_wv_tick()
+	else:
+		if _elites_fired < ELITE_SCHEDULE.size() and GameState.run_time >= float(ELITE_SCHEDULE[_elites_fired]["t"]):
+			_spawn_elite(String(ELITE_SCHEDULE[_elites_fired]["kind"]))
+			_elites_fired += 1
+		_wave_t -= delta
+		if _wave_t <= 0.0:
+			_wave_t = WAVE_INTERVAL
+			_spawn_wave()
 	_pulse_soft_wall_squad()
 
 ## Hold off spawning for `s` seconds (used by the run-start teleport intro).
@@ -572,6 +606,11 @@ func _kind_unlocked(k: String, t: float) -> bool:
 
 func _weighted_pick(fodder_only: bool = false) -> String:
 	var t: float = GameState.run_time
+	if _wv_active():
+		var slot: String = WaveSchedule.pick(_wv_sched(), t, fodder_only)
+		var kk: String = _wv_kind(slot)
+		_wv_note(slot)
+		return kk
 	var picks: Array = []
 	var total: int = 0
 	var pool: Array = BIOME_POOL.get(current_biome, [])   # filtre PAR BIOME
@@ -682,6 +721,8 @@ func _phase() -> Dictionary:
 			k = i
 	return PHASES[k]
 func _phase_rate() -> float:
+	if _wv_active():
+		return 0.6 if _boss_up() else 1.0   # la densite vient de la table des vagues
 	return float(_phase()["rate"]) * (0.6 if _boss_up() else 1.0)
 var _prof_defs: Dictionary = {}     # cache (biome|tier|alt) -> def fusionne
 var _pat_n: int = 0
@@ -693,6 +734,8 @@ func _special_cap(tier: int) -> int:
 	return 4 + tier / 4
 
 func _is_special(d: Dictionary) -> bool:
+	if bool(d.get("melee", false)):
+		return false
 	var b: String = String(d.get("behavior", ""))
 	return b == "dasher" or b == "kamikaze" or b == "miner" or b == "rush" or bool(d.get("bull", false))
 
@@ -771,6 +814,10 @@ func _def_for(kind: String) -> Dictionary:
 		# v12.19 (bancs ak4/ak5/bm1/bm2 : 1 mort Normal sur 4 vers 3:30, toujours un sniper) : snipers apparus avant 4:00 frappent a 75 %.
 		if String(d_spec.get("tir_style", "")) == "sniper" and GameState.run_time < 240.0:
 			d_spec["dmg"] = float(d_spec.get("dmg", 5.0)) * 0.75
+		# 05/11 VAGUES : les snipers arrivent tard (7:30 au Ch1) ; leurs 30 premieres secondes, le laser frappe a 75 %.
+		if _wv_active() and String(d_spec.get("tir_style", "")) == "sniper" and GameState.run_time < WaveSchedule.intro_t(_wv_sched(), "sniper") + 30.0:
+			d_spec["dmg"] = float(d_spec.get("dmg", 5.0)) * 0.75
+			d_spec["attack_dmg"] = float(d_spec.get("attack_dmg", 9.0)) * 0.75
 		if AK_ON and String(d_spec.get("behavior", "")) == "ranged" and not d_spec.has("aim_lead"):
 			# banc ak1 : 0,6 au sniper = 1re cause de mort des 1:50 (le laser suit deja la cible pendant la charge) -> 0,3
 			# banc ak3/ak4 (04/11) : le sniper reste la 1re source de degats (35-50 %) -> anticipation quasi nulle pour lui (son laser suit deja
@@ -946,7 +993,7 @@ func _squad_tick(delta: float) -> void:
 	var ph: Dictionary = _phase()
 	var pi: int = PHASES.find(ph)
 	if pi != _phase_idx:
-		if _phase_idx >= 0:
+		if _phase_idx >= 0 and not _wv_active():
 			_announce("", "PHASE : " + String(ph["label"]), Color(1.0, 0.45, 0.3))
 		_phase_idx = pi
 	_tier_tick(delta)
@@ -972,7 +1019,8 @@ func _maybe_elite(e: Enemy) -> void:
 	if not PROFILES.has(current_biome) or not e.kind.begins_with("mech") or e.grade != "":
 		return
 	var minutes: float = GameState.run_time / 60.0
-	if randf() >= minf((0.05 + 0.005 * minutes) * float(_phase()["elite"]), 0.3):
+	var el_f: float = float(WaveSchedule.slice(_wv_sched(), GameState.run_time)["elite"]) if _wv_active() else float(_phase()["elite"])
+	if randf() >= minf((0.05 + 0.005 * minutes) * el_f, 0.3):
 		return
 	e.grade = "elite"
 	e.hp *= minf(2.0 + 0.5 * minutes, 5.0)   # opensurvivor : l'elite devient plus coriace avec le temps
@@ -1033,6 +1081,8 @@ func _spawn_squad(force: bool = false, formation: String = "") -> bool:
 				member_kind = kind              # frontline mecha
 		if not EnemyDiv.kind_allowed(member_kind, _raw(member_kind), dtier):
 			member_kind = kind
+		if _wv_active():
+			member_kind = _wv_sub(member_kind)
 		var e: Enemy = Enemy.new()
 		e.global_position = pos
 		game.enemy_layer.add_child(e)
@@ -1150,6 +1200,12 @@ func _spawn_tier(tier_name: String) -> Enemy:
 		game.spawn_vfx("shockwave", e.global_position, 0.0, 1.5 + float(tp["size"]), tp["tint"])
 	_announce("", "!  %s  !" % String(tp["label"]), tp["tint"])
 	Audio.sfx("boss", 0.1)
+	if _wv_active() and int(tp["rank"]) >= 2:
+		# HoloCure : les PV du boss suivent la minute d'apparition (en plus de la rampe et des multiplicateurs de difficulte)
+		e.hp_max *= WaveSchedule.boss_hp_mult(GameState.run_time)
+		e.hp = e.hp_max
+		_wv_watch.append(e)
+		_wv_logp("BOSS %s t=%.0f pv=%.0f" % [tier_name, GameState.run_time, e.hp_max])
 	if tier_name.begins_with("boss"):
 		_boss_ref = e
 		Audio.music("boss")
@@ -1177,12 +1233,16 @@ const TIER_EVENTS: Array = [
 ## Echeancier de la hierarchie (appele par _squad_tick, apres les phases)
 func _tier_tick(_delta: float) -> void:
 	var t: float = GameState.run_time
-	if t >= 120.0 and t - float(_tier_last["inter"]) >= 90.0 and not _boss_up() and _live_tier(1) < 2:
+	var inter_t0: float = 180.0 if _wv_active() else 120.0   # VAGUES : pas d'intermediaire avant la 1re elite (3:00)
+	if t >= inter_t0 and t - float(_tier_last["inter"]) >= 90.0 and not _boss_up() and _live_tier(1) < 2:
 		_tier_last["inter"] = t
 		_spawn_tier("inter")
 	for ev in TIER_EVENTS:
 		var et: float = float(ev["t"])
 		if t >= et and not _tier_fired.has(et):
+			if _wv_active() and et < 200.0:
+				_tier_fired[et] = true   # VAGUES : a 3:00 c'est l'elite scriptee + les camps, pas un mini-boss en plus
+				continue
 			if _boss_up():
 				if String(ev["tier"]).begins_with("boss"):
 					continue
@@ -1200,6 +1260,8 @@ func _tier_tick(_delta: float) -> void:
 ## MARK 2 : part des apparitions de base. Introduits des 1:30, puis « swap de base » apres le boss 1 (5:00) et le boss 2 (10:00).
 func _mk2_share() -> float:
 	var t: float = GameState.run_time
+	if _wv_active():
+		return float(WaveSchedule.slice(_wv_sched(), t)["mk2"])   # palier blinde apres chaque boss (table des vagues)
 	if t >= 600.0:
 		return 0.8
 	if t >= 300.0:
@@ -1283,6 +1345,8 @@ func _scale_enemy(e: Enemy) -> void:
 	# run — kiting was free and permanent, and ENEMY_CAP forbids raising pressure by numbers.
 	# The cap keeps them beatable: even maxed they stay slower than an upgraded player.
 	var spd_scale: float = minf(1.0 + difficulty_bonus * 0.10 + GameState.run_time * 0.00018, 1.25)   # 17/10 : plafond 1,40 -> 1,25
+	if _wv_active():
+		spd_scale = minf(1.0 + difficulty_bonus * 0.10, 1.25)   # VAGUES (Brotato) : la vitesse ne monte pas avec le temps
 	e.speed *= speed_mult * float(d.get("speed", 1.0)) * spd_scale * clampf(Protocols.enemy_speed, 0.8, 1.2)
 	# 17/10 (patron : « les ennemis sont trop rapides ») : un ennemi ne rattrape plus un mecha qui FUIT. Plafond = 80 % de la vitesse du
 	# joueur : la poursuite reste menacante (on ne peut pas s'arreter), mais on peut toujours repositionner en courant. Les ruees
@@ -1296,28 +1360,34 @@ func _scale_enemy(e: Enemy) -> void:
 	var t0: float = GameState.run_time
 	var tier_ease: float = clampf(t0 / 90.0, 0.35, 1.0)
 	var proto_hp: float = lerpf(1.0, Protocols.enemy_hp, clampf(t0 / 75.0, 0.0, 1.0))
-	var hp_scale: float = (1.0 + 0.04 * tier_n * tier_ease) * (1.0 + t0 * 0.0020) * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * proto_hp
+	var time_hp: float = WaveSchedule.hp_mult(t0) if _wv_active() else (1.0 + t0 * 0.0020)   # VAGUES : +8 %/min, +25 % en montee pre-boss
+	var hp_scale: float = (1.0 + 0.04 * tier_n * tier_ease) * time_hp * (1.0 + difficulty_bonus) * float(d.get("hp", 1.0)) * proto_hp
 	e.hp *= hp_scale
 	e.hp_max = e.hp
 	if e.shield_max > 0.0:               # shields scale with HP too, else late-game shields are trivial
 		e.shield_max *= hp_scale
 		e.shield = e.shield_max
 	var proto_dmg: float = lerpf(1.0, Protocols.enemy_dmg, clampf(t0 / 75.0, 0.0, 1.0))
-	var dmg_scale: float = (1.0 + GameState.run_time * 0.0008) * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * proto_dmg
+	var time_dmg: float = WaveSchedule.dmg_mult(t0) if _wv_active() else (1.0 + GameState.run_time * 0.0008)   # VAGUES : +4 %/min
+	var dmg_scale: float = time_dmg * (1.0 + difficulty_bonus * 0.5) * float(d.get("dmg", 1.0)) * proto_dmg
 	e.contact_dmg *= dmg_scale
 	e.attack_dmg *= dmg_scale             # ranged bolts scale too (else late-game shooters are harmless)
 
 # Scripted horde: a big ring of foes crashes in at once. Leans on one archetype for a
 # coherent "swarm" read, mixes in a few others, and stays under the enemy cap for mobile.
-func _spawn_wave() -> void:
+func _spawn_wave(lead_slot: String = "", size_mult: float = 1.0) -> void:
 	if player == null or not is_instance_valid(player):
 		return
 	var existing: int = get_tree().get_nodes_in_group("enemies").size()
 	var want: int = 24 + int(GameState.run_time / 40.0) * 6 + int(difficulty_bonus * 24.0)
+	want = int(round(float(want) * size_mult))
 	var count: int = clampi(want, 0, maxi(0, ENEMY_CAP - existing))
 	if count <= 0:
 		return
 	var lead: String = _weighted_pick(true)   # waves are pure weak swarm (fodder only)
+	if lead_slot != "" and _wv_active() and WaveSchedule.allowed(_wv_sched(), GameState.run_time, lead_slot):
+		lead = _wv_kind(lead_slot)
+		_wv_note(lead_slot)
 	if lead == "":
 		return   # aucun ennemi defini -> pas de vague (evite une banniere "VAGUE MASSIVE" pour rien)
 	var base_ang: float = randf() * TAU
@@ -1547,3 +1617,117 @@ func spawn_chasseur(pos: Vector2) -> Enemy:
 		e._spr.self_modulate = CH_TINT
 	ak_stats["chasseurs"] = int(ak_stats["chasseurs"]) + 1
 	return e
+
+## ======================= VAGUES PAR TRANCHE DE TEMPS (05/11, v12.20) =======================
+func _wv_active() -> bool:
+	return WV_ON and (BIOME_POOL.get(current_biome, []) as Array).size() >= 5
+
+func _wv_tier() -> int:
+	return clampi(int((PROFILES.get(current_biome, {}) as Dictionary).get("tier", chapter)), 1, 18)
+
+func _wv_sched() -> Dictionary:
+	return WaveSchedule.build(_wv_tier())
+
+## Slot de la table -> ennemi reel du biome.
+func _wv_kind(slot: String) -> String:
+	var pool: Array = BIOME_POOL.get(current_biome, [])
+	if pool.size() < 5:
+		return ""
+	var base: String = String(pool[0])
+	match slot:
+		"melee": return base + "_melee"
+		"swarm": return String(pool[1])
+		"shield": return String(pool[2])
+		"sniper": return String(pool[3])
+		"kami": return base + "_kami"
+		"summoner": return base + "_summoner"
+	return base
+
+func _wv_slot_of(kind: String) -> String:
+	if kind.ends_with("_melee"): return "melee"
+	if kind.ends_with("_swarm"): return "swarm"
+	if kind.ends_with("_shield"): return "shield"
+	if kind.ends_with("_sniper"): return "sniper"
+	if kind.ends_with("_kami"): return "kami"
+	if kind.ends_with("_summoner"): return "summoner"
+	if kind.ends_with("_elite"): return "elite"
+	return "tir"
+
+## Membre d'escouade pas encore introduit -> remplace par un type deja present (le plus proche en role).
+func _wv_sub(kind: String) -> String:
+	var t: float = GameState.run_time
+	var sc: Dictionary = _wv_sched()
+	var slot: String = _wv_slot_of(kind)
+	if slot == "elite":
+		return kind if t >= float((sc["elites"] as Array)[0]) else _wv_sub(_wv_kind("tir"))
+	if WaveSchedule.allowed(sc, t, slot):
+		_wv_note(slot)
+		return kind
+	for alt in ["tir", "swarm", "melee"]:
+		if WaveSchedule.allowed(sc, t, alt):
+			_wv_note(alt)
+			return _wv_kind(alt)
+	return _wv_kind("melee")
+
+func _wv_dens() -> float:
+	var t: float = GameState.run_time
+	var dn: float = WaveSchedule.dens(_wv_sched(), t)
+	if t < _wv_relief_until:
+		dn *= WaveSchedule.RELIEF_DENS
+	return dn
+
+func _wv_logp(s: String) -> void:
+	var line: String = "[vagues] %s" % s
+	wv_log.append(line)
+	print(line)
+
+func _wv_note(slot: String) -> void:
+	if _wv_seen.has(slot):
+		return
+	_wv_seen[slot] = GameState.run_time
+	_wv_logp("NOUVEAU %s t=%.0f" % [slot, GameState.run_time])
+	if GameState.run_time > 20.0 and WaveSchedule.SLOT_LABEL.has(slot):
+		_announce("", "NOUVEAU : %s" % String(WaveSchedule.SLOT_LABEL[slot]), Color(1.0, 0.8, 0.35))
+
+func _wv_tick() -> void:
+	var t: float = GameState.run_time
+	var sc: Dictionary = _wv_sched()
+	var si: int = WaveSchedule.slice_idx(sc, t)
+	if si != _wv_slice:
+		_wv_slice = si
+		var sl: Dictionary = (sc["slices"] as Array)[si]
+		_wv_logp("TRANCHE %d t=%.0f types=%s dens=%.2f mk2=%.2f pv=x%.2f deg=x%.2f" % [si, t, str((sl["w"] as Dictionary).keys()), float(sl["dens"]), float(sl["mk2"]), WaveSchedule.hp_mult(t), WaveSchedule.dmg_mult(t)])
+	# montee pre-boss : avertissement a l'entree de la fenetre de 90 s
+	for b in WaveSchedule.BOSS_T:
+		var bt: float = float(b)
+		if t >= bt - WaveSchedule.SURGE_LEN and t < bt and not _wv_surge_ann.has(bt):
+			_wv_surge_ann[bt] = true
+			_wv_logp("SIGNAL pre-boss t=%.0f (boss a %.0f)" % [t, bt])
+			if game != null and game.has_method("show_horde_warning"):
+				game.show_horde_warning("⚠️ SIGNAL HOSTILE DÉTECTÉ ⚠️", "Le boss approche : les ennemis se renforcent")
+			elif game != null and game.has_method("show_banner"):
+				game.show_banner("!  SIGNAL HOSTILE DÉTECTÉ  !", Color(1.0, 0.35, 0.3))
+	# elites scriptees (3:00 + 15 s avant chaque boss)
+	var els: Array = sc["elites"]
+	if _wv_elite_i < els.size() and t >= float(els[_wv_elite_i]):
+		_wv_elite_i += 1
+		_wv_note("elite")
+		_wv_logp("ELITE t=%.0f" % t)
+		_spawn_elite("elite")
+	# hordes chronometrees (pas pendant une accalmie)
+	var hs: Array = sc["hordes"]
+	if _wv_horde_i < hs.size() and t >= float(hs[_wv_horde_i]["t"]):
+		var h: Dictionary = hs[_wv_horde_i]
+		_wv_horde_i += 1
+		if t >= _wv_relief_until:
+			_wv_logp("HORDE t=%.0f lead=%s n=x%.2f" % [t, String(h["lead"]), float(h["n"])])
+			_spawn_wave(String(h["lead"]), float(h["n"]))
+	# accalmie apres la mort d'un mini-boss / boss
+	for i in range(_wv_watch.size() - 1, -1, -1):
+		var w: Variant = _wv_watch[i]
+		if w == null or not is_instance_valid(w) or not (w as Enemy).alive:
+			_wv_watch.remove_at(i)
+			_wv_relief_until = t + WaveSchedule.RELIEF_S
+			_wv_logp("ACCALMIE t=%.0f -> %.0f" % [t, _wv_relief_until])
+			_announce("", "ACCALMIE : LA HORDE RECULE", Color(0.5, 1.0, 0.7))
+
