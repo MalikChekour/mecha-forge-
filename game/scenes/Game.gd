@@ -3445,7 +3445,8 @@ func _drive_bot() -> void:
 	# 31/10 : un joueur humain voit le champ d'energie et s'en ecarte ; le bot de banc aussi (sinon il s'y brule en boucle).
 	# 05/11 ZONE PUBG : le bot (normal ET fuyard) rejoint le cercle a atteindre (le prochain des qu'il est annonce) ;
 	# hors du cercle actuel, rentrer passe avant tout le reste (comme un joueur qui prend le gaz).
-	if arena_wall != null and arena_wall.active:
+	# banc : `-- --kite --zone-blind` = fuyard qui IGNORE la zone (mesure ce que la zone coute a un vrai fuyard).
+	if arena_wall != null and arena_wall.active and not (_kite_bot and OS.get_cmdline_user_args().has("--zone-blind")):
 		var zc: Vector2 = arena_wall.target_center()
 		var zr: float = arena_wall.target_radius()
 		var aoff: Vector2 = pp - zc
