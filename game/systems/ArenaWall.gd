@@ -38,7 +38,8 @@ var radius: float = R0
 var next_center: Vector2 = Vector2.ZERO   # prochain cercle (blanc), valable si next_shown
 var next_radius: float = R0
 var next_shown: bool = false
-var phase: int = 0                        # nombre de retrecissements commences
+var phase: int = 0                        # nombre de retrecissements TERMINES (= zones fermees)
+var _shrinking: int = -1                  # index de la phase en cours de retrecissement, -1 sinon
 var shrink: float = 0.0                   # 0..1 dans le retrecissement en cours (compat)
 var outside: bool = false
 var active: bool = true
@@ -73,8 +74,9 @@ func target_radius() -> float:
 	return next_radius if next_shown else radius
 
 func cur_dps_frac() -> float:
-	var i: int = clampi(phase - 1, 0, PHASES.size() - 1)
-	var base: float = float(PHASES[i][4]) * (0.6 if phase == 0 else 1.0)
+	var z: int = phase + (1 if _shrinking >= 0 else 0)   # zones fermees ou en cours de fermeture
+	var i: int = clampi(z - 1, 0, PHASES.size() - 1)
+	var base: float = float(PHASES[i][4]) * (0.6 if z == 0 else 1.0)
 	return base * DIFF_MULT[clampi(int(GameState.difficulty), 0, 3)]
 
 func _pick_inside(c: Vector2, r: float, r_new: float) -> Vector2:
@@ -85,6 +87,7 @@ func _pick_inside(c: Vector2, r: float, r_new: float) -> Vector2:
 func _reset_at(pp: Vector2) -> void:
 	_started = true
 	phase = 0
+	_shrinking = -1
 	radius = R0
 	center = pp + Vector2.from_angle(randf() * TAU) * randf_range(0.0, R0 * 0.35)
 	next_shown = false
@@ -105,28 +108,36 @@ func _physics_process(delta: float) -> void:
 	_ui.visible = visible and (game == null or game.hud == null or game.hud.visible)
 	# --- echeancier des phases ---
 	shrink = 0.0
-	for i in PHASES.size():
-		var ph: Array = PHASES[i]
-		var a: float = float(ph[0])
+	# Machine a etats stricte : annonce de la phase `phase` -> retrecissement (_shrinking) -> phase suivante.
+	# (pz1 : l'annonce de la phase N+1 relancait l'interpolation de la phase N -> le cercle sautait d'un coup.)
+	for _guard in PHASES.size() + 1:
+		if phase >= PHASES.size():
+			break
+		var ph: Array = PHASES[phase]
 		var s0: float = float(ph[1])
 		var s1: float = float(ph[2])
-		if t >= a and i >= phase and not next_shown:
-			next_radius = float(ph[3])
-			next_center = _pick_inside(center, radius, next_radius)
-			next_shown = true
-			_say("a%d" % i, "ZONE %d/%d : NOUVELLE ZONE SURE" % [i + 1, PHASES.size()], COL_NEXT)
-		if t >= s0 and phase == i and next_shown:
-			phase = i + 1
-			_from_c = center
-			_from_r = radius
-			_say("s%d" % i, "!  LA ZONE SE RESSERRE  !", COL_OUT)
-		if phase == i + 1 and next_shown:
+		if _shrinking < 0:
+			if t >= float(ph[0]) and not next_shown:
+				next_radius = float(ph[3])
+				next_center = _pick_inside(center, radius, next_radius)
+				next_shown = true
+				_say("a%d" % phase, "ZONE %d/%d : NOUVELLE ZONE SURE" % [phase + 1, PHASES.size()], COL_NEXT)
+			if t >= s0 and next_shown:
+				_shrinking = phase
+				_from_c = center
+				_from_r = radius
+				_say("s%d" % phase, "!  LA ZONE SE RESSERRE  !", COL_OUT)
+		if _shrinking == phase:
 			var k: float = clampf((t - s0) / maxf(0.01, s1 - s0), 0.0, 1.0)
 			shrink = k
 			center = _from_c.lerp(next_center, k)
 			radius = lerpf(_from_r, next_radius, k)
 			if k >= 1.0:
 				next_shown = false
+				_shrinking = -1
+				phase += 1
+				continue
+		break
 	# --- degats hors zone : continus, sans recul ---
 	var d: float = pp.distance_to(center)
 	outside = GameState.alive and d > radius
@@ -164,6 +175,7 @@ func _say(key: String, text: String, col: Color) -> void:
 	if _banner.has(key) or game == null or not game.has_method("show_banner"):
 		return
 	_banner[key] = true
+	print("[zone] t=%.0f %s phase=%d r=%.0f -> %.0f" % [GameState.run_time, key, phase, radius, next_radius])
 	game.show_banner(text, col)
 
 ## Monde : cercle actuel bleu (mur d'energie + voile exterieur), prochain cercle en blanc fin.

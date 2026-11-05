@@ -7,3 +7,4 @@
 - Note : stash nov2 NON utilise (ArenaWall reecrit de zero, seule l'idee de phases reprise).
 - smoke 250 s OK (phase 2, rayon 900 a 4:10). Banc pz1 lance (qa_antikite\pz1*_d*_s*.log).
 - [x] 4 captures qa_pubg\zone_pubg_dedans.png + zone_pubg_hors_zone.png (game\_shot_pubg.tscn). HUD : etat de zone sous la minicarte (le centre-haut est pris par les bandeaux), minicarte 1:26, prochain cercle 7 px.
+- pz1 : BUG machine a etats (l'annonce N+1 relancait l'interpolation N -> cercle qui saute, phase bloquee a 2). Normal 246/305/388/382 s, zone 0 % des degats. Kite 643 s. Fix (_shrinking) + log [zone]. pz2 lance.
