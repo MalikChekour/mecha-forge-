@@ -7,8 +7,8 @@ Ne pas toucher : stash "nov2 non-antikite". Pas de Meshy. Pas de refonte Armored
 - [x] 2. Recherche (Vampire Survivors, Survivor.io, Brotato, Halls of Torment, HoloCure) -> voir section Recherche
 - [x] 3. Audit EnemySpawner (voir section Audit)
 - [x] 4. Implementation WaveSchedule.gd (table Ch1 a la main, Ch2-18 generes) + rampe + surge pre-boss + accalmie
-- [~] 5. Banc (smoke Normal s3 400 s OK : melee@0 > swarm@92 > elite@180 > tir@180 > shield@247 > kami@365 ; banc complet wv1 en cours) Ch1 Facile + Normal, ordre d'introduction dans les logs, reglage
-- [ ] 6. Commit, v12.20, push itch (html5 + android), captures /workspace/qa_waves/
+- [x] 5. Banc wv1 (Ch1, 960 s, x6) : voir section Banc
+- [~] 6. Commit, v12.20, push itch (html5 + android), captures /workspace/qa_waves/
 
 ## Recherche (principes)
 1. Table minute par minute (VS Mad Forest) : roster par minute, minimum d'ennemis vivants, intervalle. https://vampire.survivors.wiki/w/Mad_Forest https://teemo.dev/game-design/vampire-survivors/systems/spawn-director/
@@ -33,3 +33,11 @@ Ne pas toucher : stash "nov2 non-antikite". Pas de Meshy. Pas de refonte Armored
 - EnemySpawner.gd : _wv_* (pick, substitution d'escouade, tick), nouveau type mechNN_melee (base riggee en melee), kami/invocateur reactives via la table.
   -- --no-waves = temoin v12.19. Zone PUBG / grande carte / anti-fuite / multiplicateurs de difficulte inchanges.
 - _bal_ch1.gd : ligne CH1 VAGUES (ordre d'introduction).
+
+## Banc wv1 (etape 5)
+Ordre d'introduction (8/8 runs identique) : melee@0 > swarm@90-92 > elite@180 > tir@180 > shield@241-247 > kami@361-365 > sniper@450-451 > summoner@541-559
+- Facile : 4/4 vivants a 960 s (pv_min 53-83 %). Boss 5:00 tue en 21-103 s, boss 10:00 en 10-91 s.
+- Normal : 1 vivant a 960 s (s1, pv_min 33 %) ; morts a 526 s (s3, tireur), 668 s (s4), 896 s (s2, sniper, juste avant le boss final). Aucune mort avant 8:00
+  (v12.19 Normal : 273 / 301 / >740 / 340 s). Pas de reglage supplementaire : « difficile mais gagnable ».
+- Captures : qa_waves/1_debut_fantassins_seuls.png (0:28, 6 fantassins seuls), 2_signal_hostile_pre_boss.png (3:31, bandeau), 2b_montee_pre_boss.png, 3_fin_melange_blinde.png (11:54, 9 types).
+- Correctif apres captures : le bandeau show_horde_warning n'apparait pas a l'ecran -> le signal passe aussi par show_banner (visible).

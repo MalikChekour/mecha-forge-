@@ -1686,7 +1686,7 @@ func _wv_note(slot: String) -> void:
 		return
 	_wv_seen[slot] = GameState.run_time
 	_wv_logp("NOUVEAU %s t=%.0f" % [slot, GameState.run_time])
-	if GameState.run_time > 20.0 and WaveSchedule.SLOT_LABEL.has(slot):
+	if GameState.run_time > 20.0 and WaveSchedule.SLOT_LABEL.has(slot) and _t - float(_banner_t.get("NOUVEAU", -99.0)) > 4.0:
 		_announce("", "NOUVEAU : %s" % String(WaveSchedule.SLOT_LABEL[slot]), Color(1.0, 0.8, 0.35))
 
 func _wv_tick() -> void:
@@ -1704,8 +1704,9 @@ func _wv_tick() -> void:
 			_wv_surge_ann[bt] = true
 			_wv_logp("SIGNAL pre-boss t=%.0f (boss a %.0f)" % [t, bt])
 			if game != null and game.has_method("show_horde_warning"):
-				game.show_horde_warning("⚠️ SIGNAL HOSTILE DÉTECTÉ ⚠️", "Le boss approche : les ennemis se renforcent")
-			elif game != null and game.has_method("show_banner"):
+				game.show_horde_warning("SIGNAL HOSTILE DÉTECTÉ", "Le boss approche : les ennemis se renforcent")
+			if game != null and game.has_method("show_banner"):
+				_banner_t["NOUVEAU"] = _t
 				game.show_banner("!  SIGNAL HOSTILE DÉTECTÉ  !", Color(1.0, 0.35, 0.3))
 	# elites scriptees (3:00 + 15 s avant chaque boss)
 	var els: Array = sc["elites"]
