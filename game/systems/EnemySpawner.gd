@@ -484,13 +484,19 @@ func _rigged_kind(kind: String) -> String:
 		pool = BIOME_POOL["tech"]
 	return String(pool[mini(int(NON_RIGGED_REDIRECT[kind]), pool.size() - 1)])
 
+## v12.19 : la carte est bornee (ArenaWall.MAP_R) -> aucune apparition hors carte.
+func _in_map(pos: Vector2) -> Vector2:
+	if game != null and game.get("arena_wall") != null and game.arena_wall.active and game.arena_wall.has_method("clamp_to_map"):
+		return game.arena_wall.clamp_to_map(pos, 80.0)
+	return pos
+
 func spawn_kind_at(kind: String, pos: Vector2) -> Enemy:
 	kind = _rigged_kind(kind)
 	if not _has_def(kind) or player == null or not is_instance_valid(player):
 		return null
 	_sync_div()
 	var e: Enemy = Enemy.new()
-	e.global_position = pos
+	e.global_position = _in_map(pos)
 	game.enemy_layer.add_child(e)
 	var def: Dictionary = _def_for(kind) if PHASE2_DEFS.has(kind) else DEFS[kind]
 	e.setup(kind, def, player, game)
@@ -1213,7 +1219,8 @@ func _spawn() -> void:
 	# 05/11 ZONE PUBG : une part des apparitions vient du cote de la zone sure -> la horde converge la ou le joueur DOIT aller.
 	if not ahead and AK_ON and game != null and game.get("arena_wall") != null and game.arena_wall.active and randf() < AK_ZONE_SHARE:
 		var zv: Vector2 = game.arena_wall.target_center() - player.global_position
-		if zv.length() > game.arena_wall.target_radius() * 0.25:
+		# v12.19 grande carte : seulement si le joueur est hors du cercle a atteindre ou pres de son bord (sinon exploration libre)
+		if game.arena_wall.zone_live() and zv.length() > game.arena_wall.target_radius() * 0.8:
 			var a_z: float = zv.angle() + randf_range(-0.6, 0.6)
 			off = Vector2.from_angle(a_z) * offscreen_dist(a_z)
 			ak_stats["zone_spawns"] = int(ak_stats.get("zone_spawns", 0)) + 1
@@ -1251,7 +1258,7 @@ func spawn_at(pos: Vector2, kind: String) -> void:
 	if get_tree().get_nodes_in_group("enemies").size() >= ENEMY_CAP:
 		return
 	var e: Enemy = Enemy.new()
-	var p: Vector2 = pos
+	var p: Vector2 = _in_map(pos)
 	if arena_half > 0.0:
 		p.x = clampf(p.x, arena.position.x, arena.end.x)
 		p.y = clampf(p.y, arena.position.y, arena.end.y)
@@ -1526,7 +1533,7 @@ func spawn_chasseur(pos: Vector2) -> Enemy:
 		return null
 	_sync_div()
 	var e: Enemy = Enemy.new()
-	e.global_position = pos
+	e.global_position = _in_map(pos)
 	game.enemy_layer.add_child(e)
 	e.setup(String((BIOME_POOL.get(current_biome, ["mech01"]) as Array)[0]) + "_chasseur", d, player, game)
 	_scale_enemy(e)

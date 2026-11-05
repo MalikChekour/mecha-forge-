@@ -3428,6 +3428,11 @@ func _drive_bot() -> void:
 			move = (gem.global_position - player.global_position).normalized()
 		else:
 			move = strafe + (Vector2.ZERO - player.global_position) * 0.0006
+	# v12.19 GRANDE CARTE : le bot explore (POI non visite dans la zone a atteindre), comme un joueur qui se balade.
+	if not _kite_bot and arena_wall != null and arena_wall.active and arena_wall.has_method("bot_goal"):
+		var goal: Vector2 = arena_wall.bot_goal(pp)
+		if goal.distance_to(pp) > 120.0:
+			move += (goal - pp).normalized() * (0.55 if danger == Vector2.ZERO else 0.25)
 	# 31/10 BANC ANTI-FUITE : `-- --kite` = bot FUYARD (le pire cas signale par le patron) : il court en permanence a l'oppose
 	# de la masse ennemie (< 1100 px), sans jamais chercher le contact ni l'XP. Mesure l'efficacite du plan B.
 	if _kite_bot:
