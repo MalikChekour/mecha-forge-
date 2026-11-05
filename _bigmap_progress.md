@@ -6,3 +6,4 @@
 - [ ] 4 banc bm1
 - [ ] 5 captures qa_bigmap
 - [ ] 6 v12.19 push
+- [x] 3 smoke 300 s OK (annonce 2:00, phase 1 r 6500, 2 POI faits, aucune erreur). Banc bm1 lance 02:5x (qa_antikite\bm1*.log).
