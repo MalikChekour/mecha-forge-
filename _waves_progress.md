@@ -8,7 +8,7 @@ Ne pas toucher : stash "nov2 non-antikite". Pas de Meshy. Pas de refonte Armored
 - [x] 3. Audit EnemySpawner (voir section Audit)
 - [x] 4. Implementation WaveSchedule.gd (table Ch1 a la main, Ch2-18 generes) + rampe + surge pre-boss + accalmie
 - [x] 5. Banc wv1 (Ch1, 960 s, x6) : voir section Banc
-- [~] 6. Commit, v12.20, push itch (html5 + android), captures /workspace/qa_waves/
+- [x] 6. Commit, v12.20, push itch (html5 + android), captures /workspace/qa_waves/
 
 ## Recherche (principes)
 1. Table minute par minute (VS Mad Forest) : roster par minute, minimum d'ennemis vivants, intervalle. https://vampire.survivors.wiki/w/Mad_Forest https://teemo.dev/game-design/vampire-survivors/systems/spawn-director/
@@ -41,3 +41,6 @@ Ordre d'introduction (8/8 runs identique) : melee@0 > swarm@90-92 > elite@180 > 
   (v12.19 Normal : 273 / 301 / >740 / 340 s). Pas de reglage supplementaire : « difficile mais gagnable ».
 - Captures : qa_waves/1_debut_fantassins_seuls.png (0:28, 6 fantassins seuls), 2_signal_hostile_pre_boss.png (3:31, bandeau), 2b_montee_pre_boss.png, 3_fin_melange_blinde.png (11:54, 9 types).
 - Correctif apres captures : le bandeau show_horde_warning n'apparait pas a l'ecran -> le signal passe aussi par show_banner (visible).
+
+## Push itch v12.20 (etape 6)
+html5 build #2307342, android build #2307344 (statut butler OK).
