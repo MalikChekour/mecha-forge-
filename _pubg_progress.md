@@ -10,3 +10,4 @@
 - pz1 : BUG machine a etats (l'annonce N+1 relancait l'interpolation N -> cercle qui saute, phase bloquee a 2). Normal 246/305/388/382 s, zone 0 % des degats. Kite 643 s. Fix (_shrinking) + log [zone]. pz2 lance.
 - pz2 (fix) : phases OK (log [zone] 40/90/160/210/340...). Normal 290/464/563/361 s (aucune avant 4:00), zone 0 % des degats (bot reste dedans). Facile + kite encore en cours a 01:31.
 - pz2 Facile : s11 VICTOIRE 920 s, s14 VICTOIRE 954 s (phase 6, r 380). Kite s12 mort 780 s. Flag banc --zone-blind (fuyard qui ignore la zone) : pz2blind lance. Version 12.18.
+- Facile pz2 : 4/4 survivent (V 920, s12 >936, TEMPS 960, V 954). Kite s11 mort 674. Captures refaites sur code final. PUSH 12.18 lance.
