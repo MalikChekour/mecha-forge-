@@ -10,3 +10,4 @@
 - [x] 5 captures qa_bigmap\1_debut_sans_cercle / 2_poi_cache / 3_milieu_cercle / 4_fin_petit_cercle (game\_shot_bigmap.tscn).
 - bm1 Normal : 593/355/214/490 s (s13 mort 3:34 sniper, 1 seul POI). -> camps endormis avant 3:00, bot n'explore plus sous 45 % PV. bm2 Normal lance. Facile/kite bm1 en cours.
 - bm2 Normal 353/299/214/(s11 >491) : encore 1 mort a 3:34 (sniper, 0 POI). bm1blind (zone 0,5-8 %/s) encore vivants a 690/801 s -> zone trop douce. bm1 Facile : s11/s13 survivent 960, s12 >880, s14 >725. -> zone 1-9 %/s, snipers <4:00 a 75 % degats. bm3 lance (Normal x4 + blind x2).
+- 03:05 reprise : bm3 en cours (~3 min de jeu). bm1kite (suit la zone) mort 866 s. bm1 Facile s11/s13 960 OK, s12 >949, s14 >788.
