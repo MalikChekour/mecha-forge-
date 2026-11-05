@@ -42,6 +42,7 @@ const POI_COL: Dictionary = {"cache": Color(1.0, 0.85, 0.3), "arsenal": Color(0.
 const POI_OPEN_R: float = 230.0
 const CAMP_TRIGGER_R: float = 760.0
 const POI_MIN_GAP: float = 2600.0
+const CAMP_WAKE_T: float = 180.0   # banc bm1 : un camp d'elite reveille des 1:30 + snipers = mort a 3:34 en Normal -> camps endormis avant 3:00
 
 var game: Node
 var player: Node2D
@@ -249,7 +250,7 @@ func _poi_tick(pp: Vector2) -> void:
 		var d: float = pp.distance_to(p)
 		var ty: String = q["type"]
 		if ty == "camp":
-			if st == 0 and d < CAMP_TRIGGER_R:
+			if st == 0 and d < CAMP_TRIGGER_R and GameState.run_time >= CAMP_WAKE_T:
 				q["state"] = 1
 				q["guards"] = _spawn_camp(p)
 				if game.has_method("show_banner"):

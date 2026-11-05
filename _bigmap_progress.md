@@ -8,3 +8,4 @@
 - [ ] 6 v12.19 push
 - [x] 3 smoke 300 s OK (annonce 2:00, phase 1 r 6500, 2 POI faits, aucune erreur). Banc bm1 lance 02:5x (qa_antikite\bm1*.log).
 - [x] 5 captures qa_bigmap\1_debut_sans_cercle / 2_poi_cache / 3_milieu_cercle / 4_fin_petit_cercle (game\_shot_bigmap.tscn).
+- bm1 Normal : 593/355/214/490 s (s13 mort 3:34 sniper, 1 seul POI). -> camps endormis avant 3:00, bot n'explore plus sous 45 % PV. bm2 Normal lance. Facile/kite bm1 en cours.
