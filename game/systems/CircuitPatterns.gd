@@ -42,11 +42,11 @@ static func pick_pattern_type(c: Vector2i, rng: RandomNumberGenerator) -> int:
 
 ## Classement des props disponibles du biome par rôle tactique
 static func categorize_props(kinds: Array) -> Dictionary:
-	var solids: Array[String] = []
-	var booms: Array[String] = []
-	var hazards: Array[String] = []
-	var loots: Array[String] = []
-	var others: Array[String] = []
+	var solids: Array = []
+	var booms: Array = []
+	var hazards: Array = []
+	var loots: Array = []
+	var others: Array = []
 
 	for k_any in kinds:
 		var k: String = String(k_any)

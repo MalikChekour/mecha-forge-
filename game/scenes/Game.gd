@@ -3131,8 +3131,13 @@ func _apply_upgrade(id: String) -> void:
 		var base: String = id.substr(4)
 		if EVO_RULES.has(base) and player.has_method("weapons"):
 			player.weapons().replace_weapon(base, String(EVO_RULES[base]["evo"]))
-			Audio.sfx("levelup")
-			show_banner("EVOLUTION !", Color(1.0, 0.85, 0.3))
+			Audio.sfx("victory")
+			Events.screen_shake.emit(6.0)
+			if has_method("spawn_vfx") and player != null:
+				spawn_vfx("shockwave", player.global_position, 0.0, 3.2, Color(1.0, 0.82, 0.2))
+				spawn_vfx("aaa_shockwave", player.global_position, 0.0, 1.8, Color(1.0, 0.95, 0.5))
+			var evo_name: String = String(EVO_RULES[base].get("name", "ÉVOLUTION")).replace("EVOLUTION : ", "")
+			show_banner("★ ÉVOLUTION : %s ★" % evo_name, Color(1.0, 0.88, 0.25))
 		return
 	if id.begins_with("hyb_"):
 		for r: Dictionary in HYBRID_RULES:
@@ -3141,8 +3146,13 @@ func _apply_upgrade(id: String) -> void:
 				if player.has_method("weapons"):
 					player.weapons().merge_weapons(String(pair[0]), String(pair[1]), String(r["evo"]))
 					_hyb_slots_freed += 1   # compense _slots_used("act") : fusion = swap 2-pour-1
-					Audio.sfx("levelup")
-					show_banner("FUSION !", Color(0.75, 0.5, 1.0))
+					Audio.sfx("victory")
+					Events.screen_shake.emit(7.0)
+					if has_method("spawn_vfx") and player != null:
+						spawn_vfx("shockwave", player.global_position, 0.0, 3.6, Color(0.75, 0.45, 1.0))
+						spawn_vfx("aaa_shockwave", player.global_position, 0.0, 2.0, Color(0.9, 0.65, 1.0))
+					var hyb_name: String = String(r.get("name", "FUSION")).replace("FUSION : ", "")
+					show_banner("★ FUSION HYBRIDE : %s ★" % hyb_name, Color(0.85, 0.55, 1.0))
 				break
 		return
 	_passives[id] = int(_passives.get(id, 0)) + 1

@@ -679,13 +679,11 @@ func _physics_process(delta: float) -> void:
 				mecha.play(wa)
 
 	_update_aim()
-	# BODY faces the TARGET whenever it is FIRING (which is almost always, thanks to auto-fire) so it
-	# never "shoots from its back" while strafing — it turns to face what it shoots (twin-stick / Buzz
-	# Lightyear feel). Only when NOT firing does it face its movement direction. The 4-dir hysteresis in
-	# set_facing_from keeps this from jittering between two equidistant foes.
-	# while the Overdrive beam is out, the arm IS attacking -> face the aim too (so the beam
-	# leaves the cannon tip pointed at the target, never from the back).
-	mecha.set_facing_from(aim_dir if (_firing_t > 0.0 or transformed or _is_aiming()) else mv)
+	# BODY facing: while moving under auto-aim, the mech faces its movement direction (runs forward naturally
+	# in 8 directions, no backward moonwalk). When stationary, or during manual aim override (_is_aiming()),
+	# or during Overdrive transformation, the mech turns to face the target.
+	var want_aim_facing: bool = _is_aiming() or (mv.length() < 0.1 and (_firing_t > 0.0 or auto_aim)) or transformed
+	mecha.set_facing_from(aim_dir if want_aim_facing else mv)
 	# NO body tilt: a mech stays PLANTED on its feet — it faces the target in 4 dir and the head-laser
 	# shows the exact aim; it does not rock/pitch toward the aim (that read as a "dancer", not a mech).
 	if mecha.has_method("set_lean_target"):
