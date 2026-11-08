@@ -814,6 +814,7 @@ func show_settings(from_home: bool = false) -> void:
 	_add_orient_toggle(grid)
 	_add_toggle(grid, "shake", "SECOUSSES", true)
 	_add_toggle(grid, "damage_numbers", "DEGATS CHIFFRES", true)
+	_add_toggle(grid, "vibrations", "VIBRATIONS", true)
 	# MODE DE JEU : seul endroit ou SANS FIN etait reglable, dans un ecran inatteignable.
 	# On le remonte ici pour que le mode existe reellement. Hors partie uniquement : changer
 	# de mode au milieu d'un run n'aurait aucun sens.

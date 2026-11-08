@@ -192,6 +192,7 @@ func _on_damaged(hp: float, _mx: float) -> void:
 	_update_hp()
 
 func _on_skill_pressed(id: String) -> void:
+	Haptics.tap()
 	if player != null and is_instance_valid(player) and player.has_method("use_skill"):
 		player.use_skill(id)
 
@@ -203,10 +204,12 @@ func _unhandled_input(e: InputEvent) -> void:
 			KEY_L: _on_skill_pressed("jet")
 
 func _on_od_pressed() -> void:
+	Haptics.tap()
 	if player != null and player.has_method("activate_overdrive"):
 		player.activate_overdrive()
 
 func _on_menu_pressed() -> void:
+	Haptics.tap()
 	if player != null and "game" in player and player.game != null and player.game.has_method("show_settings"):
 		player.game.show_settings()
 
@@ -833,6 +836,7 @@ func pick(i: int) -> void:      # headless bot entry point
 		_pick(i)
 
 func _pick(i: int) -> void:
+	Haptics.tap()
 	_draft_root.visible = false
 	card_picked.emit(i)
 

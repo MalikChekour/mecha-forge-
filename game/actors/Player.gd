@@ -357,6 +357,7 @@ func _ready() -> void:
 	Events.enemy_killed.connect(func(_pos: Vector2, rank: int) -> void:
 		if rank >= 3:
 			trigger_hitstop(55)
+			Haptics.boss_kill()
 	)
 
 	# --- MARQUEUR DU JOUEUR ---------------------------------------------------------------
@@ -1417,6 +1418,7 @@ func _transform_on() -> void:
 	GameState.overdrive_active = true
 	GameState.overdrive_count += 1
 	Events.overdrive_changed.emit(0.0)
+	Haptics.overdrive()
 	if mecha.has_method("set_tint"):
 		mecha.set_tint(Color(1.6, 1.35, 0.95))
 	if _od_aura != null:
@@ -1789,6 +1791,7 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO, source_tag: 
 	_iframe = 0.55
 	_hurt_t = 0.30   # flash rouge du chassis — visible AUSSI en mouvement (voir _update_marker)
 	Audio.sfx("hurt", 0.1)
+	Haptics.hurt()
 	Events.player_damaged.emit(hp, max_hp)
 	Events.screen_shake.emit(6.0)
 	if game != null and game.has_method("shield_ripple"):
