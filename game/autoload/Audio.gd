@@ -76,20 +76,39 @@ const SFX_ALIASES: Dictionary = {
 	"teleport": "w_railgun",
 }
 
+# Variation automatique de pitch par type de son pour eviter la fatigue auditive (audio-design)
+const _AUTO_PITCH_VAR: Dictionary = {
+	"shoot": 0.08, "hit": 0.10, "crit": 0.06,
+	"w_autocannon": 0.08, "w_missile": 0.06, "w_railgun": 0.04,
+	"w_plasma": 0.06, "w_sabre": 0.07, "scrap": 0.08, "explosion": 0.07
+}
+var _xp_streak: int = 0
+var _xp_last_time: float = 0.0
+
 func sfx(name: String, pitch_var: float = 0.0) -> void:
 	var actual_name: String = String(SFX_ALIASES.get(name, name))
 	if not _streams.has(actual_name) or _players.is_empty():
 		return
 	var thr: float = float(_THROTTLE.get(actual_name, 0.0))
+	var now: float = Time.get_ticks_msec() / 1000.0
 	if thr > 0.0:
-		var now: float = Time.get_ticks_msec() / 1000.0
 		if now - float(_last.get(actual_name, -10.0)) < thr:
 			return
 		_last[actual_name] = now
 	var pl: AudioStreamPlayer = _players[_idx]
 	_idx = (_idx + 1) % _players.size()
 	pl.stream = _streams[actual_name]
-	pl.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
+	if actual_name == "xp":
+		# Cascade d'XP : les gemmes ramassees en rafale montent en gamme pour un effet gratifiant
+		if now - _xp_last_time < 0.32:
+			_xp_streak = mini(12, _xp_streak + 1)
+		else:
+			_xp_streak = 0
+		_xp_last_time = now
+		pl.pitch_scale = clampf(1.0 + float(_xp_streak) * 0.038 + randf_range(-0.02, 0.02), 0.92, 1.62)
+	else:
+		var pvar: float = pitch_var if pitch_var > 0.0 else float(_AUTO_PITCH_VAR.get(actual_name, 0.0))
+		pl.pitch_scale = 1.0 + randf_range(-pvar, pvar)
 	pl.play()
 
 const MUSIC_FALLBACK: Dictionary = {

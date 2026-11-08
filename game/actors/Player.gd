@@ -354,6 +354,10 @@ func _ready() -> void:
 	_apply_phase3_loadout()
 	if mecha.has_method("set_tint"):
 		mecha.set_tint(BASE_TINT)   # heros legerement plus clair que la pietaille (voir BASE_TINT)
+	Events.enemy_killed.connect(func(_pos: Vector2, rank: int) -> void:
+		if rank >= 3:
+			trigger_hitstop(55)
+	)
 
 	# --- MARQUEUR DU JOUEUR ---------------------------------------------------------------
 	# 🚨 Point n°1 du testeur « sensations » : a 01:29, 22 ennemis a l'ecran, « j'ai ete
@@ -1106,16 +1110,19 @@ func _confirm_slash_hit() -> void:
 	# w_sabre est dans le pool ; son throttle (0.13 s) est sous le cooldown de lame (0.24 s).
 	Audio.sfx("w_sabre", 0.04)
 
-func _begin_hitstop() -> void:
+func trigger_hitstop(duration_ms: int = _HITSTOP_MS) -> void:
 	if Engine.time_scale <= 0.01:
 		return
 	var now: int = Time.get_ticks_msec()
 	if _hitstop_until_ms > now:
-		_hitstop_until_ms = now + _HITSTOP_MS
+		_hitstop_until_ms = now + duration_ms
 		return
 	_hitstop_restore = Engine.time_scale if Engine.time_scale > 0.2 else 1.0
 	Engine.time_scale = _HITSTOP_SCALE
-	_hitstop_until_ms = now + _HITSTOP_MS
+	_hitstop_until_ms = now + duration_ms
+
+func _begin_hitstop() -> void:
+	trigger_hitstop(_HITSTOP_MS)
 
 func _tick_hitstop() -> void:
 	if _hitstop_until_ms <= 0:
