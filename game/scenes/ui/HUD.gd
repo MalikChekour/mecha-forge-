@@ -1,5 +1,6 @@
 extends CanvasLayer
 class_name HUD
+const OrbitalDropPod = preload("res://systems/OrbitalDrop.gd")
 ## In-run HUD: HP/XP/Overdrive bars, run timer, level/kills/scrap, the touch-stick ring, the
 ## DAMAGE feedback (red vignette + low-HP pulse) and the level-up DRAFT-of-3 overlay (pauses
 ## the tree, real buttons — also drivable by the headless bot via pick()).
@@ -1191,4 +1192,43 @@ class OffscreenBossRadar extends Control:
 		draw_rect(rect, Color(0.08, 0.02, 0.03, 0.88), true)
 		draw_rect(rect, col_gold, false, 1.5)
 		draw_string(font, badge_center + Vector2(-s_sz.x * 0.5, fs * 0.36), dist_str, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+
+		# Pointeur de Ravitaillement Orbital (Drop Pod hors-écran)
+		var pod: Node = hud.get_tree().get_first_node_in_group("drop_pods")
+		if pod != null and is_instance_valid(pod) and pod is OrbitalDropPod and (pod as OrbitalDropPod).active:
+			var pod_screen: Vector2 = cam_xform * (pod as Node2D).global_position
+			if not (pod_screen.x >= pad_l and pod_screen.x <= pad_r and pod_screen.y >= pad_t and pod_screen.y <= pad_b):
+				var p_dir: Vector2 = (pod_screen - center).normalized()
+				if p_dir.length_squared() > 0.001:
+					var pt_x: float = 1e9
+					if p_dir.x > 0.0001: pt_x = (pad_r - center.x) / p_dir.x
+					elif p_dir.x < -0.0001: pt_x = (pad_l - center.x) / p_dir.x
+					var pt_y: float = 1e9
+					if p_dir.y > 0.0001: pt_y = (pad_b - center.y) / p_dir.y
+					elif p_dir.y < -0.0001: pt_y = (pad_t - center.y) / p_dir.y
+					var p_edge: Vector2 = center + p_dir * minf(pt_x, pt_y)
+					var p_dist: int = int(round(((pod as Node2D).global_position - hud.player.global_position).length() / 40.0))
+
+					var col_amber: Color = Color(1.0, 0.78, 0.22, 0.95 * pulse)
+					var col_white: Color = Color(1.0, 0.95, 0.8, pulse)
+
+					var p_tip: Vector2 = p_edge
+					var p_base: Vector2 = p_edge - p_dir * 18.0
+					var p_perp: Vector2 = Vector2(-p_dir.y, p_dir.x)
+					var pa1: Vector2 = p_base + p_perp * 10.0
+					var pa2: Vector2 = p_base - p_perp * 10.0
+					draw_colored_polygon(PackedVector2Array([p_tip, pa1, p_base + p_dir * 4.0, pa2]), col_amber)
+					draw_polyline(PackedVector2Array([p_tip, pa1, p_base + p_dir * 4.0, pa2, p_tip]), col_white, 1.8, true)
+
+					var b_pos: Vector2 = p_edge - p_dir * 38.0
+					var b_str: String = "📦 %dm" % p_dist
+					var p_font: Font = ThemeDB.fallback_font
+					var p_fs: int = 12
+					var ps_sz: Vector2 = p_font.get_string_size(b_str, HORIZONTAL_ALIGNMENT_CENTER, -1, p_fs)
+					var p_rw: float = ps_sz.x + 10.0
+					var p_rh: float = maxf(18.0, ps_sz.y + 4.0)
+					var p_rect: Rect2 = Rect2(b_pos - Vector2(p_rw * 0.5, p_rh * 0.5), Vector2(p_rw, p_rh))
+					draw_rect(p_rect, Color(0.12, 0.08, 0.02, 0.88), true)
+					draw_rect(p_rect, col_amber, false, 1.5)
+					draw_string(p_font, b_pos + Vector2(-ps_sz.x * 0.5, p_fs * 0.36), b_str, HORIZONTAL_ALIGNMENT_LEFT, -1, p_fs, Color.WHITE)
 
