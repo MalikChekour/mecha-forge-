@@ -1,6 +1,7 @@
 extends Node2D
 class_name PropScatter
 const DwellZone = preload("res://actors/DwellZone.gd")   # voir la note dans Player.gd
+const CircuitPatterns = preload("res://systems/CircuitPatterns.gd")
 ## Scatters the Gemini decor sprites across the arena, coherently per biome. Every prop is a
 ## StaticBody2D (blocks the player; enemies steer around it via Game.cover_list). Some crates are
 ## DESTRUCTIBLE and drop a skill bonus; the rest are indestructible obstacles.
@@ -1308,67 +1309,36 @@ func _load_chunk(c: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash("%s:%d:%d" % [biome, c.x, c.y])
 	var origin: Vector2 = Vector2(float(c.x) * CHUNK, float(c.y) * CHUNK)
-	var lo: float = MARGIN
-	var hi: float = CHUNK - MARGIN
 	var ppos: Vector2 = _player_pos()
 	var made: Array = []
 	var placed: Array = []               # [{pos, gap}] — gap scales with prop size
-	var tries: int = 0
-	# LAYOUT: chunks vary between OPEN (few props -> the horde surrounds you) and CLUSTERED (a rock
-	# outcrop / nest of structures = cover, but your shots get blocked too). Density is seeded and
-	# capped at 3 so cover_list stays bounded. At most ONE hazard per chunk -> turrets/pylons come
-	# at a readable cadence, never a wall of them.
-	var dr: float = rng.randf()
-	# No empty chunks any more (was 16% empty -> dead stretches you could run through unthreatened).
-	# Denser average, same max of 3 so cover_list stays bounded (3x3 chunks -> <=27 props).
-	var want: int = 1 if dr < 0.22 else (2 if dr < 0.60 else 3)
-	var clustered: bool = want >= 2 and rng.randf() < 0.55
-	var anchor: Vector2 = origin + Vector2(rng.randf_range(lo, hi), rng.randf_range(lo, hi))
-	var haz_count: int = 0   # up to TWO hazards per chunk (was one) -> cannons come thick enough to matter
-	while placed.size() < want and tries < want * 10:
-		tries += 1
-		var pos: Vector2
-		if clustered:
-			var ca: float = rng.randf() * TAU
-			pos = anchor + Vector2(cos(ca), sin(ca)) * rng.randf_range(40.0, 210.0)
-			pos.x = clampf(pos.x, origin.x + lo, origin.x + hi)
-			pos.y = clampf(pos.y, origin.y + lo, origin.y + hi)
-		else:
-			pos = origin + Vector2(rng.randf_range(lo, hi), rng.randf_range(lo, hi))
-		if pos.distance_to(ppos) < CLEAR_R:
-			continue                     # never spawn a prop on the player (spawn is at origin)
-		var kind: String = _pick_kind(kinds, rng)
-		if HAZARDS.has(kind):            # cap hazards per chunk -> swap extras for a harmless prop
-			if haz_count >= 2:
-				kind = _nonhazard(kinds)
-			else:
-				haz_count += 1
-		# footprint radius: big props need far more room so their enemy-repulsion bubbles never overlap.
-		# 04/10, lisibilite signalee par le patron : brouillard_froid/nuage_spores masquent leur
-		# sprite de base (sz=20, quasi nul) et affichent UNIQUEMENT un nuage procedural bien plus
-		# grand (fog_r/spore_r * 2.2, ~500-600 unites) - l'espacement calcule sur le seul "sz"
-		# laissait donc poser d'autres decors presque DANS le nuage, illisible. Utilise le plus
-		# grand des deux (generalise a tout futur "nuage procedural", pas un cas particulier fige).
+
+	# v12.21 : Generation par gabarits de circuits (anneaux de kiting, chicanes, goulets, tranchees)
+	var layout_items: Array = CircuitPatterns.generate_layout(c, kinds, rng, ppos, CLEAR_R)
+	for item in layout_items:
+		var kind: String = String(item.get("kind", ""))
+		if kind == "" or not DECOR.has(kind):
+			continue
+		var pos: Vector2 = item.get("pos", Vector2.ZERO)
 		var gap: float = _gap_of(kind)
 		var ok: bool = true
 		for e in placed:
 			if pos.distance_to(e["pos"]) < gap + float(e["gap"]):
-				ok = false; break
+				ok = false
+				break
 		if not ok:
 			continue
 		placed.append({"pos": pos, "gap": gap})
-		# Draw the seeded variation ALWAYS, before deciding to skip: bailing out early would leave
-		# the RNG stream shifted and every later prop in the chunk would move.
-		var rs: float = rng.randf_range(0.86, 1.16)
-		var sr: float = rng.randf()
-		var fl: bool = rng.randf() < 0.5
+
+		var rs: float = float(item.get("rand_scale", 1.0))
+		var sr: float = float(item.get("skill_roll", 0.5))
+		var fl: bool = bool(item.get("flip", false))
+
 		if _destroyed.has(Vector2i(pos.round())):
 			continue                     # smashed earlier this run — the spot stays empty
 		made.append(_place(kind, pos, rs, sr, fl))
-		# 14/10 (patron : decors « sans effet ») : une console/vanne/radiateur n'agit que sur SA cible
-		# a portee (tapis, bassin, turbine, nuage). Avec 2-3 props par chunk de 1000 unites, la
-		# cible se trouvait rarement a moins de 400 unites -> la console ne faisait jamais rien.
-		# On pose donc toujours une cible juste a cote (rng DEDIE : ne decale pas le flux du chunk).
+
+		# 14/10 : consoles/vannes avec cible companion a portee
 		if COMPANION.has(kind):
 			var cp: Array = COMPANION[kind]
 			var rc: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -1377,10 +1347,11 @@ func _load_chunk(c: Vector2i) -> void:
 			var cdist: float = float(cp[1])
 			var cpos: Vector2 = Vector2.ZERO
 			var cfound: bool = false
-			for _t in 16:   # meme regle d'espacement que le reste du chunk (lisibilite des nuages)
+			for _t in 16:
 				var ang: float = rc.randf() * TAU
 				var cand: Vector2 = pos + Vector2(cos(ang), sin(ang)) * cdist
-				if cand.x < origin.x + 60.0 or cand.x > origin.x + CHUNK - 60.0 						or cand.y < origin.y + 60.0 or cand.y > origin.y + CHUNK - 60.0:
+				if cand.x < origin.x + 60.0 or cand.x > origin.x + CHUNK - 60.0 \
+						or cand.y < origin.y + 60.0 or cand.y > origin.y + CHUNK - 60.0:
 					continue
 				if cand.distance_to(ppos) < CLEAR_R:
 					continue
@@ -1395,12 +1366,11 @@ func _load_chunk(c: Vector2i) -> void:
 				placed.append({"pos": cpos, "gap": cgap})
 				made.append(_place(String(cp[0]), cpos, 1.0, 0.5, cflip))
 			elif not cfound:
-				# aucune place pour la cible : un support SANS cible serait un decor « sans effet »
-				# -> on le retire plutot que de le laisser inerte.
 				var orphan: Node = made.pop_back()
 				placed.erase(placed.back())
 				orphan.queue_free()
 	_chunks[c] = made
+
 
 func _unload_chunk(c: Vector2i) -> void:
 	for p in _chunks[c]:
