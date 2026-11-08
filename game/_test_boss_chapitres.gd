@@ -20,7 +20,7 @@ class StubGame extends Node:
 	var zone_calls: Array = []
 	func _init() -> void:
 		enemy_layer = Node2D.new(); add_child(enemy_layer)
-	func spawn_ground_zone(_pos: Vector2, _radius: float, _delay: float, _dmg: float, _color: Color = Color.WHITE, _fx_kind: String = "decor_hit") -> void:
+	func spawn_ground_zone(_pos: Vector2, _radius: float, _delay: float, _dmg: float, _color: Color = Color.WHITE, _fx_kind: String = "decor_hit", _shape: String = "circle", _line_from: Vector2 = Vector2.ZERO, _line_to: Vector2 = Vector2.ZERO) -> void:
 		zone_calls.append({"radius": _radius, "dmg": _dmg, "color": _color})
 	func spawn_vfx(_kind: String, _pos: Vector2, _rot: float, _scale: float, _color: Color) -> void:
 		pass

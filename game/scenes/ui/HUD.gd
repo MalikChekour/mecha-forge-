@@ -53,6 +53,15 @@ var _hurt_flash: float = 0.0
 var _hp_overlay: Control   # 05/10, refonte UI hologramme : cadre + segments par-dessus la barre de vie
 var _hud_glass: Panel      # 05/10 : "verre depoli" derriere horloge + stats
 
+# Boss Health Bar HUD (alerte visuelle et barre de vie de boss pour mobiles)
+var _boss_panel: Panel
+var _boss_title: Label
+var _boss_hp_bg: ColorRect
+var _boss_hp_ghost: ColorRect
+var _boss_hp_fill: ColorRect
+var _active_boss: Enemy = null
+var _last_boss_hp: float = -1.0
+
 ## Cadre holographique + decoupe en segments par-dessus la barre de vie (demande du patron, 05/10 :
 ## "barre segmentee style tech/armure" au lieu d'un simple rectangle plein). Dessine PAR-DESSUS
 ## _hp_bg/_hp_fill sans jamais toucher leur logique de remplissage (_update_hp() reste inchange,
@@ -80,6 +89,22 @@ class HpSegments extends Control:
 		draw_line(Vector2(0, 0), Vector2(cl, 0), Color(1, 1, 1, 0.9), 2.0)
 		draw_line(Vector2(w - cl, h), Vector2(w, h), Color(1, 1, 1, 0.9), 2.0)
 		draw_line(Vector2(w, h), Vector2(w, h - cl), Color(1, 1, 1, 0.9), 2.0)
+
+## Safe Area pour encoches d'appareils mobiles (notches, barres de gestes) — compatible Godot 4.
+func _safe_insets() -> Dictionary:
+	var insets: Dictionary = {"left": 0.0, "top": 0.0, "right": 0.0, "bottom": 0.0}
+	if DisplayServer.has_method("get_display_safe_area"):
+		var safe: Rect2i = DisplayServer.get_display_safe_area()
+		var win: Vector2i = DisplayServer.window_get_size()
+		if win.x > 0 and win.y > 0 and (safe.position != Vector2i.ZERO or safe.size != win):
+			var vp: Vector2 = _vp()
+			var sx: float = vp.x / float(win.x)
+			var sy: float = vp.y / float(win.y)
+			insets["left"] = maxf(0.0, float(safe.position.x) * sx)
+			insets["top"] = maxf(0.0, float(safe.position.y) * sy)
+			insets["right"] = maxf(0.0, float(win.x - safe.end.x) * sx)
+			insets["bottom"] = maxf(0.0, float(win.y - safe.end.y) * sy)
+	return insets
 
 ## Echelle d'interface commune (meme formule que Palette.fs / MetaScreen._ui_k).
 func _k() -> float:
@@ -111,6 +136,8 @@ func _on_died() -> void:
 	visible = false
 	if _draft_root != null:
 		_draft_root.visible = false
+	if _boss_panel != null:
+		_boss_panel.visible = false
 
 func _on_overdrive(v: float) -> void:
 	if _od_fill != null and _od_bg != null:
@@ -127,6 +154,7 @@ func _process(delta: float) -> void:
 		var p: float = 0.78 + 0.22 * sin(Time.get_ticks_msec() / 140.0)
 		_od_btn.modulate = Color(1, 1, 1, p)
 	_update_hurt(delta)
+	_update_boss_bar(delta)
 	if _stick != null:
 		_stick.queue_redraw()
 	if _aim_stick != null:
@@ -310,6 +338,46 @@ func _build() -> void:
 		# The big one-shot ANNOUNCE is fired by Game._begin_run (sequenced after the sector title,
 		# once the biome-intro card is gone) — not here, so it can't play hidden under the intro.
 
+	# --- BANDEAU DE VIE BOSS (alerte holographique pour les menaces rank >= 3) ---
+	_boss_panel = Panel.new()
+	var bsb: StyleBoxFlat = StyleBoxFlat.new()
+	bsb.bg_color = Color(0.10, 0.02, 0.04, 0.88)
+	bsb.border_width_left = 2; bsb.border_width_right = 2
+	bsb.border_width_top = 2; bsb.border_width_bottom = 2
+	bsb.border_color = Color(1.0, 0.28, 0.22, 0.95)
+	bsb.corner_radius_top_left = 8; bsb.corner_radius_top_right = 8
+	bsb.corner_radius_bottom_left = 8; bsb.corner_radius_bottom_right = 8
+	bsb.shadow_color = Color(1.0, 0.15, 0.15, 0.4)
+	bsb.shadow_size = 10
+	_boss_panel.add_theme_stylebox_override("panel", bsb)
+	_boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_panel.visible = false
+	_root.add_child(_boss_panel)
+
+	_boss_title = Label.new()
+	_boss_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_boss_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+	_boss_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_boss_title.add_theme_constant_override("outline_size", 4)
+	_boss_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_panel.add_child(_boss_title)
+
+	_boss_hp_bg = ColorRect.new()
+	_boss_hp_bg.color = Color(0.18, 0.04, 0.04, 0.9)
+	_boss_hp_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_panel.add_child(_boss_hp_bg)
+
+	_boss_hp_ghost = ColorRect.new()
+	_boss_hp_ghost.color = Color(1.0, 0.9, 0.7, 0.85)
+	_boss_hp_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_panel.add_child(_boss_hp_ghost)
+
+	_boss_hp_fill = ColorRect.new()
+	_boss_hp_fill.color = Color(0.95, 0.22, 0.16, 1.0)
+	_boss_hp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_panel.add_child(_boss_hp_fill)
+
 	# --- vignette de degats (sous les boutons, au-dessus du jeu) ---
 	_hurt = _make_vignette()
 	_root.add_child(_hurt)
@@ -384,20 +452,26 @@ func _relayout() -> void:
 		return
 	var vp: Vector2 = _vp()
 	var k: float = _k()
+	var insets: Dictionary = _safe_insets()
 	var pad: float = 14.0 * k
+	var pad_left: float = pad + float(insets["left"])
+	var pad_right: float = pad + float(insets["right"])
+	var pad_top: float = pad * 0.8 + float(insets["top"])
+	var pad_bottom: float = pad * 1.2 + float(insets["bottom"])
 	var portrait: bool = vp.y > vp.x
-	# largeur de barre PROPORTIONNELLE : 360 px en dur mangeaient 75 % d'un ecran portrait 480.
-	_bar_w = clampf(vp.x * (0.56 if portrait else 0.30), 150.0, 460.0)
+
+	# largeur de barre PROPORTIONNELLE avec prise en compte de la safe area
+	_bar_w = clampf((vp.x - pad_left - pad_right) * (0.56 if portrait else 0.30), 150.0, 460.0)
 	var hp_h: float = maxf(12.0, 15.0 * k)
 	var xp_h: float = maxf(6.0, 7.0 * k)
 	var od_h: float = maxf(5.0, 6.0 * k)
 	var gap: float = 4.0 * k
-	var top: float = pad * 0.8
+	var top: float = pad_top
 	var bar_total: float = hp_h + xp_h + od_h + gap * 2.0
 	var band_h: float = top + bar_total + pad * 0.7
 
 	_topbar.offset_bottom = band_h
-	_hp_bg.position = Vector2(pad, top)
+	_hp_bg.position = Vector2(pad_left, top)
 	_hp_bg.size = Vector2(_bar_w, hp_h)
 	_hp_ghost.position = _hp_bg.position
 	_hp_ghost.size.y = hp_h
@@ -406,21 +480,19 @@ func _relayout() -> void:
 	_hp_overlay.position = _hp_bg.position
 	_hp_overlay.size = _hp_bg.size
 	_hp_overlay.queue_redraw()
-	_xp_bg.position = Vector2(pad, top + hp_h + gap)
+	_xp_bg.position = Vector2(pad_left, top + hp_h + gap)
 	_xp_bg.size = Vector2(_bar_w, xp_h)
 	_xp_fill.position = _xp_bg.position
 	_xp_fill.size = Vector2(0, xp_h)
-	_od_bg.position = Vector2(pad, top + hp_h + xp_h + gap * 2.0)
+	_od_bg.position = Vector2(pad_left, top + hp_h + xp_h + gap * 2.0)
 	_od_bg.size = Vector2(_bar_w, od_h)
 	_od_fill.position = _od_bg.position
 	_od_fill.size = Vector2(0, od_h)
 
-	# libelles a droite de chaque barre — memes lignes, meme hauteur que leur barre respective.
-	# Largeur dispo calculee jusqu'au bord ecran (pas une largeur fixe) : jamais de debordement
-	# meme sur un telephone etroit ou _bar_w mange deja 56 % de la largeur en portrait.
-	var lbl_x: float = pad + _bar_w + 8.0 * k
+	# libelles a droite de chaque barre
+	var lbl_x: float = pad_left + _bar_w + 8.0 * k
 	var lbl_fs: float = maxf(10.0, 11.0 * k)
-	var lbl_w: float = maxf(40.0, vp.x - lbl_x - pad)
+	var lbl_w: float = maxf(40.0, vp.x - lbl_x - pad_right)
 	for pair in [[_hp_lbl, _hp_bg], [_xp_lbl, _xp_bg], [_bar_od_lbl, _od_bg]]:
 		var lbl: Label = pair[0]
 		var bg: ColorRect = pair[1]
@@ -432,17 +504,14 @@ func _relayout() -> void:
 	var mb: Vector2 = Vector2(maxf(118.0, 134.0 * k), maxf(48.0, 44.0 * k))
 	_menu_btn.add_theme_font_size_override("font_size", Palette.fs(15))
 	_menu_btn.size = mb
-	_menu_btn.position = Vector2(vp.x - mb.x - pad, top)
+	_menu_btn.position = Vector2(vp.x - mb.x - pad_right, top)
 
-	# horloge + stats : centrees sur la largeur reelle, jamais a x=596 en dur.
-	# En portrait la place manque a cote des barres -> on les descend sous le bandeau.
+	# horloge + stats : centrees sur la largeur reelle
 	_timer_lbl.add_theme_font_size_override("font_size", Palette.fs(24))
 	_stat_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
-	var mid_x: float = _bar_w + pad * 2.0
-	var mid_w: float = maxf(80.0, vp.x - mid_x - mb.x - pad * 2.0)
-	# 🚨 Tout ce qui vit SOUS le bandeau (horloge + stats en portrait, « SURCHARGE PRETE »,
-	# rappel de protocole) partait de la meme ordonnee et se superposait — visible en capture
-	# portrait : « 00:11 » ecrit par-dessus le libelle de protocole. On empile avec un curseur.
+	var mid_x: float = _bar_w + pad_left + pad
+	var mid_w: float = maxf(80.0, vp.x - mid_x - mb.x - pad_right - pad)
+
 	_od_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
 	_chip_fs()
 	var cur: float = band_h + 3.0 * k
@@ -465,39 +534,98 @@ func _relayout() -> void:
 	var glass_x: float = ((vp.x - glass_w) * 0.5) if portrait else mid_x
 	_hud_glass.position = Vector2(glass_x - glass_pad, _timer_lbl.position.y - glass_pad * 0.5)
 	_hud_glass.size = Vector2(glass_w + glass_pad * 2.0, th + sh + glass_pad)
-	# « SURCHARGE PRETE » va a GAUCHE sous les barres, le protocole occupe la ligne suivante
-	_od_lbl.position = Vector2(pad, cur)
+
+	_od_lbl.position = Vector2(pad_left, cur)
 	cur += float(Palette.fs(14)) * 1.35
 	if _chip != null:
 		_chip.position = Vector2(0, cur)
 		_chip.size = Vector2(vp.x, 0)
 		cur += float(Palette.fs(13)) * 1.35
-	# En PORTRAIT l'horloge, les stats et le rappel de protocole descendent SOUS les barres :
-	# sans fond ils se posaient a meme le decor (verifie en capture — « • FRENESIE » en ambre
-	# sur un sol bleu nuit). On prolonge le voile du bandeau jusqu'a la derniere ligne.
 	if portrait:
 		_topbar.offset_bottom = maxf(band_h, cur)
 
-	# SURCHARGE : ancre en bas a droite, et plus GRAND (48 dp mini, ~22 % de la largeur)
+	# --- BANDEAU DE VIE DU BOSS (alerte menaces majeures) ---
+	if _boss_panel != null:
+		var bp_w: float = clampf((vp.x - pad_left - pad_right) * (0.86 if portrait else 0.46), 260.0, 520.0)
+		var bp_h: float = maxf(40.0, 44.0 * k)
+		var bp_x: float = (vp.x - bp_w) * 0.5
+		var bp_y: float = (cur + 8.0 * k) if portrait else (band_h + 8.0 * k)
+		_boss_panel.size = Vector2(bp_w, bp_h)
+		_boss_panel.position = Vector2(bp_x, bp_y)
+		var bh_pad: float = 8.0 * k
+		var b_bar_w: float = bp_w - bh_pad * 2.0
+		var b_bar_h: float = maxf(10.0, 12.0 * k)
+		_boss_title.position = Vector2(bh_pad, 2.0 * k)
+		_boss_title.size = Vector2(b_bar_w, maxf(16.0, 18.0 * k))
+		_boss_title.add_theme_font_size_override("font_size", Palette.fs(13))
+		var b_bar_y: float = bp_h - b_bar_h - bh_pad * 0.7
+		_boss_hp_bg.position = Vector2(bh_pad, b_bar_y)
+		_boss_hp_bg.size = Vector2(b_bar_w, b_bar_h)
+		_boss_hp_ghost.position = _boss_hp_bg.position
+		_boss_hp_ghost.size.y = b_bar_h
+		_boss_hp_fill.position = _boss_hp_bg.position
+		_boss_hp_fill.size.y = b_bar_h
+
+	# SURCHARGE : ancre en bas a droite, cible tactile >= 48 dp
 	var ob: Vector2 = Vector2(clampf(vp.x * 0.22, 150.0, 230.0), maxf(64.0, 78.0 * k))
 	_od_btn.add_theme_font_size_override("font_size", Palette.fs(19))
 	_od_btn.size = ob
-	# dock de competences : bas droite ; la SURCHARGE se pose JUSTE AU-DESSUS quand elle est prete
+	# dock de competences : bas droite avec marge safe area
 	var bs: float = clampf(88.0 * k, 64.0, 110.0)
 	var dgap: float = 10.0 * k
 	var dock_w: float = bs * 3.0 + dgap * 4.0 + 8.0
 	var dock_h: float = bs + 28.0 + 26.0 * k
 	if _dock != null:
 		_dock.size = Vector2(dock_w, dock_h)
-		_dock.position = Vector2(vp.x - dock_w - pad, vp.y - dock_h - pad * 1.2)
+		_dock.position = Vector2(vp.x - dock_w - pad_right, vp.y - dock_h - pad_bottom)
 		for i in _skill_btns.size():
 			var sb2: Control = _skill_btns[i]
 			sb2.size = Vector2(bs, bs)
 			sb2.position = Vector2(dgap + 4.0 + float(i) * (bs + dgap), 28.0)
-	_od_btn.position = Vector2(vp.x - ob.x - pad, vp.y - dock_h - ob.y - pad * 2.0)
+	_od_btn.position = Vector2(vp.x - ob.x - pad_right, vp.y - dock_h - ob.y - pad_bottom - pad * 0.8)
 
 	if _draft_root != null and _draft_root.visible:
 		_render_draft()
+
+func _update_boss_bar(_delta: float) -> void:
+	if _boss_panel == null:
+		return
+	var boss: Enemy = null
+	if _active_boss != null and is_instance_valid(_active_boss) and _active_boss.alive and _active_boss.rank >= 3:
+		boss = _active_boss
+	else:
+		_active_boss = null
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if e is Enemy and (e as Enemy).alive and (e as Enemy).rank >= 3:
+				boss = e as Enemy
+				_active_boss = boss
+				_last_boss_hp = boss.hp
+				break
+	
+	if boss != null and is_instance_valid(boss) and boss.alive and GameState.alive:
+		if not _boss_panel.visible:
+			_boss_panel.visible = true
+			if _boss_hp_bg != null and _boss_hp_fill != null and _boss_hp_ghost != null:
+				_boss_hp_fill.size.x = _boss_hp_bg.size.x
+				_boss_hp_ghost.size.x = _boss_hp_bg.size.x
+		var bname: String = String(boss.name_label) if "name_label" in boss and boss.name_label != "" else boss.kind.to_upper()
+		_boss_title.text = "★ MENACE MAJEURE : %s ★" % bname
+		if _boss_hp_bg != null and _boss_hp_fill != null and _boss_hp_ghost != null:
+			var frac: float = clampf(boss.hp / maxf(1.0, boss.max_hp), 0.0, 1.0)
+			var target_w: float = _boss_hp_bg.size.x * frac
+			var cur_fill: float = _boss_hp_fill.size.x
+			_boss_hp_fill.size.x = target_w
+			if target_w < cur_fill - 1.0:
+				_boss_hp_ghost.size.x = maxf(_boss_hp_ghost.size.x, cur_fill)
+				var t: Tween = _boss_hp_ghost.create_tween()
+				t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+				t.tween_property(_boss_hp_ghost, "size:x", target_w, 0.35).set_delay(0.12).set_trans(Tween.TRANS_SINE)
+			elif target_w > cur_fill:
+				_boss_hp_ghost.size.x = target_w
+	else:
+		if _boss_panel.visible:
+			_boss_panel.visible = false
+			_active_boss = null
 
 func _chip_fs() -> void:
 	if _chip != null:

@@ -26,6 +26,7 @@ var _pools_ready: bool = false
 var _ebolt_live: int = 0
 
 var _shake: float = 0.0
+var _shake_t: float = 0.0
 var _dmg_active: int = 0
 var _headless: bool = false
 # 04/10 tour 2 : boite a outils VFX premium (couches coeur/onde/etincelles/fumee/traces au sol).
@@ -3369,10 +3370,18 @@ func _process(delta: float) -> void:
 		
 
 	if bool(SaveManager.data.get("settings", {}).get("shake", true)) and _shake > 0.0:
-		_shake = maxf(0.0, _shake - delta * 34.0)
-		cam.offset = CAM_OFFSET + Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+		_shake = maxf(0.0, _shake - delta * 20.0)
+		_shake_t += delta * 42.0
+		# Shake fluide non-bruyant : harmoniques déphasées et atténuation quadratique (game-feel AAA)
+		var s_norm: float = clampf(_shake / 10.0, 0.0, 1.0)
+		var s_mag: float = s_norm * s_norm * 14.0
+		cam.offset = CAM_OFFSET + Vector2(
+			s_mag * sin(_shake_t * 1.7) + randf_range(-0.5, 0.5) * _shake * 0.15,
+			s_mag * cos(_shake_t * 2.3) + randf_range(-0.5, 0.5) * _shake * 0.15
+		)
 	elif cam.offset != CAM_OFFSET:
 		cam.offset = CAM_OFFSET
+		_shake_t = 0.0
 
 	if _bot:
 		_drive_bot()
