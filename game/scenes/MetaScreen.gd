@@ -444,18 +444,16 @@ func _build_home() -> void:
 	var tabw: float = playw * 0.86
 	var tabh: float = maxf(48.0, 56.0 * vk)          # 48 dp mini (cible tactile)
 	var tabfs: int = maxi(17, int(21.0 * vk))          # navigation principale : jamais sous 17 px
+	var arsenal_badge: String = "   •  %d PT%s" % [SaveManager.sp(), "S" if SaveManager.sp() > 1 else ""] if SaveManager.can_upgrade_any_meta() else ""
+	var gear_badge: String = "   •  FUSION DISPO" if SaveManager.gear_can_merge_any() else ""
+	var garage_badge: String = "   •  DISPONIBLE" if SaveManager.can_buy_any_mech() else ""
+	var daily_badge: String = "   •  A RECLAMER" if SaveManager.quotidien_a_reclamer() else ""
 	var secs: Array = [
-		["ARSENAL", _build_arsenal, Color(0.55, 0.4, 0.22)],
-		["EQUIPEMENT", _build_gear, Color(0.42, 0.34, 0.6)],
-		["GARAGE", _build_garage, Color(0.24, 0.42, 0.62)],
-		# 🚨 une pastille quand une recompense du jour ou une quete terminee attend : sans elle,
-		# le crochet de retention existe dans le code mais aucun joueur ne le voit.
-		["QUOTIDIEN" + ("   •  A RECLAMER" if SaveManager.quotidien_a_reclamer() else ""),
-			_build_daily, Color(0.24, 0.5, 0.37)],
+		["ARSENAL" + arsenal_badge, _build_arsenal, Color(0.72, 0.52, 0.22) if arsenal_badge != "" else Color(0.55, 0.4, 0.22)],
+		["EQUIPEMENT" + gear_badge, _build_gear, Color(0.60, 0.45, 0.85) if gear_badge != "" else Color(0.42, 0.34, 0.6)],
+		["GARAGE" + garage_badge, _build_garage, Color(0.32, 0.55, 0.85) if garage_badge != "" else Color(0.24, 0.42, 0.62)],
+		["QUOTIDIEN" + daily_badge, _build_daily, Color(0.28, 0.62, 0.45) if daily_badge != "" else Color(0.24, 0.5, 0.37)],
 		["HISTOIRE", _play_story, Color(0.6, 0.3, 0.24)],
-		# 🚨 les reglages (musique, bruitages, auto-visee, ecran, mode SANS FIN) n'etaient
-		# joignables que par un ecran JAMAIS ouvert : couper la musique imposait de lancer
-		# une partie d'abord. Ils ont maintenant leur entree sur l'accueil.
 		["REGLAGES", _open_settings, Color(0.32, 0.38, 0.46)],
 	]
 	var si: int = 0
@@ -1226,17 +1224,68 @@ func _part_text(p: Dictionary) -> String:
 		return base
 	return "%s   %s" % [maker, base]
 
+func _build_set_synergies(parent: Control) -> void:
+	var sets: Array = SaveManager.gear_set_details()
+	var panel: PanelContainer = PanelContainer.new()
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.08, 0.14, 0.85)
+	sb.border_width_left = 2; sb.border_width_top = 2; sb.border_width_right = 2; sb.border_width_bottom = 2
+	sb.border_color = Color(0.35, 0.55, 0.95, 0.55)
+	sb.corner_radius_top_left = 6; sb.corner_radius_top_right = 6
+	sb.corner_radius_bottom_left = 6; sb.corner_radius_bottom_right = 6
+	panel.add_theme_stylebox_override("panel", sb)
+	parent.add_child(panel)
+
+	var box: VBoxContainer = VBoxContainer.new()
+	box.add_theme_constant_override("separation", 5)
+	panel.add_child(box)
+
+	var head: Label = Label.new()
+	head.text = "✦ SYNERGIES FABRICANTS (2p = +8% • 4p = signature) ✦"
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.add_theme_font_size_override("font_size", Palette.fs(14))
+	head.add_theme_color_override("font_color", Color(0.65, 0.82, 1.0))
+	box.add_child(head)
+
+	for s: Dictionary in sets:
+		var n: int = int(s.get("count", 0))
+		var col: Color = s.get("col", Color.WHITE)
+		var srow: HBoxContainer = HBoxContainer.new()
+		srow.add_theme_constant_override("separation", 8)
+
+		var title_lbl: Label = Label.new()
+		title_lbl.text = "• %s [%d/4]" % [String(s.get("name", "")), n]
+		title_lbl.custom_minimum_size = Vector2(170, 0)
+		title_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
+		title_lbl.add_theme_color_override("font_color", col if n > 0 else Color(0.5, 0.55, 0.62))
+		srow.add_child(title_lbl)
+
+		var t2_lbl: Label = Label.new()
+		var t2_active: bool = bool(s.get("t2_active", false))
+		t2_lbl.text = "[2p: %s %s]" % [String(s.get("t2", "")), "✓" if t2_active else ""]
+		t2_lbl.add_theme_font_size_override("font_size", Palette.fs(13))
+		t2_lbl.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5) if t2_active else Color(0.48, 0.52, 0.58))
+		srow.add_child(t2_lbl)
+
+		var t4_lbl: Label = Label.new()
+		var t4_active: bool = bool(s.get("t4_active", false))
+		t4_lbl.text = "[4p: %s %s]" % [String(s.get("t4", "")), "★" if t4_active else ""]
+		t4_lbl.add_theme_font_size_override("font_size", Palette.fs(13))
+		t4_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35) if t4_active else Color(0.42, 0.45, 0.50))
+		srow.add_child(t4_lbl)
+
+		box.add_child(srow)
+
+	var sp: Control = Control.new()
+	sp.custom_minimum_size = Vector2(0, 6)
+	parent.add_child(sp)
+
 func _build_gear() -> void:
 	_clear()
 	var v: VBoxContainer = _scaffold(600.0)
 	_title(v, "EQUIPEMENT", Color(0.75, 0.65, 1.0))
 	_currency_row(v)
-	var set_l: Label = Label.new()
-	set_l.text = SaveManager.set_summary()
-	set_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	set_l.add_theme_font_size_override("font_size", Palette.fs(16))
-	set_l.add_theme_color_override("font_color", Color(0.85, 0.78, 1.0))
-	v.add_child(set_l)
+	_build_set_synergies(v)
 	for slot: String in SaveManager.GEAR_SLOTS:
 		var uid: int = int(SaveManager.gear_equipped().get(slot, -1))
 		var p: Dictionary = SaveManager.gear_part(uid) if uid >= 0 else {}

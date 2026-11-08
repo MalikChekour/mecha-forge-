@@ -478,6 +478,50 @@ func set_summary() -> String:
 		lines.append(bit)
 	return "\n".join(lines)
 
+## Structure riche pour l'UI mobile (panneau de synergies et badges de fabricants)
+func gear_set_details() -> Array:
+	var counts: Dictionary = gear_set_counts()
+	var defs: Dictionary = {
+		"anahei": {
+			"name": "Anahei Heavy",
+			"focus": "Dégâts & Surcharge",
+			"t2": "+8% Dégâts globaux",
+			"t4": "+1 Charge Overdrive max",
+			"col": Color(1.0, 0.45, 0.22)
+		},
+		"korr": {
+			"name": "Korr Munitions",
+			"focus": "Blindage & Survie",
+			"t2": "+8% PV Max",
+			"t4": "+8% Armure passive",
+			"col": Color(0.42, 0.88, 0.48)
+		},
+		"voss": {
+			"name": "Voss Dynamics",
+			"focus": "Vitesse & Magnétisme",
+			"t2": "+8% Vitesse de marche",
+			"t4": "Portée aimant +60 px",
+			"col": Color(0.25, 0.82, 1.0)
+		},
+		"sena": {
+			"name": "Sena Robotics",
+			"focus": "Critique & Données Tactiques",
+			"t2": "+8% Chance critique",
+			"t4": "+8% Gain d'expérience",
+			"col": Color(0.95, 0.76, 0.28)
+		}
+	}
+	var res: Array = []
+	for m in MAKERS:
+		var d: Dictionary = (defs.get(m, {}) as Dictionary).duplicate()
+		var n: int = int(counts.get(m, 0))
+		d["id"] = m
+		d["count"] = n
+		d["t2_active"] = (n >= 2)
+		d["t4_active"] = (n >= 4)
+		res.append(d)
+	return res
+
 func mastery_done(biome: String, id: String) -> bool:
 	return bool(data.get("mastery", {}).get(biome, {}).get(id, false))
 
@@ -611,6 +655,13 @@ func gear_can_merge(slot: String, rarity: String) -> bool:
 	if not GEAR_MERGE_NEXT.has(rarity):
 		return false
 	return gear_count(slot, rarity) >= 3
+
+func gear_can_merge_any() -> bool:
+	for slot: String in GEAR_SLOTS:
+		for r in ["commun", "rare", "epique"]:
+			if gear_can_merge(slot, r):
+				return true
+	return false
 
 ## Fusion 3-en-1 (formule canonique Survivor.io) : combine 3 pieces identiques de meme slot
 ## et meme rarete en 1 piece du palier superieur. Si l'une des 3 pieces etait equipee, la piece
@@ -805,6 +856,28 @@ func spend_sp(n: int) -> bool:
 	data["skill_points"] = sp() - n
 	save_data()
 	return true
+
+func can_upgrade_any_meta() -> bool:
+	if sp() <= 0:
+		return false
+	var m: Dictionary = data.get("meta", {})
+	for k in GameState.META.keys():
+		var d: Dictionary = GameState.META[k]
+		if int(m.get(k, 0)) < int(d.get("max", 0)):
+			var cost: int = int(d.get("cost", 1))
+			if sp() >= cost:
+				return true
+	return false
+
+func can_buy_any_mech() -> bool:
+	var scrap: int = int(data.get("meta_scrap", 0))
+	var owned: Array = data.get("owned_mechs", [])
+	for m in GameState.MECHS:
+		var mid: String = String(m.get("id", ""))
+		var cost: int = int(m.get("cost", 0))
+		if cost > 0 and not owned.has(mid) and scrap >= cost:
+			return true
+	return false
 
 ## --- STARTING WEAPONS (unlocked with points; autocannon is free) ---
 func weapon_unlocked(id: String) -> bool:

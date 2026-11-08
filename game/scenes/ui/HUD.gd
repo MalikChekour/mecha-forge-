@@ -61,6 +61,7 @@ var _boss_hp_ghost: ColorRect
 var _boss_hp_fill: ColorRect
 var _active_boss: Enemy = null
 var _last_boss_hp: float = -1.0
+var _boss_radar: Control
 
 ## Cadre holographique + decoupe en segments par-dessus la barre de vie (demande du patron, 05/10 :
 ## "barre segmentee style tech/armure" au lieu d'un simple rectangle plein). Dessine PAR-DESSUS
@@ -138,6 +139,8 @@ func _on_died() -> void:
 		_draft_root.visible = false
 	if _boss_panel != null:
 		_boss_panel.visible = false
+	if _boss_radar != null:
+		_boss_radar.visible = false
 
 func _on_overdrive(v: float) -> void:
 	if _od_fill != null and _od_bg != null:
@@ -159,6 +162,8 @@ func _process(delta: float) -> void:
 		_stick.queue_redraw()
 	if _aim_stick != null:
 		_aim_stick.queue_redraw()
+	if _boss_radar != null:
+		_boss_radar.queue_redraw()
 
 ## RETOUR DE DEGATS. Constat des testeurs : « sur une douzaine de captures ou la vie tombe de
 ## 100 % a 8 %, aucune image ne me dit que j'encaisse ». L'onde de blessure existante est CYAN,
@@ -397,6 +402,14 @@ func _build() -> void:
 	_aim_stick.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_aim_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_aim_stick)
+
+	# --- RADAR DE MENACE HORS-ECRAN (Offscreen Boss Radar pour confort mobile) ---
+	var br: OffscreenBossRadar = OffscreenBossRadar.new()
+	br.hud = self
+	_boss_radar = br
+	_boss_radar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_boss_radar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_boss_radar)
 
 	# --- SURCHARGE : gros bouton ancre EN BAS A DROITE ---
 	# Deux testeurs sur quatre l'ont dit illisible alors que c'est la SEULE action manuelle
@@ -1092,3 +1105,86 @@ class AimStickRing extends Control:
 		draw_arc(o, r, 0.0, TAU, 48, Color(1.0, 0.65, 0.35, 0.6 * a), 3.0, true)
 		draw_circle(o + v * r, r * 0.36, Color(1.0, 0.7, 0.4, 0.40 * a))
 		draw_arc(o + v * r, r * 0.36, 0.0, TAU, 32, Color(1.0, 0.8, 0.5, 0.9 * a), 3.0, true)
+
+## Radar de menace hors-écran (Offscreen Boss Indicator).
+## Alerte le joueur de l'arrivée d'un Boss/Élite majeur (rank >= 3) situé hors du champ visuel :
+## flèche holographique néon orientée sur le bord d'écran, étiquette de distance en mètres,
+## pulsation dynamique et prise en compte stricte des Safe Area mobiles.
+class OffscreenBossRadar extends Control:
+	var hud: HUD
+	func _draw() -> void:
+		if hud == null or hud.player == null or not is_instance_valid(hud.player) or not GameState.alive:
+			return
+		var boss: Enemy = hud._active_boss
+		if boss == null or not is_instance_valid(boss) or not boss.alive or boss.rank < 3:
+			return
+
+		var vp: Vector2 = hud._vp()
+		if vp.x <= 0.0 or vp.y <= 0.0:
+			return
+
+		var cam_xform: Transform2D = hud.player.get_viewport().get_canvas_transform()
+		var screen_pos: Vector2 = cam_xform * boss.global_position
+
+		var insets: Dictionary = hud._safe_insets()
+		var pad_l: float = 38.0 + float(insets["left"])
+		var pad_r: float = vp.x - 38.0 - float(insets["right"])
+		var pad_t: float = 88.0 + float(insets["top"])
+		var pad_b: float = vp.y - 48.0 - float(insets["bottom"])
+
+		# Si le boss est visible à l'intérieur des marges, pas d'indicateur
+		if screen_pos.x >= pad_l and screen_pos.x <= pad_r and screen_pos.y >= pad_t and screen_pos.y <= pad_b:
+			return
+
+		var center: Vector2 = vp * 0.5
+		var dir: Vector2 = (screen_pos - center).normalized()
+		if dir.length_squared() < 0.001:
+			return
+
+		var t_x: float = 1e9
+		if dir.x > 0.0001:
+			t_x = (pad_r - center.x) / dir.x
+		elif dir.x < -0.0001:
+			t_x = (pad_l - center.x) / dir.x
+
+		var t_y: float = 1e9
+		if dir.y > 0.0001:
+			t_y = (pad_b - center.y) / dir.y
+		elif dir.y < -0.0001:
+			t_y = (pad_t - center.y) / dir.y
+
+		var t_edge: float = minf(t_x, t_y)
+		var edge_pt: Vector2 = center + dir * t_edge
+
+		var world_dist: float = (boss.global_position - hud.player.global_position).length()
+		var dist_m: int = int(round(world_dist / 40.0))
+
+		var pulse: float = 0.80 + 0.20 * sin(Time.get_ticks_msec() / 130.0)
+		var col_main: Color = Color(1.0, 0.24, 0.18, 0.95 * pulse)
+		var col_gold: Color = Color(1.0, 0.88, 0.42, pulse)
+
+		# Chevron directionnel
+		var tip: Vector2 = edge_pt
+		var base_pt: Vector2 = edge_pt - dir * 20.0
+		var perp: Vector2 = Vector2(-dir.y, dir.x)
+		var p1: Vector2 = base_pt + perp * 11.0
+		var p2: Vector2 = base_pt - perp * 11.0
+		var inner: Vector2 = base_pt + dir * 5.0
+		var arrow_pts: PackedVector2Array = PackedVector2Array([tip, p1, inner, p2])
+		draw_colored_polygon(arrow_pts, col_main)
+		var closed: PackedVector2Array = PackedVector2Array([tip, p1, inner, p2, tip])
+		draw_polyline(closed, col_gold, 2.0, true)
+
+		# Badge distance
+		var badge_center: Vector2 = edge_pt - dir * 42.0
+		var dist_str: String = "%dm" % dist_m
+		var font: Font = ThemeDB.fallback_font
+		var fs: int = 12
+		var s_sz: Vector2 = font.get_string_size(dist_str, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
+		var rw: float = s_sz.x + 12.0
+		var rh: float = maxf(18.0, s_sz.y + 4.0)
+		var rect: Rect2 = Rect2(badge_center - Vector2(rw * 0.5, rh * 0.5), Vector2(rw, rh))
+		draw_rect(rect, Color(0.08, 0.02, 0.03, 0.88), true)
+		draw_rect(rect, col_gold, false, 1.5)
+		draw_string(font, badge_center + Vector2(-s_sz.x * 0.5, fs * 0.36), dist_str, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+

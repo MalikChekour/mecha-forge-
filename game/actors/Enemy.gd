@@ -9,6 +9,9 @@ var kind: String = "brute"
 var chassis: String = "brute"    # which baked sheets to render (may differ from kind)
 var hp: float = 20.0
 var hp_max: float = 20.0
+var max_hp: float:
+	get: return hp_max
+	set(v): hp_max = v
 var speed: float = 90.0
 var contact_dmg: float = 8.0
 var rank: int = 0
