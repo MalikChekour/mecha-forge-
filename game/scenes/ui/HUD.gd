@@ -709,10 +709,10 @@ func _render_draft() -> void:
 	var cards: Array = _draft_cards
 	var vp: Vector2 = _vp()
 	var k: float = _k()
-	var pw: float = clampf(vp.x * 0.86, 280.0, 640.0)
-	var row_h: float = maxf(74.0, 82.0 * k)
+	var pw: float = clampf(vp.x * 0.94, 320.0, 880.0)
+	var row_h: float = maxf(88.0, 96.0 * k)
 	var row_gap: float = 12.0 * k
-	var mar: float = 20.0 * k
+	var mar: float = 18.0 * k
 
 	# 1. Full-screen blur overlay
 	var bg_blur: ColorRect = ColorRect.new()
@@ -860,38 +860,41 @@ func _render_draft() -> void:
 			if card_icon_tex == null:
 				card_icon_tex = Tex.get_tex(icon_tex_path)
 
+		var isz: float = maxf(72.0, 80.0 * k)
 		if card_icon_tex != null:
 			var icon_frame: PanelContainer = PanelContainer.new()
 			var if_sb: StyleBoxFlat = StyleBoxFlat.new()
-			if_sb.bg_color = Color(0.02, 0.04, 0.08, 0.95)
-			if_sb.border_width_left = 1; if_sb.border_width_right = 1
-			if_sb.border_width_top = 1; if_sb.border_width_bottom = 1
+			if_sb.bg_color = Color(0.01, 0.02, 0.05, 1.0)
+			if_sb.border_width_left = 2; if_sb.border_width_right = 2
+			if_sb.border_width_top = 2; if_sb.border_width_bottom = 2
 			if_sb.border_color = border_color
-			if_sb.corner_radius_top_left = 6; if_sb.corner_radius_bottom_right = 6
-			if_sb.corner_radius_top_right = 6; if_sb.corner_radius_bottom_left = 6
+			if_sb.corner_radius_top_left = 8; if_sb.corner_radius_bottom_right = 8
+			if_sb.corner_radius_top_right = 8; if_sb.corner_radius_bottom_left = 8
 			icon_frame.add_theme_stylebox_override("panel", if_sb)
 			icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			icon_frame.clip_contents = true
 			
-			var isz: float = maxf(44.0, 50.0 * k)
 			icon_frame.custom_minimum_size = Vector2(isz, isz)
 			icon_frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			
 			var img_rect: TextureRect = TextureRect.new()
 			img_rect.texture = card_icon_tex
 			img_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			img_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			img_rect.custom_minimum_size = Vector2(isz - 4.0, isz - 4.0)
+			img_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			img_rect.custom_minimum_size = Vector2(isz, isz)
+			img_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			img_rect.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			img_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			icon_frame.add_child(img_rect)
 			card_hbox.add_child(icon_frame)
 		else:
 			var icon_badge: Label = Label.new()
 			icon_badge.text = icon_sym
-			icon_badge.custom_minimum_size = Vector2(36.0 * k, 36.0 * k)
+			icon_badge.custom_minimum_size = Vector2(isz, isz)
 			icon_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			icon_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			icon_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			icon_badge.add_theme_font_size_override("font_size", Palette.fs(22))
+			icon_badge.add_theme_font_size_override("font_size", Palette.fs(32))
 			icon_badge.add_theme_color_override("font_color", tag_color)
 			icon_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			card_hbox.add_child(icon_badge)
@@ -911,14 +914,14 @@ func _render_draft() -> void:
 		
 		var tag_lbl: Label = Label.new()
 		tag_lbl.text = tag_text
-		tag_lbl.add_theme_font_size_override("font_size", Palette.fs(12))
+		tag_lbl.add_theme_font_size_override("font_size", Palette.fs(13))
 		tag_lbl.add_theme_color_override("font_color", tag_color)
 		tag_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		title_row.add_child(tag_lbl)
 		
 		var name_lbl: Label = Label.new()
 		name_lbl.text = raw_name
-		name_lbl.add_theme_font_size_override("font_size", Palette.fs(16))
+		name_lbl.add_theme_font_size_override("font_size", Palette.fs(18))
 		name_lbl.add_theme_color_override("font_color", Color.WHITE)
 		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		title_row.add_child(name_lbl)
@@ -927,8 +930,8 @@ func _render_draft() -> void:
 			var desc_lbl: Label = Label.new()
 			desc_lbl.text = desc
 			desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			desc_lbl.add_theme_font_size_override("font_size", Palette.fs(13))
-			desc_lbl.add_theme_color_override("font_color", Color(0.8, 0.88, 0.95, 0.88))
+			desc_lbl.add_theme_font_size_override("font_size", Palette.fs(14))
+			desc_lbl.add_theme_color_override("font_color", Color(0.85, 0.92, 0.98, 0.9))
 			desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			text_col.add_child(desc_lbl)
 		
@@ -936,7 +939,7 @@ func _render_draft() -> void:
 		var arrow_lbl: Label = Label.new()
 		arrow_lbl.text = "✕" if _banish_mode else "➔"
 		arrow_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		arrow_lbl.add_theme_font_size_override("font_size", Palette.fs(18))
+		arrow_lbl.add_theme_font_size_override("font_size", Palette.fs(22))
 		arrow_lbl.add_theme_color_override("font_color", tag_color)
 		arrow_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card_hbox.add_child(arrow_lbl)
