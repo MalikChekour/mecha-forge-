@@ -226,6 +226,7 @@ func use_skill(id: String) -> bool:
 		"jet":
 			jet_t = float(SKILLS[id]["dur"])
 			_was_jetting = true
+			collision_mask = 0   # Survol : passe au-dessus des murs et obstacles du labyrinthe
 			Audio.sfx("dash", 0.08)
 			Audio.sfx("powerup", 0.06)
 			Haptics.heavy()
@@ -304,6 +305,24 @@ func _update_skills(delta: float) -> void:
 		_shield_spr.visible = false
 
 func _on_jetpack_landing() -> void:
+	collision_mask = 8   # Rétablit la collision avec les murs
+	# S'assurer qu'on n'est pas bloqué à l'intérieur d'un mur après le survol
+	var space := get_world_2d().direct_space_state
+	if space != null:
+		var q := PhysicsShapeQueryParameters2D.new()
+		var cs := CircleShape2D.new()
+		cs.radius = 28.0
+		q.shape = cs
+		q.transform = global_transform
+		q.collision_mask = 8
+		var hits := space.intersect_shape(q, 1)
+		if not hits.is_empty():
+			var obs = hits[0].get("collider")
+			if obs is Node2D:
+				var push_dir: Vector2 = (global_position - (obs as Node2D).global_position).normalized()
+				if push_dir.length() < 0.1: push_dir = Vector2.DOWN
+				global_position += push_dir * 60.0
+
 	if mecha != null:
 		mecha.position.y = 0.0
 		mecha.scale = Vector2.ONE

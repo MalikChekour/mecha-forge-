@@ -8,9 +8,11 @@ extends Node2D
 var player: Player
 var spawner: EnemySpawner
 const ArenaWallScript = preload("res://systems/ArenaWall.gd")
+const TechMazeScript = preload("res://systems/TechMaze.gd")
 const OrbitalDropPod = preload("res://systems/OrbitalDrop.gd")
 const IonStorm = preload("res://systems/IonStorm.gd")
 var arena_wall: Node2D = null   # 31/10 anti-fuite : champ de confinement mobile (cf. ArenaWall.gd)
+var _tech_maze: Node2D = null
 var hud: HUD
 var cam: Camera2D
 var enemy_layer: Node2D
@@ -2822,8 +2824,29 @@ func _build_environment() -> void:
 func _scatter_decor(biome_name: String) -> void:
 	if _scatter != null and is_instance_valid(_scatter):
 		_scatter.queue_free()
+		_scatter = null
+	if _tech_maze != null and is_instance_valid(_tech_maze):
+		_tech_maze.queue_free()
+		_tech_maze = null
 	cover_list.clear()
 	_map_phase_shown = -1   # 04/10 : nouveau biome -> jamais bannerer son tout premier etat de map
+
+	# TEST NIVEAU 1 ("tech" / L'Usine) :
+	# Suppression temporaire de tous les décors anciens et activation du labyrinthe léger modulaire Blender.
+	if biome_name == "tech":
+		var maze: Node2D = TechMazeScript.new()
+		maze.game = self
+		maze.z_index = -1
+		add_child(maze)
+		_tech_maze = maze
+		if player != null:
+			player.arena = Rect2(-1500.0, -1500.0, 3000.0, 3000.0)
+		if spawner != null:
+			spawner.arena = Rect2(-1450.0, -1450.0, 2900.0, 2900.0)
+		if cam != null:
+			cam.limit_left = -1650; cam.limit_right = 1650; cam.limit_top = -1650; cam.limit_bottom = 1650
+		return
+
 	var s: PropScatter = PropScatter.new()
 	s.game = self
 	s.biome = biome_name
