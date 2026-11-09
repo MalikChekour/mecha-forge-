@@ -448,11 +448,13 @@ func _build_home() -> void:
 	var gear_badge: String = "   •  FUSION DISPO" if SaveManager.gear_can_merge_any() else ""
 	var garage_badge: String = "   •  DISPONIBLE" if SaveManager.can_buy_any_mech() else ""
 	var daily_badge: String = "   •  A RECLAMER" if SaveManager.quotidien_a_reclamer() else ""
+	var trophies_badge: String = "   •  A RECLAMER" if SaveManager.has_unclaimed_mastery_milestones() else ""
 	var secs: Array = [
 		["ARSENAL" + arsenal_badge, _build_arsenal, Color(0.72, 0.52, 0.22) if arsenal_badge != "" else Color(0.55, 0.4, 0.22)],
 		["EQUIPEMENT" + gear_badge, _build_gear, Color(0.60, 0.45, 0.85) if gear_badge != "" else Color(0.42, 0.34, 0.6)],
 		["GARAGE" + garage_badge, _build_garage, Color(0.32, 0.55, 0.85) if garage_badge != "" else Color(0.24, 0.42, 0.62)],
 		["QUOTIDIEN" + daily_badge, _build_daily, Color(0.28, 0.62, 0.45) if daily_badge != "" else Color(0.24, 0.5, 0.37)],
+		["TROPHÉES" + trophies_badge, _build_trophies, Color(0.88, 0.72, 0.22) if trophies_badge != "" else Color(0.68, 0.55, 0.24)],
 		["HISTOIRE", _play_story, Color(0.6, 0.3, 0.24)],
 		["REGLAGES", _open_settings, Color(0.32, 0.38, 0.46)],
 	]
@@ -1198,6 +1200,242 @@ func _claim_daily() -> void:
 	var res: Dictionary = SaveManager.claim_daily()
 	Audio.sfx("levelup" if not res.is_empty() else "click")
 	_build_daily()
+
+func _build_trophies() -> void:
+	_clear()
+	var v: VBoxContainer = _scaffold(640.0)
+	var uk: float = _ui_k()
+	_title(v, "SALLE DES TROPHÉES & MAÎTRISES", Palette.GOLD, 32)
+	
+	var tot: int = SaveManager.total_masteries_count()
+	var max_m: int = GameScript.CHAPTERS.size() * 3
+	var rank_name: String = "RECRUE DE FORGE"
+	var rank_col: Color = Color(0.7, 0.75, 0.8)
+	if tot >= 42:
+		rank_name = "LÉGENDE SUPRÊME"
+		rank_col = Color(1.0, 0.84, 0.25)
+	elif tot >= 28:
+		rank_name = "MAÎTRE CONQUÉRANT"
+		rank_col = Color(0.9, 0.5, 1.0)
+	elif tot >= 16:
+		rank_name = "AS DE BATAILLE"
+		rank_col = Color(0.3, 0.85, 1.0)
+	elif tot >= 8:
+		rank_name = "VANGUARD D'ACIER"
+		rank_col = Color(0.4, 0.9, 0.6)
+	elif tot >= 3:
+		rank_name = "INITIÉ DE FORGE"
+		rank_col = Color(0.85, 0.9, 0.95)
+	
+	# Panneau Récapitulatif du Rang
+	var rank_panel: PanelContainer = PanelContainer.new()
+	var rsb: StyleBoxFlat = StyleBoxFlat.new()
+	rsb.bg_color = Color(0.04, 0.07, 0.12, 0.85)
+	rsb.border_width_left = 2; rsb.border_width_right = 2
+	rsb.border_width_top = 2; rsb.border_width_bottom = 2
+	rsb.border_color = rank_col
+	rsb.corner_radius_top_left = 10; rsb.corner_radius_bottom_right = 10
+	rsb.corner_radius_top_right = 10; rsb.corner_radius_bottom_left = 10
+	rsb.shadow_color = Color(rank_col.r, rank_col.g, rank_col.b, 0.3)
+	rsb.shadow_size = 10
+	rsb.content_margin_left = 14.0 * uk; rsb.content_margin_right = 14.0 * uk
+	rsb.content_margin_top = 10.0 * uk; rsb.content_margin_bottom = 10.0 * uk
+	rank_panel.add_theme_stylebox_override("panel", rsb)
+	v.add_child(rank_panel)
+	
+	var rbox: VBoxContainer = VBoxContainer.new()
+	rbox.add_theme_constant_override("separation", int(6.0 * uk))
+	rank_panel.add_child(rbox)
+	
+	var rtitle: Label = Label.new()
+	rtitle.text = "🏆 RANG DU PILOTE : %s" % rank_name
+	rtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rtitle.add_theme_font_size_override("font_size", maxi(16, int(20.0 * uk)))
+	rtitle.add_theme_color_override("font_color", rank_col)
+	rbox.add_child(rtitle)
+	
+	var rsub: Label = Label.new()
+	rsub.text = "%d / %d Médailles de Maîtrise Décrochées" % [tot, max_m]
+	rsub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rsub.add_theme_font_size_override("font_size", maxi(13, int(15.0 * uk)))
+	rsub.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0))
+	rbox.add_child(rsub)
+	
+	# Paliers de Récompenses
+	var ptitle: Label = Label.new()
+	ptitle.text = "PALIERS DE RÉCOMPENSES DE MAÎTRISE"
+	ptitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ptitle.add_theme_font_size_override("font_size", maxi(14, int(16.0 * uk)))
+	ptitle.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0))
+	v.add_child(ptitle)
+	
+	for mi in range(SaveManager.MASTERY_MILESTONES.size()):
+		var mdef: Dictionary = SaveManager.MASTERY_MILESTONES[mi]
+		var req: int = int(mdef["req"])
+		var claimed: bool = SaveManager.is_mastery_milestone_claimed(mi)
+		var can_claim: bool = SaveManager.can_claim_mastery_milestone(mi)
+		
+		var mrow: HBoxContainer = HBoxContainer.new()
+		mrow.add_theme_constant_override("separation", int(10.0 * uk))
+		v.add_child(mrow)
+		
+		var mdesc: Label = Label.new()
+		var rw_txt: String = ""
+		if mdef.has("crystals"): rw_txt += "+%d Cristaux  " % int(mdef["crystals"])
+		if mdef.has("sp"): rw_txt += "+%d SP  " % int(mdef["sp"])
+		if mdef.has("cores"): rw_txt += "+%d Noyaux  " % int(mdef["cores"])
+		if mdef.has("scrap"): rw_txt += "+%d Ferraille  " % int(mdef["scrap"])
+		mdesc.text = "[%d ⭐] %s : %s" % [req, String(mdef["title"]), rw_txt]
+		mdesc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mdesc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mdesc.add_theme_font_size_override("font_size", maxi(12, int(14.0 * uk)))
+		mdesc.add_theme_color_override("font_color", Color(1.0, 0.88, 0.4) if can_claim else (Color(0.5, 0.8, 0.5) if claimed else Color(0.7, 0.75, 0.85)))
+		mrow.add_child(mdesc)
+		
+		var mb: Button = Button.new()
+		mb.custom_minimum_size = Vector2(130.0 * uk, maxf(36.0, 38.0 * uk))
+		mb.add_theme_font_size_override("font_size", maxi(12, int(13.0 * uk)))
+		if claimed:
+			mb.text = "ACQUIS ✓"
+			mb.disabled = true
+		elif can_claim:
+			mb.text = "RÉCLAMER !"
+			mb.add_theme_color_override("font_color", Color.WHITE)
+			var sb_btn: StyleBoxFlat = StyleBoxFlat.new()
+			sb_btn.bg_color = Color(0.18, 0.65, 0.35)
+			sb_btn.set_corner_radius_all(int(6.0 * uk))
+			mb.add_theme_stylebox_override("normal", sb_btn)
+			var m_idx: int = mi
+			mb.pressed.connect(func() -> void:
+				if SaveManager.claim_mastery_milestone(m_idx):
+					Audio.sfx("victory")
+					Haptics.victory()
+					_build_trophies()
+			)
+		else:
+			mb.text = "%d / %d ⭐" % [tot, req]
+			mb.disabled = true
+		mrow.add_child(mb)
+	
+	# Séparateur / Titre Défis
+	var gap: Control = Control.new()
+	gap.custom_minimum_size = Vector2(0, 10.0 * uk)
+	v.add_child(gap)
+	
+	var stitle: Label = Label.new()
+	stitle.text = "DÉFIS PAR SECTEUR (3 MÉDAILLES CHACUN)"
+	stitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stitle.add_theme_font_size_override("font_size", maxi(14, int(16.0 * uk)))
+	stitle.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0))
+	v.add_child(stitle)
+	
+	# Liste des Chapitres avec leurs 3 médailles
+	for ci in range(GameScript.CHAPTERS.size()):
+		var ch: Dictionary = GameScript.CHAPTERS[ci]
+		var b_key: String = String(ch.get("biome", ""))
+		var nohit_ok: bool = SaveManager.mastery_done(b_key, "nohit")
+		var fast_ok: bool = SaveManager.mastery_done(b_key, "fast")
+		var melee_ok: bool = SaveManager.mastery_done(b_key, "melee")
+		
+		var cp: PanelContainer = PanelContainer.new()
+		var csb: StyleBoxFlat = StyleBoxFlat.new()
+		csb.bg_color = Color(0.03, 0.06, 0.1, 0.8)
+		csb.border_width_left = 1; csb.border_width_right = 1
+		csb.border_width_top = 1; csb.border_width_bottom = 1
+		csb.border_color = Color(0.2, 0.45, 0.7, 0.4)
+		csb.corner_radius_top_left = 6; csb.corner_radius_bottom_right = 6
+		csb.corner_radius_top_right = 6; csb.corner_radius_bottom_left = 6
+		csb.content_margin_left = 10.0 * uk; csb.content_margin_right = 10.0 * uk
+		csb.content_margin_top = 8.0 * uk; csb.content_margin_bottom = 8.0 * uk
+		cp.add_theme_stylebox_override("panel", csb)
+		v.add_child(cp)
+		
+		var cv: VBoxContainer = VBoxContainer.new()
+		cv.add_theme_constant_override("separation", int(4.0 * uk))
+		cp.add_child(cv)
+		
+		var ch_hdr: Label = Label.new()
+		ch_hdr.text = "CH. %02d : %s (%s)" % [ci + 1, String(ch.get("name", "?")), b_key.to_upper()]
+		ch_hdr.add_theme_font_size_override("font_size", maxi(13, int(15.0 * uk)))
+		ch_hdr.add_theme_color_override("font_color", Color(0.8, 0.92, 1.0))
+		cv.add_child(ch_hdr)
+		
+		var med_row: HBoxContainer = HBoxContainer.new()
+		med_row.add_theme_constant_override("separation", int(12.0 * uk))
+		cv.add_child(med_row)
+		
+		# 1. Intouchable
+		var m1: Label = Label.new()
+		m1.text = "🛡️ Intouchable %s" % ("✓" if nohit_ok else "—")
+		m1.add_theme_font_size_override("font_size", maxi(11, int(13.0 * uk)))
+		m1.add_theme_color_override("font_color", Color(1.0, 0.84, 0.3) if nohit_ok else Color(0.5, 0.55, 0.6))
+		med_row.add_child(m1)
+		
+		# 2. Éclair
+		var m2: Label = Label.new()
+		m2.text = "⏱️ Éclair <12m %s" % ("✓" if fast_ok else "—")
+		m2.add_theme_font_size_override("font_size", maxi(11, int(13.0 * uk)))
+		m2.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0) if fast_ok else Color(0.5, 0.55, 0.6))
+		med_row.add_child(m2)
+		
+		# 3. Au Contact
+		var m3: Label = Label.new()
+		m3.text = "⚔️ Contact %s" % ("✓" if melee_ok else "—")
+		m3.add_theme_font_size_override("font_size", maxi(11, int(13.0 * uk)))
+		m3.add_theme_color_override("font_color", Color(1.0, 0.55, 0.3) if melee_ok else Color(0.5, 0.55, 0.6))
+		med_row.add_child(m3)
+	
+	# Section Plans de Boss Disponibles
+	var ps: Array = SaveManager.plans()
+	if not ps.is_empty():
+		var p_gap: Control = Control.new()
+		p_gap.custom_minimum_size = Vector2(0, 10.0 * uk)
+		v.add_child(p_gap)
+		
+		var p_title: Label = Label.new()
+		p_title.text = "PLANS D'ÉQUIPEMENT DISPONIBLES (%d)" % ps.size()
+		p_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		p_title.add_theme_font_size_override("font_size", maxi(14, int(16.0 * uk)))
+		p_title.add_theme_color_override("font_color", Color(0.9, 0.7, 1.0))
+		v.add_child(p_title)
+		
+		for pi in range(ps.size()):
+			var plan: Dictionary = ps[pi]
+			var ph: HBoxContainer = HBoxContainer.new()
+			ph.add_theme_constant_override("separation", int(10.0 * uk))
+			v.add_child(ph)
+			
+			var pl: Label = Label.new()
+			pl.text = "📜 Plan %s : %s (%s)" % [
+				String(plan.get("rarity", "")).to_upper(),
+				String(plan.get("slot", "")).to_upper(),
+				String(plan.get("maker", "Standard")).to_upper()
+			]
+			pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			pl.add_theme_font_size_override("font_size", maxi(12, int(14.0 * uk)))
+			pl.add_theme_color_override("font_color", Color(0.85, 0.75, 1.0))
+			ph.add_child(pl)
+			
+			var fb: Button = Button.new()
+			fb.text = "FORGER"
+			fb.custom_minimum_size = Vector2(100.0 * uk, maxf(34.0, 36.0 * uk))
+			fb.add_theme_font_size_override("font_size", maxi(12, int(13.0 * uk)))
+			var p_idx: int = pi
+			fb.pressed.connect(func() -> void:
+				var res_part: Dictionary = SaveManager.forge_from_plan(p_idx)
+				if not res_part.is_empty():
+					Audio.sfx("victory")
+					Haptics.heavy()
+					_build_trophies()
+			)
+			ph.add_child(fb)
+	
+	var foot_gap: Control = Control.new()
+	foot_gap.custom_minimum_size = Vector2(0, 14.0 * uk)
+	v.add_child(foot_gap)
+	
+	_big_button(v, "RETOUR", _back, Color(0.3, 0.35, 0.45))
 
 # --- EQUIPEMENT : 4 slots, rarities, upgrade, recycle, crystal pulls ---
 const RARITY_COL: Dictionary = {

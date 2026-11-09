@@ -9,6 +9,7 @@ var player: Player
 var spawner: EnemySpawner
 const ArenaWallScript = preload("res://systems/ArenaWall.gd")
 const OrbitalDropPod = preload("res://systems/OrbitalDrop.gd")
+const IonStorm = preload("res://systems/IonStorm.gd")
 var arena_wall: Node2D = null   # 31/10 anti-fuite : champ de confinement mobile (cf. ArenaWall.gd)
 var hud: HUD
 var cam: Camera2D
@@ -206,6 +207,7 @@ var _banished: Array = []      # upgrade ids banished for this run
 var _passives: Dictionary = {} # picked upgrade ids -> count (evolution eligibility)
 var _hyb_slots_freed: int = 0  # nb de fusions hybrides cette run -> compense _slots_used("act")
 var _drop_pod_cd: float = 75.0 # cadence du Ravitaillement Orbital in-run (75s 1er pod, puis ~120s)
+var _ion_storm_cd: float = 140.0 # cadence de la Tempête Ionique in-run (~140s 1ere, puis ~170s)
 var _floor_mat: ShaderMaterial
 # Weapon EVOLUTIONS: base weapon at MAX level + a condition -> evolved form.
 # 🚨 29/09, plan de refonte (rapport externe) : la condition etait auparavant "avoir pioche au
@@ -1525,6 +1527,15 @@ func _spawn_orbital_drop_pod() -> void:
 	show_banner("★ LARGAGE ORBITAL IMMINENT ! ★", Color(1.0, 0.85, 0.3))
 	Haptics.heavy()
 	Audio.sfx("levelup")
+
+func _start_ion_storm() -> void:
+	if _headless or player == null or not is_instance_valid(player):
+		return
+	if not get_tree().get_nodes_in_group("ion_storms").is_empty():
+		return
+	var storm: IonStorm = IonStorm.new()
+	add_child(storm)
+	storm.setup(self, player)
 
 func open_lucky_chest() -> void:
 	if not GameState.alive:
@@ -3376,6 +3387,10 @@ func _process(delta: float) -> void:
 			if _drop_pod_cd <= 0.0:
 				_drop_pod_cd = randf_range(110.0, 140.0)
 				_spawn_orbital_drop_pod()
+			_ion_storm_cd -= delta
+			if _ion_storm_cd <= 0.0:
+				_ion_storm_cd = randf_range(160.0, 210.0)
+				_start_ion_storm()
 		# 04/10, bannière discrète pour la derive silencieuse d'une map a l'autre a l'interieur
 		# d'un chapitre (cf. MAP_PHASE_NAMES plus haut). Jamais au tout premier calcul (idx 0 des
 		# le debut du run) : deja couvert par la banniere/intro du changement de BIOME.

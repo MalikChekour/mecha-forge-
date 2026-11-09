@@ -525,6 +525,62 @@ func gear_set_details() -> Array:
 func mastery_done(biome: String, id: String) -> bool:
 	return bool(data.get("mastery", {}).get(biome, {}).get(id, false))
 
+const MASTERY_MILESTONES: Array = [
+	{"req": 3, "title": "Initié de Forge", "crystals": 60, "scrap": 150, "cores": 10},
+	{"req": 8, "title": "Vanguard d'Acier", "crystals": 120, "sp": 4, "cores": 25},
+	{"req": 16, "title": "As de Bataille", "crystals": 200, "sp": 6, "cores": 40},
+	{"req": 28, "title": "Maître Conquérant", "crystals": 350, "sp": 8, "cores": 60},
+	{"req": 42, "title": "Légende Suprême", "crystals": 500, "sp": 12, "cores": 100},
+]
+
+func total_masteries_count() -> int:
+	var total: int = 0
+	var m: Dictionary = data.get("mastery", {})
+	for b in m.keys():
+		var row: Dictionary = m.get(b, {})
+		for mid in MASTERY_IDS:
+			if bool(row.get(mid, false)):
+				total += 1
+	return total
+
+func is_mastery_milestone_claimed(idx: int) -> bool:
+	var claimed: Array = data.get("claimed_mastery_milestones", [])
+	return claimed.has(idx)
+
+func can_claim_mastery_milestone(idx: int) -> bool:
+	if idx < 0 or idx >= MASTERY_MILESTONES.size():
+		return false
+	if is_mastery_milestone_claimed(idx):
+		return false
+	var req: int = int(MASTERY_MILESTONES[idx]["req"])
+	return total_masteries_count() >= req
+
+func claim_mastery_milestone(idx: int) -> bool:
+	if not can_claim_mastery_milestone(idx):
+		return false
+	var m: Dictionary = MASTERY_MILESTONES[idx]
+	var claimed: Array = data.get("claimed_mastery_milestones", []).duplicate()
+	claimed.append(idx)
+	data["claimed_mastery_milestones"] = claimed
+	
+	if m.has("crystals"):
+		data["crystals"] = int(data.get("crystals", 0)) + int(m["crystals"])
+	if m.has("scrap"):
+		bank_scrap(int(m["scrap"]))
+	if m.has("cores"):
+		data["cores"] = int(data.get("cores", 0)) + int(m["cores"])
+	if m.has("sp"):
+		add_sp(int(m["sp"]))
+	
+	save_data()
+	return true
+
+func has_unclaimed_mastery_milestones() -> bool:
+	for i in MASTERY_MILESTONES.size():
+		if can_claim_mastery_milestone(i):
+			return true
+	return false
+
 ## Une fois par biome et par defi. Noyaux + plan rare du fabricant.
 func record_mastery(biome: String, id: String) -> bool:
 	if biome == "" or not MASTERY_IDS.has(id):

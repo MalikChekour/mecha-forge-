@@ -729,54 +729,157 @@ func _render_draft() -> void:
 
 	for i in cards.size():
 		var b: Button = Button.new()
-		var is_evo: bool = bool(cards[i].get("evo", false))
-		var is_hybrid: bool = bool(cards[i].get("hybrid", false))
-		var card_txt: String = ("BANNIR : " if _banish_mode else "") + String(cards[i].get("name", "?"))
-		if cards[i].has("desc_evo"):
-			card_txt += "\n" + String(cards[i]["desc_evo"])
-		b.text = card_txt
-		b.custom_minimum_size = Vector2(0, row_h)
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.add_theme_font_size_override("font_size", Palette.fs(16 if cards[i].has("desc_evo") else 17))
+		var card_id: String = String(cards[i].get("id", ""))
+		var is_evo: bool = bool(cards[i].get("evo", false)) or card_id.begins_with("evo_")
+		var is_hybrid: bool = bool(cards[i].get("hybrid", false)) or card_id.begins_with("hyb_")
+		var is_weapon: bool = String(cards[i].get("cat", "")) == "act" or (not is_evo and not is_hybrid and not card_id.begins_with("pas_"))
 		
-		# Holographic card styling
+		var raw_name: String = String(cards[i].get("name", "?"))
+		var desc: String = ""
+		if cards[i].has("desc_evo"):
+			desc = String(cards[i]["desc_evo"])
+		elif cards[i].has("desc"):
+			desc = String(cards[i]["desc"])
+		
+		# Styling & Theme Colors
+		var tag_text: String = ""
+		var tag_color: Color = Color.WHITE
+		var icon_sym: String = "⚔"
+		var border_color: Color = Color(0.2, 0.6, 0.8, 0.5)
+		var bg_color: Color = Color(0.02, 0.05, 0.1, 0.82)
+		var glow_color: Color = Color(0.15, 0.85, 1.0, 0.3)
+		
+		if is_evo and not _banish_mode:
+			tag_text = "[★ ÉVOLUTION ★]"
+			tag_color = Color(1.0, 0.88, 0.35)
+			icon_sym = "★"
+			border_color = Color(1.0, 0.82, 0.2, 0.9)
+			bg_color = Color(0.12, 0.09, 0.03, 0.9)
+			glow_color = Color(1.0, 0.75, 0.1, 0.45)
+			if desc == "": desc = "Arme Ultime Débloquée"
+		elif is_hybrid and not _banish_mode:
+			tag_text = "[✦ FUSION HYBRIDE ✦]"
+			tag_color = Color(0.85, 0.6, 1.0)
+			icon_sym = "✦"
+			border_color = Color(0.75, 0.45, 1.0, 0.9)
+			bg_color = Color(0.1, 0.04, 0.15, 0.9)
+			glow_color = Color(0.75, 0.45, 1.0, 0.45)
+			if desc == "": desc = "Fusion Tactique Spéciale"
+		elif is_weapon and not _banish_mode:
+			tag_text = "[ARME]"
+			tag_color = Color(0.25, 0.85, 1.0)
+			icon_sym = "⚔"
+			border_color = Color(0.25, 0.85, 1.0, 0.7)
+			bg_color = Color(0.02, 0.08, 0.14, 0.85)
+			glow_color = Color(0.2, 0.8, 1.0, 0.3)
+		else:
+			tag_text = "[MODULE]"
+			tag_color = Color(0.35, 0.9, 0.55)
+			icon_sym = "⚙"
+			border_color = Color(0.3, 0.78, 0.5, 0.6)
+			bg_color = Color(0.02, 0.08, 0.06, 0.85)
+			glow_color = Color(0.3, 0.85, 0.5, 0.25)
+		
+		if _banish_mode:
+			tag_text = "[BANNIR]"
+			tag_color = Color(1.0, 0.35, 0.35)
+			icon_sym = "✕"
+			border_color = Color(0.9, 0.3, 0.3, 0.75)
+		
+		b.custom_minimum_size = Vector2(0, row_h)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		
 		var btn_sb: StyleBoxFlat = StyleBoxFlat.new()
-		btn_sb.bg_color = Color(0.02, 0.05, 0.1, 0.7)
-		btn_sb.border_width_left = 1; btn_sb.border_width_right = 1
-		btn_sb.border_width_top = 1; btn_sb.border_width_bottom = 1
-		btn_sb.border_color = Color(0.2, 0.6, 0.8, 0.4)
-		btn_sb.corner_radius_top_left = 6; btn_sb.corner_radius_bottom_right = 6
-		btn_sb.corner_radius_top_right = 6; btn_sb.corner_radius_bottom_left = 6
+		btn_sb.bg_color = bg_color
+		btn_sb.border_width_left = 3
+		btn_sb.border_width_right = 1
+		btn_sb.border_width_top = 1
+		btn_sb.border_width_bottom = 1
+		btn_sb.border_color = border_color
+		btn_sb.corner_radius_top_left = 8
+		btn_sb.corner_radius_bottom_right = 8
+		btn_sb.corner_radius_top_right = 8
+		btn_sb.corner_radius_bottom_left = 8
+		btn_sb.shadow_color = glow_color
+		btn_sb.shadow_size = 8
 		
 		var btn_sb_hover: StyleBoxFlat = btn_sb.duplicate()
-		btn_sb_hover.bg_color = Color(0.1, 0.25, 0.4, 0.8)
-		btn_sb_hover.border_color = Color(0.15, 0.85, 1.0, 1.0)
-		btn_sb_hover.shadow_color = Color(0.15, 0.85, 1.0, 0.5)
-		btn_sb_hover.shadow_size = 8
-
-		if is_evo and not _banish_mode:
-			b.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35))   # gold evolution
-			btn_sb.border_color = Color(1.0, 0.82, 0.2, 0.85)
-			btn_sb.border_width_left = 2; btn_sb.border_width_right = 2
-			btn_sb.border_width_top = 2; btn_sb.border_width_bottom = 2
-			btn_sb.shadow_color = Color(1.0, 0.75, 0.1, 0.35)
-			btn_sb.shadow_size = 10
-			btn_sb.bg_color = Color(0.12, 0.09, 0.03, 0.85)
-			btn_sb_hover.bg_color = Color(0.22, 0.16, 0.05, 0.95)
-			btn_sb_hover.border_color = Color(1.0, 0.92, 0.4, 1.0)
-		elif is_hybrid and not _banish_mode:
-			b.add_theme_color_override("font_color", Color(0.85, 0.6, 1.0))   # violet fusion hybride
-			btn_sb.border_color = Color(0.75, 0.45, 1.0, 0.85)
-			btn_sb.border_width_left = 2; btn_sb.border_width_right = 2
-			btn_sb.border_width_top = 2; btn_sb.border_width_bottom = 2
-			btn_sb.shadow_color = Color(0.75, 0.45, 1.0, 0.35)
-			btn_sb.shadow_size = 10
-			btn_sb.bg_color = Color(0.09, 0.04, 0.14, 0.85)
-			btn_sb_hover.bg_color = Color(0.18, 0.08, 0.26, 0.95)
-			btn_sb_hover.border_color = Color(0.85, 0.65, 1.0, 1.0)
+		btn_sb_hover.bg_color = bg_color.lightened(0.12)
+		btn_sb_hover.border_color = border_color.lightened(0.25)
+		btn_sb_hover.shadow_size = 14
+		
 		b.add_theme_stylebox_override("normal", btn_sb)
 		b.add_theme_stylebox_override("hover", btn_sb_hover)
 		b.add_theme_stylebox_override("pressed", btn_sb_hover)
+		
+		# Child Layout inside the button
+		var card_hbox: HBoxContainer = HBoxContainer.new()
+		card_hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+		card_hbox.offset_left = 12.0 * k
+		card_hbox.offset_right = -12.0 * k
+		card_hbox.offset_top = 6.0 * k
+		card_hbox.offset_bottom = -6.0 * k
+		card_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_hbox.add_theme_constant_override("separation", int(10.0 * k))
+		b.add_child(card_hbox)
+		
+		# Icon Badge
+		var icon_badge: Label = Label.new()
+		icon_badge.text = icon_sym
+		icon_badge.custom_minimum_size = Vector2(36.0 * k, 36.0 * k)
+		icon_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		icon_badge.add_theme_font_size_override("font_size", Palette.fs(22))
+		icon_badge.add_theme_color_override("font_color", tag_color)
+		icon_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_hbox.add_child(icon_badge)
+		
+		# Texts Stack
+		var text_col: VBoxContainer = VBoxContainer.new()
+		text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		text_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_col.add_theme_constant_override("separation", 2)
+		card_hbox.add_child(text_col)
+		
+		var title_row: HBoxContainer = HBoxContainer.new()
+		title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_row.add_theme_constant_override("separation", int(8.0 * k))
+		text_col.add_child(title_row)
+		
+		var tag_lbl: Label = Label.new()
+		tag_lbl.text = tag_text
+		tag_lbl.add_theme_font_size_override("font_size", Palette.fs(12))
+		tag_lbl.add_theme_color_override("font_color", tag_color)
+		tag_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_row.add_child(tag_lbl)
+		
+		var name_lbl: Label = Label.new()
+		name_lbl.text = raw_name
+		name_lbl.add_theme_font_size_override("font_size", Palette.fs(16))
+		name_lbl.add_theme_color_override("font_color", Color.WHITE)
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_row.add_child(name_lbl)
+		
+		if desc != "":
+			var desc_lbl: Label = Label.new()
+			desc_lbl.text = desc
+			desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			desc_lbl.add_theme_font_size_override("font_size", Palette.fs(13))
+			desc_lbl.add_theme_color_override("font_color", Color(0.8, 0.88, 0.95, 0.88))
+			desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			text_col.add_child(desc_lbl)
+		
+		# Right Action Hint
+		var arrow_lbl: Label = Label.new()
+		arrow_lbl.text = "✕" if _banish_mode else "➔"
+		arrow_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		arrow_lbl.add_theme_font_size_override("font_size", Palette.fs(18))
+		arrow_lbl.add_theme_color_override("font_color", tag_color)
+		arrow_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_hbox.add_child(arrow_lbl)
+		
 		var idx: int = i
 		if _banish_mode:
 			b.disabled = is_evo or is_hybrid   # evolutions/fusions can't be banished
