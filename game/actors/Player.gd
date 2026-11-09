@@ -229,16 +229,27 @@ func use_skill(id: String) -> bool:
 			Audio.sfx("dash", 0.08)
 			Audio.sfx("powerup", 0.06)
 			Haptics.heavy()
-			Events.screen_shake.emit(4.0)
+			Events.screen_shake.emit(5.0)
+
+			# EXTIRPATION D'URGENCE : bondit hors de l'encerclement
+			var move_in: Vector2 = _move_input()
+			var esc_dir: Vector2 = move_in.normalized() if move_in.length() > 0.1 else (-aim_dir.normalized() if aim_dir.length() > 0.1 else Vector2.UP)
+			global_position += esc_dir * 180.0
+			global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
+			global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
+
 			if game != null and game.has_method("shield_ripple"):
-				game.shield_ripple(global_position, 130.0, Color(1.0, 0.6, 0.2))
+				game.shield_ripple(global_position, 220.0, Color(1.0, 0.65, 0.2))
+
+			# SOUFFLE D'ÉJECTION : disperse et repousse violemment tous les ennemis encerclants
 			for e in get_tree().get_nodes_in_group("enemies"):
 				if e is Node2D and is_instance_valid(e):
 					var off: Vector2 = (e as Node2D).global_position - global_position
-					if off.length() <= 130.0:
+					if off.length() <= 220.0:
 						if e.has_method("take_damage"):
-							e.take_damage(35.0, base_chassis, "jet_blast")
-						(e as Node2D).global_position += off.normalized() * 90.0
+							e.take_damage(45.0, base_chassis, "jet_blast")
+						var push_v: Vector2 = off.normalized() if off.length() > 1.0 else esc_dir
+						(e as Node2D).global_position += push_v * 150.0
 	return true
 
 func _cast_special() -> void:
@@ -672,8 +683,6 @@ func _physics_process(delta: float) -> void:
 		if _aim_stick_id != -1 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			reset_aim_stick()
 	var mv: Vector2 = Vector2.ZERO if _stun_t > 0.0 else _move_input()
-	if jet_t > 0.0 and mv.length() < 0.1 and _stun_t <= 0.0:
-		mv = aim_dir   # JET PACK : la poussee part meme sans direction (vers la visee)
 	if base_chassis == "pylone" and not transformed:
 		_anchor_t = minf(_anchor_t + delta, ANCHOR_DELAY) if mv == Vector2.ZERO else 0.0
 		anchored = _anchor_t >= ANCHOR_DELAY
@@ -693,7 +702,8 @@ func _physics_process(delta: float) -> void:
 		var eff_slow: float = 1.0 if is_flying else field_slow
 		var eff_move: float = 1.0 if is_flying else move_mult
 		_thruster.color = Color(1.0, 0.6, 0.15) if is_flying else Palette.CYAN
-		var target_vel: Vector2 = mv * base_speed * eff_move * eff_slow * (2.0 if transformed else 1.0) * (JET_MULT if is_flying else 1.0)
+		# JET PACK : aucune accélération de vitesse (l'utilisateur veut s'extirper sans courir à toute vitesse)
+		var target_vel: Vector2 = mv * base_speed * eff_move * eff_slow * (2.0 if transformed else 1.0)
 		if _kit_boost_t > 0.0:
 			target_vel *= 1.45
 		var eff_inertia: float = maxf(inertia, _patch_inertia)
@@ -701,7 +711,7 @@ func _physics_process(delta: float) -> void:
 			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
 		else:
 			# 17/10 : montee/descente en vitesse LISSEE (~50 ms) au lieu d'un saut instantane -> demarrage et arret fluides
-			velocity = velocity.lerp(target_vel, 1.0 - exp(-delta * (32.0 if is_flying else 22.0)))
+			velocity = velocity.lerp(target_vel, 1.0 - exp(-delta * 22.0))
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)

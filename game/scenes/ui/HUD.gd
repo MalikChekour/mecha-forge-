@@ -689,15 +689,16 @@ func _icon_path_for_card(card_id: String, is_weapon: bool, is_evo: bool, is_hybr
 		return "res://assets/icons/icon_magnet.png"
 	if card_id == "w_missile" or card_id == "ammo" or card_id.contains("hydra") or card_id.contains("missile"):
 		return "res://assets/icons/icon_missile.png"
-	if card_id == "w_sabre" or card_id == "blade" or card_id.contains("sabre") or card_id.contains("blade"):
+	if card_id == "w_sabre" or card_id == "blade" or card_id.contains("sabre") or card_id.contains("blade") or card_id.contains("tempest") or card_id.contains("guillotine"):
 		return "res://assets/icons/icon_blade.png"
 	if card_id == "drone" or card_id.contains("drone"):
 		return "res://assets/icons/icon_drone.png"
-	if card_id == "w_plasma" or card_id == "orb" or card_id == "pool" or card_id == "arc" or is_hybrid:
+	if card_id == "w_plasma" or card_id == "orb" or card_id == "pool" or card_id == "arc" or is_hybrid or card_id.contains("singularity") or card_id.contains("nova"):
 		return "res://assets/icons/icon_plasma.png"
-	if is_weapon or card_id == "w_autocannon" or card_id == "w_railgun" or card_id == "w_disperseur" or card_id == "w_ricochet" or card_id == "w_disque" or card_id == "w_faisceau" or card_id == "dmg" or card_id == "haste" or card_id == "crit":
+	if is_weapon or is_evo or card_id.begins_with("w_") or card_id == "dmg" or card_id == "haste" or card_id == "crit" or card_id.contains("vulcan") or card_id.contains("annihilator") or card_id.contains("deflagrateur") or card_id.contains("carambole") or card_id.contains("spectre"):
 		return "res://assets/icons/icon_weapon.png"
-	return ""
+	# Fallback d'arme générique si c'est une compétence ou passif non encore catalogué
+	return "res://assets/icons/icon_weapon.png"
 
 ## Panneau de draft CENTRE et ancre (avant : (340,175) taille 600x410 en dur -> decale de
 ## 200 px en 21:9, et completement hors cadre en portrait).
@@ -844,12 +845,25 @@ func _render_draft() -> void:
 		card_hbox.add_theme_constant_override("separation", int(10.0 * k))
 		b.add_child(card_hbox)
 		
-		# Icon Badge (Image si disponible, sinon symbole vectoriel)
+		# Icon Badge (Image haute-définition si disponible)
 		var icon_tex_path: String = _icon_path_for_card(card_id, is_weapon, is_evo, is_hybrid)
-		if icon_tex_path != "" and ResourceLoader.exists(icon_tex_path):
+		var card_icon_tex: Texture2D = null
+		if icon_tex_path != "":
+			if ResourceLoader.exists(icon_tex_path):
+				var r: Variant = load(icon_tex_path)
+				if r is Texture2D:
+					card_icon_tex = r
+			if card_icon_tex == null:
+				var img: Image = Image.load_from_file(icon_tex_path)
+				if img != null and not img.is_empty():
+					card_icon_tex = ImageTexture.create_from_image(img)
+			if card_icon_tex == null:
+				card_icon_tex = Tex.get_tex(icon_tex_path)
+
+		if card_icon_tex != null:
 			var icon_frame: PanelContainer = PanelContainer.new()
 			var if_sb: StyleBoxFlat = StyleBoxFlat.new()
-			if_sb.bg_color = Color(0.02, 0.04, 0.08, 0.9)
+			if_sb.bg_color = Color(0.02, 0.04, 0.08, 0.95)
 			if_sb.border_width_left = 1; if_sb.border_width_right = 1
 			if_sb.border_width_top = 1; if_sb.border_width_bottom = 1
 			if_sb.border_color = border_color
@@ -858,12 +872,12 @@ func _render_draft() -> void:
 			icon_frame.add_theme_stylebox_override("panel", if_sb)
 			icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			
-			var isz: float = maxf(42.0, 48.0 * k)
+			var isz: float = maxf(44.0, 50.0 * k)
 			icon_frame.custom_minimum_size = Vector2(isz, isz)
 			icon_frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			
 			var img_rect: TextureRect = TextureRect.new()
-			img_rect.texture = load(icon_tex_path)
+			img_rect.texture = card_icon_tex
 			img_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			img_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			img_rect.custom_minimum_size = Vector2(isz - 4.0, isz - 4.0)
