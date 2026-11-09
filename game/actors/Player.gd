@@ -192,13 +192,14 @@ var _mark_top: Sprite2D = null   # chevron au-dessus du chassis
 const SKILLS: Dictionary = {
 	"shield":  {"name": "BOUCLIER", "cd": 18.0, "dur": 4.0},
 	"special": {"name": "SPECIAL",  "cd": 12.0, "dur": 0.0},
-	"jet":     {"name": "JET PACK", "cd": 9.0,  "dur": 1.3},
+	"jet":     {"name": "JET PACK", "cd": 8.0,  "dur": 1.6},
 }
 const SPECIAL_RADIUS: float = 300.0
-const JET_MULT: float = 2.1
+const JET_MULT: float = 2.4
 var skill_cd: Dictionary = {"shield": 0.0, "special": 0.0, "jet": 0.0}
 var shield_t: float = 0.0
 var jet_t: float = 0.0
+var _was_jetting: bool = false
 var _shield_spr: Sprite2D = null
 
 func skill_ratio(id: String) -> float:
@@ -224,7 +225,20 @@ func use_skill(id: String) -> bool:
 			_cast_special()
 		"jet":
 			jet_t = float(SKILLS[id]["dur"])
+			_was_jetting = true
 			Audio.sfx("dash", 0.08)
+			Audio.sfx("powerup", 0.06)
+			Haptics.heavy()
+			Events.screen_shake.emit(4.0)
+			if game != null and game.has_method("shield_ripple"):
+				game.shield_ripple(global_position, 130.0, Color(1.0, 0.6, 0.2))
+			for e in get_tree().get_nodes_in_group("enemies"):
+				if e is Node2D and is_instance_valid(e):
+					var off: Vector2 = (e as Node2D).global_position - global_position
+					if off.length() <= 130.0:
+						if e.has_method("take_damage"):
+							e.take_damage(35.0, base_chassis, "jet_blast")
+						(e as Node2D).global_position += off.normalized() * 90.0
 	return true
 
 func _cast_special() -> void:
@@ -248,6 +262,20 @@ func _update_skills(delta: float) -> void:
 		skill_cd[k] = maxf(0.0, float(skill_cd[k]) - delta)
 	shield_t = maxf(0.0, shield_t - delta)
 	jet_t = maxf(0.0, jet_t - delta)
+	
+	# Gestion de l'altitude et de l'atterrissage du Jetpack
+	if _was_jetting and jet_t <= 0.0:
+		_was_jetting = false
+		_on_jetpack_landing()
+	elif jet_t > 0.0:
+		_was_jetting = true
+		var j_dur: float = float(SKILLS["jet"]["dur"])
+		var f: float = clampf(1.0 - (jet_t / maxf(0.01, j_dur)), 0.0, 1.0)
+		var alt: float = sin(f * PI) * 58.0
+		if mecha != null:
+			mecha.position.y = -alt
+			mecha.scale = Vector2.ONE * (1.0 + alt / 190.0)
+
 	if shield_t > 0.0:
 		if _shield_spr == null:
 			_shield_spr = Sprite2D.new()
@@ -263,6 +291,23 @@ func _update_skills(delta: float) -> void:
 		_shield_spr.visible = true
 	elif _shield_spr != null:
 		_shield_spr.visible = false
+
+func _on_jetpack_landing() -> void:
+	if mecha != null:
+		mecha.position.y = 0.0
+		mecha.scale = Vector2.ONE
+	Audio.sfx("explosion", 0.05)
+	Events.screen_shake.emit(6.0)
+	Haptics.heavy()
+	if game != null and game.has_method("shield_ripple"):
+		game.shield_ripple(global_position, 170.0, Color(1.0, 0.65, 0.2))
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e is Node2D and is_instance_valid(e):
+			var off: Vector2 = (e as Node2D).global_position - global_position
+			if off.length() <= 170.0:
+				if e.has_method("take_damage"):
+					e.take_damage(65.0, base_chassis, "jet_slam")
+				(e as Node2D).global_position += off.normalized() * 105.0
 
 ## 17/10 audit des decors : barre de controle du Noyau -> reduit de 60 % les degats recus pendant guard_t secondes
 var guard_t: float = 0.0
@@ -644,16 +689,19 @@ func _physics_process(delta: float) -> void:
 		_thruster.direction = -_dash_dir
 		_thruster.color = Color(1.0, 0.55, 0.15)
 	else:
-		_thruster.color = Color(1.0, 0.6, 0.15) if jet_t > 0.0 else Palette.CYAN
-		var target_vel: Vector2 = mv * base_speed * move_mult * field_slow * (2.0 if transformed else 1.0) * (JET_MULT if jet_t > 0.0 else 1.0)
+		var is_flying: bool = jet_t > 0.0
+		var eff_slow: float = 1.0 if is_flying else field_slow
+		var eff_move: float = 1.0 if is_flying else move_mult
+		_thruster.color = Color(1.0, 0.6, 0.15) if is_flying else Palette.CYAN
+		var target_vel: Vector2 = mv * base_speed * eff_move * eff_slow * (2.0 if transformed else 1.0) * (JET_MULT if is_flying else 1.0)
 		if _kit_boost_t > 0.0:
 			target_vel *= 1.45
 		var eff_inertia: float = maxf(inertia, _patch_inertia)
-		if eff_inertia > 0.0:
+		if eff_inertia > 0.0 and not is_flying:
 			velocity = velocity.lerp(target_vel, clampf(1.0 - eff_inertia, 0.05, 1.0))
 		else:
 			# 17/10 : montee/descente en vitesse LISSEE (~50 ms) au lieu d'un saut instantane -> demarrage et arret fluides
-			velocity = velocity.lerp(target_vel, 1.0 - exp(-delta * 22.0))   # Overdrive = x2 speed deja dans target_vel
+			velocity = velocity.lerp(target_vel, 1.0 - exp(-delta * (32.0 if is_flying else 22.0)))
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x, arena.end.x)
 	global_position.y = clampf(global_position.y, arena.position.y, arena.end.y)
@@ -662,21 +710,22 @@ func _physics_process(delta: float) -> void:
 	_update_skills(delta)
 	_firing_t = maxf(0.0, _firing_t - delta)
 	_melee_t = maxf(0.0, _melee_t - delta)
-	if mv.length() > 0.1:
+	if mv.length() > 0.1 or jet_t > 0.0:
 		# MOVING always walks/runs — movement wins so the mech never freezes mid-stride. The walk
 		# sheet now carries a raised combat guard (arms/cannons up), so strafing already reads as
 		# "fighting while on the move".
 		_thruster.emitting = true
-		_thruster.direction = -mv
+		_thruster.direction = -mv if mv.length() > 0.1 else Vector2.DOWN
+		_thruster.initial_velocity_min = 120.0 if jet_t > 0.0 else 60.0
+		_thruster.initial_velocity_max = 240.0 if jet_t > 0.0 else 140.0
+		_thruster.scale_amount_max = 7.0 if jet_t > 0.0 else 4.5
 		# run is reserved for Overdrive; a fixed 360 threshold on an ever-growing base_speed
 		# makes the walk sheet unreachable after ~2 speed upgrades, so gate on transform.
-		var want: String = "run" if transformed else "walk"
+		var want: String = "run" if (transformed or jet_t > 0.0) else "walk"
 		if _melee_t <= 0.0 and mecha.current_anim() != want:
 			mecha.play(want)
 	else:
-		# STANDING: play the AIM/shoot pose (cannons thrust forward) WHILE FIRING, else calm idle.
-		# The new bluestrike 'attack' bake is a clean LOOPING aim cycle (not the old self-moving
-		# lunge), so it reads as "trained on the enemy" the whole time the guns are live.
+		_thruster.scale_amount_max = 4.5
 		_thruster.emitting = false
 		if _melee_t <= 0.0:
 			var wa: String = "attack" if (_firing_t > 0.0 or _is_aiming()) else "idle"
@@ -1769,6 +1818,8 @@ func take_damage(amount: float, source_pos: Vector2 = Vector2.ZERO, source_tag: 
 	if shield_t > 0.0:   # BOUCLIER ENERGETIQUE : tout est absorbe
 		if game != null and game.has_method("shield_ripple"):
 			game.shield_ripple(global_position, 150.0, Color(0.45, 0.9, 1.0))
+		return
+	if jet_t > 0.0:   # EN PLEIN VOL JET PACK : survole les hordes au sol et les pièges
 		return
 	if transformed:   # Overdrive = invincible; the hit just sparks off the aura
 		if game != null and game.has_method("shield_ripple"):

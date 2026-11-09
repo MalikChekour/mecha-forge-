@@ -678,6 +678,27 @@ func show_draft(cards: Array, rerolls: int = 0, banishes: int = 0) -> void:
 	_banish_mode = false
 	_render_draft()
 
+func _icon_path_for_card(card_id: String, is_weapon: bool, is_evo: bool, is_hybrid: bool) -> String:
+	if card_id == "aura" or card_id == "armor" or card_id.contains("shield"):
+		return "res://assets/icons/icon_shield.png"
+	if card_id == "spd" or card_id == "jet" or card_id == "he_fuel":
+		return "res://assets/icons/icon_jetpack.png"
+	if card_id == "hp" or card_id == "regen":
+		return "res://assets/icons/icon_repair.png"
+	if card_id == "magnet" or card_id == "xpgain" or card_id == "goldgain":
+		return "res://assets/icons/icon_magnet.png"
+	if card_id == "w_missile" or card_id == "ammo" or card_id.contains("hydra") or card_id.contains("missile"):
+		return "res://assets/icons/icon_missile.png"
+	if card_id == "w_sabre" or card_id == "blade" or card_id.contains("sabre") or card_id.contains("blade"):
+		return "res://assets/icons/icon_blade.png"
+	if card_id == "drone" or card_id.contains("drone"):
+		return "res://assets/icons/icon_drone.png"
+	if card_id == "w_plasma" or card_id == "orb" or card_id == "pool" or card_id == "arc" or is_hybrid:
+		return "res://assets/icons/icon_plasma.png"
+	if is_weapon or card_id == "w_autocannon" or card_id == "w_railgun" or card_id == "w_disperseur" or card_id == "w_ricochet" or card_id == "w_disque" or card_id == "w_faisceau" or card_id == "dmg" or card_id == "haste" or card_id == "crit":
+		return "res://assets/icons/icon_weapon.png"
+	return ""
+
 ## Panneau de draft CENTRE et ancre (avant : (340,175) taille 600x410 en dur -> decale de
 ## 200 px en 21:9, et completement hors cadre en portrait).
 func _render_draft() -> void:
@@ -688,7 +709,7 @@ func _render_draft() -> void:
 	var vp: Vector2 = _vp()
 	var k: float = _k()
 	var pw: float = clampf(vp.x * 0.86, 280.0, 640.0)
-	var row_h: float = maxf(64.0, 72.0 * k)
+	var row_h: float = maxf(74.0, 82.0 * k)
 	var row_gap: float = 12.0 * k
 	var mar: float = 20.0 * k
 
@@ -823,17 +844,43 @@ func _render_draft() -> void:
 		card_hbox.add_theme_constant_override("separation", int(10.0 * k))
 		b.add_child(card_hbox)
 		
-		# Icon Badge
-		var icon_badge: Label = Label.new()
-		icon_badge.text = icon_sym
-		icon_badge.custom_minimum_size = Vector2(36.0 * k, 36.0 * k)
-		icon_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		icon_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		icon_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		icon_badge.add_theme_font_size_override("font_size", Palette.fs(22))
-		icon_badge.add_theme_color_override("font_color", tag_color)
-		icon_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card_hbox.add_child(icon_badge)
+		# Icon Badge (Image si disponible, sinon symbole vectoriel)
+		var icon_tex_path: String = _icon_path_for_card(card_id, is_weapon, is_evo, is_hybrid)
+		if icon_tex_path != "" and ResourceLoader.exists(icon_tex_path):
+			var icon_frame: PanelContainer = PanelContainer.new()
+			var if_sb: StyleBoxFlat = StyleBoxFlat.new()
+			if_sb.bg_color = Color(0.02, 0.04, 0.08, 0.9)
+			if_sb.border_width_left = 1; if_sb.border_width_right = 1
+			if_sb.border_width_top = 1; if_sb.border_width_bottom = 1
+			if_sb.border_color = border_color
+			if_sb.corner_radius_top_left = 6; if_sb.corner_radius_bottom_right = 6
+			if_sb.corner_radius_top_right = 6; if_sb.corner_radius_bottom_left = 6
+			icon_frame.add_theme_stylebox_override("panel", if_sb)
+			icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			
+			var isz: float = maxf(42.0, 48.0 * k)
+			icon_frame.custom_minimum_size = Vector2(isz, isz)
+			icon_frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			
+			var img_rect: TextureRect = TextureRect.new()
+			img_rect.texture = load(icon_tex_path)
+			img_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			img_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			img_rect.custom_minimum_size = Vector2(isz - 4.0, isz - 4.0)
+			img_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			icon_frame.add_child(img_rect)
+			card_hbox.add_child(icon_frame)
+		else:
+			var icon_badge: Label = Label.new()
+			icon_badge.text = icon_sym
+			icon_badge.custom_minimum_size = Vector2(36.0 * k, 36.0 * k)
+			icon_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			icon_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			icon_badge.add_theme_font_size_override("font_size", Palette.fs(22))
+			icon_badge.add_theme_color_override("font_color", tag_color)
+			icon_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card_hbox.add_child(icon_badge)
 		
 		# Texts Stack
 		var text_col: VBoxContainer = VBoxContainer.new()
