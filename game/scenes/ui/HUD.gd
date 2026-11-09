@@ -709,10 +709,14 @@ func _render_draft() -> void:
 	var cards: Array = _draft_cards
 	var vp: Vector2 = _vp()
 	var k: float = _k()
-	var pw: float = clampf(vp.x * 0.94, 320.0, 880.0)
-	var row_h: float = maxf(88.0, 96.0 * k)
+	var pw: float = clampf(vp.x * 0.94, 320.0, 920.0)
 	var row_gap: float = 12.0 * k
-	var mar: float = 18.0 * k
+	var mar: float = 16.0 * k
+	var title_h: float = float(Palette.fs(22)) * 1.3
+	var foot_h: float = maxf(46.0, 42.0 * k)
+	var max_avail_row: float = (vp.y * 0.91 - title_h - foot_h - mar * 2.0 - row_gap * float(cards.size() + 1)) / float(maxi(1, cards.size()))
+	var row_h: float = clampf(max_avail_row, 72.0, 126.0 * k)
+	var isz: float = clampf(row_h - 12.0 * k, 60.0, 114.0 * k)
 
 	# 1. Full-screen blur overlay
 	var bg_blur: ColorRect = ColorRect.new()
@@ -726,7 +730,7 @@ func _render_draft() -> void:
 	# 2. Holographic panel for the draft
 	var panel: Panel = Panel.new()
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
-	sb.bg_color = Color(0.04, 0.08, 0.12, 0.85)
+	sb.bg_color = Color(0.04, 0.08, 0.12, 0.88)
 	sb.border_width_left = 2; sb.border_width_right = 2
 	sb.border_width_top = 2; sb.border_width_bottom = 2
 	sb.border_color = Color(0.15, 0.85, 1.0, 0.8) # Neon cyan border
@@ -860,7 +864,6 @@ func _render_draft() -> void:
 			if card_icon_tex == null:
 				card_icon_tex = Tex.get_tex(icon_tex_path)
 
-		var isz: float = maxf(72.0, 80.0 * k)
 		if card_icon_tex != null:
 			var icon_frame: PanelContainer = PanelContainer.new()
 			var if_sb: StyleBoxFlat = StyleBoxFlat.new()
@@ -980,12 +983,10 @@ func _render_draft() -> void:
 	# l'ecran, verifie en capture portrait et 21:9) : les boutons ont autowrap_mode actif et
 	# sont mesures a une largeur encore nulle, donc le texte « s'enroule » sur des dizaines de
 	# lignes imaginaires. On additionne donc les hauteurs qu'on connait deja.
-	var title_h: float = float(Palette.fs(20)) * 1.4
-	var foot_h: float = maxf(48.0, 44.0 * k)
 	var content_h: float = title_h + float(cards.size()) * row_h + foot_h \
 		+ row_gap * float(cards.size() + 1)
 	vb.size = Vector2(pw - mar * 2.0, 0)
-	var ph: float = minf(vp.y * 0.92, content_h + mar * 2.0)
+	var ph: float = minf(vp.y * 0.94, content_h + mar * 2.0)
 	var ox: float = (vp.x - pw) * 0.5
 	var oy: float = (vp.y - ph) * 0.5
 	panel.position = Vector2(ox, oy)
