@@ -9,7 +9,8 @@ ROOT = "C:/Users/Administrator/mecha-forge"
 OUTBASE = f"{ROOT}/refs/models_vfx"
 os.makedirs(OUTBASE, exist_ok=True)
 OR_KEY = os.environ.get("OPENROUTER_API_KEY")
-GLM_KEY = open(f"{ROOT}/.glm_key").read().strip()
+import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from keys import get_key
+GLM_KEY = get_key("glm")
 
 MODELS = [
     ("qwen_coder",   "openrouter", "qwen/qwen3-coder:free"),

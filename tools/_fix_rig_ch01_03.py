@@ -8,9 +8,8 @@ ROOT = r"C:\Users\Administrator\mecha-forge"
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 # Load key before importing / configuring meshy_client
-KEY_PATH = os.path.join(ROOT, ".meshy_key")
-with open(KEY_PATH, "r", encoding="utf-8") as f:
-    KEY = f.read().strip()
+import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from keys import get_key
+KEY = get_key("meshy")
 os.environ["MESHY_KEY"] = KEY
 os.environ["MESHY_API_KEY"] = KEY
 
@@ -105,7 +104,7 @@ def main():
     open(LOGP, "w", encoding="utf-8").write(
         "START %s KEY_LEN=%d\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), len(KEY))
     )
-    log("KEY loaded len=%d prefix=%s..." % (len(KEY), KEY[:8]))
+    log("KEY loaded len=%d" % len(KEY))
     results = []
     t_all = time.time()
 

@@ -26,7 +26,21 @@ gh release download assets-2026-11-12 -p 'mecha-forge-assets.tar.gz.part*'
 cat mecha-forge-assets.tar.gz.part* | tar -xzf -
 ```
 
-Jamais dans git ni dans la Release : les profils Chrome d'automatisation (`.chrome_meshy/`, `.chrome_mixamo/`) et les clés (`.meshy_key`, `.glm_key`, `.itch_key`, `.env`). Dans le cloud, les clés passent par des **secrets** (GitHub Secrets, variables d'environnement de la session).
+Jamais dans git ni dans la Release : les profils Chrome d'automatisation (`.chrome_meshy/`, `.chrome_mixamo/`) et les clés (`.meshy_key`, `.glm_key`, `.itch_key`, `.env`).
+
+## Clés API
+Dans le cloud, les clés arrivent par des **variables d'environnement** : secrets GitHub (Actions/Codespaces) ou variables de l'environnement Claude Code web ou Cursor. En Python, on les lit toujours via `tools/keys.py` (`get_key("meshy" | "glm" | "itch")`) : la variable d'environnement d'abord, puis le fichier local en repli. Ne jamais afficher une clé, même tronquée.
+
+| Variable | Sert à |
+|---|---|
+| `MESHY_KEY` | Meshy image→3D, rig, animation (`meshy_client.py`, `enemy_batch.py`…) |
+| `GLM_API_KEY` | GLM / z.ai (`glm.py`, `multimodel_vfx.py`, audits) |
+| `BUTLER_API_KEY` | déploiement itch.io (`push_itch.ps1`) |
+| `CF_ACCOUNT_ID`, `CF_API_TOKEN` | génération d'images Cloudflare FLUX, gratuite |
+| `REPLICATE_API_TOKEN` | Replicate (pixel art), payant à l'image |
+| `FAL_KEY` | fal.ai (vidéo, image), payant |
+| `OPENROUTER_API_KEY` | modèles via OpenRouter |
+| `GOOGLE_API_KEY` | Gemini |
 
 ## Règles de travail
 - Avant de committer, vérifier la **taille** de l'index (`git status`). Un `git add -A` a déjà failli embarquer 746 Mo de profils Chrome. Aucun fichier de plus de 50 Mo dans git (GitHub refuse au-delà de 100 Mo).

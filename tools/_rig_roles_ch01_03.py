@@ -5,10 +5,8 @@ from pathlib import Path
 ROOT = Path(r"C:\Users\Administrator\mecha-forge")
 sys.path.insert(0, str(ROOT / "tools"))
 
-key_path = ROOT / ".meshy_key"
-key = key_path.read_text(encoding="utf-8").strip()
-if not key:
-    sys.exit("empty .meshy_key")
+from keys import get_key  # noqa: E402
+key = get_key("meshy")
 os.environ["MESHY_KEY"] = key
 
 import meshy_client as mc  # noqa: E402

@@ -1,5 +1,11 @@
 $KEYFILE = "C:\Users\Administrator\.itch_key"
-$env:BUTLER_API_KEY = (Get-Content $KEYFILE -Raw).Trim()
+# Cle : secret BUTLER_API_KEY (cloud) sinon fichier local hors git.
+if (-not $env:BUTLER_API_KEY) {
+    if (-not (Test-Path $KEYFILE)) {
+        Write-Error "Cle absente : definir BUTLER_API_KEY ou creer $KEYFILE (https://itch.io/user/settings/api-keys)"
+    }
+    $env:BUTLER_API_KEY = (Get-Content $KEYFILE -Raw).Trim()
+}
 $BUTLER = "C:\Users\Administrator\tools\butler\butler.exe"
 $TARGET = "whimora/mecha-forge"
 $WEBDIR = "C:\Users\Administrator\mecha-forge\web"

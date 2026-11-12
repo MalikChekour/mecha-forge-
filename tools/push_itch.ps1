@@ -31,10 +31,13 @@ $TARGET  = "whimora/mecha-forge"
 $WEBDIR  = "C:\Users\Administrator\mecha-forge\web"
 $APK     = "C:\Users\Administrator\mecha-forge\build\mecha-forge.apk"
 
-if (-not (Test-Path $KEYFILE)) {
-    Write-Error "Cle absente : $KEYFILE . Genere-la sur https://itch.io/user/settings/api-keys"
+# Cle : secret BUTLER_API_KEY (cloud) sinon fichier local hors git.
+if (-not $env:BUTLER_API_KEY) {
+    if (-not (Test-Path $KEYFILE)) {
+        Write-Error "Cle absente : definir BUTLER_API_KEY ou creer $KEYFILE (https://itch.io/user/settings/api-keys)"
+    }
+    $env:BUTLER_API_KEY = (Get-Content $KEYFILE -Raw).Trim()
 }
-$env:BUTLER_API_KEY = (Get-Content $KEYFILE -Raw).Trim()
 
 Write-Output "=== export Web + Android depuis la source actuelle ==="
 Push-Location $REPO

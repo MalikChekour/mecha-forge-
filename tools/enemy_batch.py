@@ -16,7 +16,7 @@ LIST = [   # 20/10 : chapitres 10-18 (rendus fournis, anim Meshy walk/die conser
 ]
 def gen():
     only = set(sys.argv[2:])   # optionnel : noms a traiter (ex. en03_jungle en05_swamp)
-    os.environ["MESHY_KEY"] = open(os.path.join(ROOT, ".meshy_key")).read().strip()
+    import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from keys import get_key; os.environ["MESHY_KEY"] = get_key("meshy")
     import meshy_client as m
     m.KEY = os.environ["MESHY_KEY"]
     for name, img in LIST:

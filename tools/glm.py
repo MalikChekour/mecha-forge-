@@ -10,7 +10,8 @@ generation from Claude; Claude supervises + validates headless. Key in .glm_key.
 import sys, os, json, re, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KEY = open(os.path.join(ROOT, ".glm_key")).read().strip()
+import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from keys import get_key
+KEY = get_key("glm")
 Z_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions"
 OR_URL = "https://openrouter.ai/api/v1/chat/completions"
 
