@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://test_biomes_angles_scene"]
+
+[ext_resource type="Script" path="res://_test_biomes_angles.gd" id="1"]
+
+[node name="TestBiomesAngles" type="Node"]
+script = ExtResource("1")

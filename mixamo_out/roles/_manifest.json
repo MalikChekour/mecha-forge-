@@ -1,0 +1,65 @@
+﻿[
+    {
+        "ok":  true,
+        "name":  "en01_tech_swarm",
+        "bytes":  7652684,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en01_tech_swarm\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en01_tech_swarm.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en01_tech_shield",
+        "bytes":  12627180,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en01_tech_shield\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en01_tech_shield.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en01_tech_sniper",
+        "bytes":  11581980,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en01_tech_sniper\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en01_tech_sniper.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en02_desert_swarm",
+        "bytes":  12920588,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en02_desert_swarm\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en02_desert_swarm.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en02_desert_shield",
+        "bytes":  12587404,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en02_desert_shield\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en02_desert_shield.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en02_desert_sniper",
+        "bytes":  12378188,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en02_desert_sniper\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en02_desert_sniper.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en03_jungle_swarm",
+        "bytes":  12214588,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en03_jungle_swarm\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en03_jungle_swarm.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en03_jungle_shield",
+        "bytes":  13437788,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en03_jungle_shield\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en03_jungle_shield.fbx"
+    },
+    {
+        "ok":  true,
+        "name":  "en03_jungle_sniper",
+        "bytes":  12522508,
+        "glb":  "C:\\Users\\Administrator\\mecha-forge\\meshy_in\\en03_jungle_sniper\\model.glb",
+        "fbx":  "C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en03_jungle_sniper.fbx"
+    }
+]

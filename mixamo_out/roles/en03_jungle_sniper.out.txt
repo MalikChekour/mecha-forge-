@@ -1,0 +1,7 @@
+00:53:07 | INFO: Data are loaded, start creating Blender stuff
+00:53:07 | INFO: Blender create Mesh node Mesh_0
+00:53:07 | INFO: glTF import finished in 0.22s
+
+FBX export starting... 'C:\\Users\\Administrator\\mecha-forge\\mixamo_out\\roles\\en03_jungle_sniper.fbx'
+export finished in 0.2917 sec.
+FBX -> C:\Users\Administrator\mecha-forge\mixamo_out\roles\en03_jungle_sniper.fbx 12229 KB

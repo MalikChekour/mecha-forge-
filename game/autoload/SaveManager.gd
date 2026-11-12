@@ -919,8 +919,16 @@ func can_upgrade_any_meta() -> bool:
 	var m: Dictionary = data.get("meta", {})
 	for k in GameState.META.keys():
 		var d: Dictionary = GameState.META[k]
-		if int(m.get(k, 0)) < int(d.get("max", 0)):
-			var cost: int = int(d.get("cost", 1))
+		var cur: int = int(m.get(k, 0))
+		var max_lvl: int = int(d.get("max", 0))
+		if cur < max_lvl:
+			var costs = d.get("cost", 1)
+			var cost: int = 1
+			if costs is Array:
+				if cur < costs.size():
+					cost = int(costs[cur])
+			else:
+				cost = int(costs)
 			if sp() >= cost:
 				return true
 	return false

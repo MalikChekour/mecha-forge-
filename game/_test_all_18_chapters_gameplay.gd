@@ -23,9 +23,9 @@ func _ready() -> void:
 		if g._biome_label(b_name) == "":
 			ok = false
 			print("  FAIL: label vide pour %s" % b_name)
-		if g._scatter == null or not is_instance_valid(g._scatter):
+		if (g._scatter == null or not is_instance_valid(g._scatter)) and (g._tech_maze == null or not is_instance_valid(g._tech_maze)):
 			ok = false
-			print("  FAIL: scatter null pour %s" % b_name)
+			print("  FAIL: decor null pour %s" % b_name)
 		if g._floor_mat == null:
 			ok = false
 			print("  FAIL: floor_mat null pour %s" % b_name)

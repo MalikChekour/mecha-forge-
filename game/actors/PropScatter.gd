@@ -87,7 +87,29 @@ const COVER_R: int = 1             # chunks around the player kept in cover_list
 #   * The mecha CARCASS is the exception: it is not loot, it wakes a guardian (see "awaken").
 # HP band: crates 38-50 | gear 70-90 | wrecks 110-140 | structures 180-220.
 # key -> f(ile g<n>), hp, sz(on-screen height px), destruct, nature, skill(chance the crate is a
-# gold competence cache), glow, boom(fuel barrel), shoot*(hostile turret), awaken(carcass)
+## CATALOGUE DES DECORS RESERVES (Garantie 100% de conservation — aucun décor n'est supprimé)
+## Ces décors restent disponibles en mémoire pour réutilisation ultérieure sur demande.
+const RESERVED_DECOR: Dictionary = {
+	"desert_generateur_tempete":  {"f": "desert_emetteur_generateur_tempete", "hp": 180.0, "sz": 190.0, "destruct": true, "glow": "orange", "storm_gen": true, "storm_cd": 9.0, "storm_dur": 8.0, "storm_speed": 40.0, "storm_dmg": 12.0},
+	"desert_ver_foreur":          {"f": "desert_piege_ver_foreur", "hp": 190.0, "sz": 175.0, "destruct": true, "glow": "orange", "sandworm": true, "sandworm_cd": 6.5, "sandworm_dmg": 24.0, "sandworm_r": 130.0},
+	"desert_fumerolle_vapeur":    {"f": "desert_emetteur_fumerolle_vapeur", "hp": 150.0, "sz": 150.0, "nature": true, "block": 0.0, "steam_vent": true, "vent_cd": 4.5, "vent_dmg": 16.0, "vent_r": 110.0},
+	"desert_collecteur_solaire":  {"f": "desert_inter_collecteur_solaire", "hp": 90.0, "sz": 140.0, "destruct": true, "glow": "gold", "dwell": true, "dwell_r": 110.0, "dwell_time": 1.5, "solar_od": 0.25},
+	"desert_projecteur_mirage":   {"f": "desert_inter_projecteur_mirage", "hp": 85.0, "sz": 145.0, "destruct": true, "glow": "cyan", "dwell": true, "dwell_r": 120.0, "dwell_time": 1.0, "mirage_dur": 6.0},
+	"jungle_liane_fouet":         {"f": "jungle_emetteur_liane_fouet", "hp": 170.0, "sz": 180.0, "destruct": true, "glow": "green", "whip_vine": true, "whip_cd": 5.0, "whip_dmg": 22.0, "whip_arc": 120.0, "whip_r": 160.0},
+	"jungle_arbre_ruche":         {"f": "jungle_piege_arbre_ruche", "hp": 230.0, "sz": 220.0, "destruct": true, "glow": "orange", "beacon": true, "beacon_cd": 4.0, "beacon_kind": "wasp"},
+	"jungle_fruit_grenade":       {"f": "jungle_piege_fruit_grenade", "hp": 42.0, "sz": 125.0, "destruct": true, "glow": "orange", "boom": true, "boom_r": 180.0, "boom_dmg": 38.0},
+	"jungle_plante_lasso":        {"f": "jungle_inter_plante_lasso", "hp": 95.0, "sz": 135.0, "destruct": true, "glow": "orange", "snare": true, "snare_r": 100.0, "snare_dur": 1.5},
+	"jungle_nuee_lucioles":       {"f": "jungle_inter_nuee_lucioles", "hp": 70.0, "sz": 130.0, "nature": true, "block": 0.0, "aura": "heal", "aura_r": 140.0, "aura_p1": 3.0},
+	"volcanic_event_magma":       {"f": "volcanic_emetteur_event_magma", "hp": 160.0, "sz": 160.0, "nature": true, "block": 0.0, "magma_vent": true, "vent_cd": 4.5, "vent_dmg": 20.0, "vent_r": 115.0},
+	"volcanic_creuset_basculant": {"f": "volcanic_emetteur_creuset_basculant", "hp": 180.0, "sz": 190.0, "destruct": true, "glow": "orange", "laser_creuset": true, "laser_cd": 6.5, "laser_dmg": 26.0, "laser_len": 360.0},
+	"volcanic_soufflerie_braises":{"f": "volcanic_emetteur_soufflerie_braises", "hp": 170.0, "sz": 180.0, "destruct": true, "glow": "cyan", "ember_blower": true, "blower_cd": 6.0, "blower_force": 440.0, "blower_r": 340.0},
+	"volcanic_robot_constructeur":{"f": "volcanic_inter_robot_constructeur", "hp": 160.0, "sz": 170.0, "destruct": true, "glow": "cyan", "aura": "heal", "aura_r": 180.0, "aura_p1": 4.0},
+	"swamp_vanne_crue":           {"f": "swamp_emetteur_vanne_crue", "hp": 170.0, "sz": 170.0, "nature": true, "block": 0.0, "flood_gate": true, "gate_cd": 6.5, "gate_force": 400.0, "gate_len": 400.0},
+	"swamp_vanne_barrage":        {"f": "swamp_inter_vanne_barrage", "hp": 110.0, "sz": 150.0, "destruct": true, "glow": "cyan", "dwell": true, "dwell_r": 120.0, "dwell_time": 1.5, "drain_dur": 10.0},
+	"swamp_lampadaire_phare":     {"f": "swamp_piege_lampadaire_phare", "hp": 140.0, "sz": 180.0, "destruct": true, "glow": "orange", "spotlight": true, "spot_r": 220.0, "spot_speed": 1.8},
+	"swamp_bouee_mine":           {"f": "swamp_piege_bouee_mine", "hp": 45.0, "sz": 120.0, "destruct": true, "glow": "orange", "boom": true, "boom_r": 200.0, "boom_dmg": 42.0}
+}
+
 const DECOR: Dictionary = {
 	# --- fuel barrels: get close and they arm, then blow up (see BOOM_* in Prop) ---
 	"baril":      {"f": "g20", "hp": 40.0,  "sz": 118.0, "destruct": true,  "skill": 0.30, "boom": true, "glow": "orange"},
@@ -230,6 +252,7 @@ const DECOR: Dictionary = {
 	                               "fumerolle": true, "fumerolle_cd": 5.0, "fumerolle_tell": 1.0, "fumerolle_r": 120.0, "fumerolle_dmg": 15.0, "fumerolle_push": 300.0},
 	"desert_char_enfoui":         {"f": "desert_terrain_char_enfoui", "hp": 240.0, "sz": 195.0, "nature": true, "block": 0.40},
 	"desert_arche_verre":         {"f": "desert_terrain_arche_verre", "hp": 200.0, "sz": 210.0, "nature": true, "block": 0.42},
+	"desert_obelisque_solaire":   {"f": "desert_obelisque_solaire", "hp": 260.0, "sz": 195.0, "nature": true, "block": 0.42, "glow": "gold"},
 	"desert_bordure_mesa":        {"f": "desert_bordure_mesa", "hp": 280.0, "sz": 230.0, "nature": true, "block": 0.45},
 
 	# ===== Bible des niveaux — Niveau 3 (La Ruine Verte / jungle) =====
@@ -249,6 +272,7 @@ const DECOR: Dictionary = {
 	"jungle_fruit_grenade":       {"f": "jungle_inter_fruit_grenade", "hp": 35.0,  "sz": 110.0, "destruct": true, "boom": true, "glow": "orange"},
 	"jungle_colonne_racines":     {"f": "jungle_terrain_colonne_racines", "hp": 240.0, "sz": 195.0, "nature": true, "block": 0.40},
 	"jungle_statue_mecha":        {"f": "jungle_terrain_statue_mecha", "hp": 300.0, "sz": 220.0, "nature": true, "block": 0.45},
+	"jungle_pilier_racines":      {"f": "jungle_pilier_racines", "hp": 280.0, "sz": 200.0, "nature": true, "block": 0.42, "glow": "green"},
 	"jungle_mur_vegetal":         {"f": "jungle_bordure_mur_vegetal", "hp": 280.0, "sz": 230.0, "nature": true, "block": 0.45},
 
 	# ===== Bible des niveaux — Niveau 4 (Forge & Construction) =====
@@ -269,6 +293,7 @@ const DECOR: Dictionary = {
 	                               "ember_bellows": true, "bellows_cd": 5.5, "bellows_tell": 1.0, "bellows_r": 170.0, "bellows_dmg": 18.0},
 	"volcanic_cheminee_fonderie": {"f": "volcanic_terrain_cheminee_fonderie", "hp": 260.0, "sz": 190.0, "nature": true, "block": 0.40},
 	"volcanic_pont_roulant":      {"f": "volcanic_terrain_pont_roulant", "hp": 280.0, "sz": 215.0, "nature": true, "block": 0.42},
+	"volcanic_fourneau_lourd":    {"f": "volcanic_fourneau_lourd", "hp": 300.0, "sz": 210.0, "destruct": true, "block": 0.45, "glow": "orange"},
 	"volcanic_bordure_basalte":   {"f": "volcanic_bordure_basalte", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
 	"volcanic_robot_constructeur":{"f": "g_cyber_reactor", "hp": 220.0, "sz": 180.0, "destruct": true, "glow": "cyan",
 	                               "builder_bot": true, "builder_r": 220.0, "builder_heal": 4.0},
@@ -290,6 +315,7 @@ const DECOR: Dictionary = {
 	                               "radio_jammer": true, "jammer_r": 300.0},
 	"swamp_gratte_ciel":          {"f": "swamp_terrain_gratte_ciel", "hp": 300.0, "sz": 230.0, "nature": true, "block": 0.48},
 	"swamp_pont_brise":           {"f": "swamp_terrain_pont_brise", "hp": 280.0, "sz": 210.0, "nature": true, "block": 0.45},
+	"swamp_arche_submergee":      {"f": "swamp_arche_submergee", "hp": 290.0, "sz": 205.0, "nature": true, "block": 0.44, "glow": "cyan"},
 	"swamp_bordure_facades":      {"f": "swamp_bordure_facades", "hp": 320.0, "sz": 240.0, "nature": true, "block": 0.50},
 
 	# ===== 03/10, refonte decor "Zone Cryo" (plan 15 maps, maps 4-6, nouveau biome "cryo").
@@ -553,6 +579,7 @@ const INFO: Dictionary = {
 	"desert_fumerolle_vapeur": ["Fumerolle surchauffée", "Geyser brûlant à intervalle régulier : repousse et inflige des dégâts.", "orange"],
 	"desert_char_enfoui": ["Char enfoui", "Carcasse blindée ensevelie dans les dunes : couverture lourde arrêtant les tirs.", "orange"],
 	"desert_arche_verre": ["Arche de verre fondu", "Formation naturelle de verre fondu translucide : obstacle rocheux solide.", "cyan"],
+	"desert_obelisque_solaire": ["Obélisque solaire 2.5D", "Monolithe de bronze et verre photovoltaïque gravé : couverture indestructible réfractant la lumière.", "gold"],
 	# ===== Bible des niveaux — Niveau 3 (jungle) =====
 	"jungle_mortier_plante": ["Plante-mortier", "Tire des cosses de graines en cloche par-dessus les obstacles : explose en nuage d'épines.", "green"],
 	"jungle_liane_fouet": ["Liane-fouet épineuse", "Fouette violemment un arc de 120 degrés autour de sa base : surveillez le sol.", "green"],
@@ -564,6 +591,7 @@ const INFO: Dictionary = {
 	"jungle_fruit_grenade": ["Fruit-grenade", "Fruit instable : explose après amorçage si vous restez trop près ou s'il est touché.", "orange"],
 	"jungle_colonne_racines": ["Colonne envahie", "Vestige de béton armé étranglé par de massives racines végétales : obstacle solide.", "green"],
 	"jungle_statue_mecha": ["Statue de mecha envahie", "Carcasse d'un titan antique figée sous la végétation tropicale : couverture lourde.", "green"],
+	"jungle_pilier_racines": ["Totem de racines 2.5D", "Pilier de temple sculpté colonisé par des racines bioluminescentes : abri végétal solide.", "green"],
 	"jungle_mur_vegetal": ["Mur végétal", "Frontière impénétrable de jungle dense et de ruines enchevêtrées.", "green"],
 	# ===== Bible des niveaux — Niveau 4 (volcanic / Forge & Construction) =====
 	"volcanic_mortier_scories": ["Lance-rivets lourd", "Tire des grappes de rivets industriels à haute vélocité marquant la zone d'impact.", "orange"],
@@ -576,6 +604,7 @@ const INFO: Dictionary = {
 	"volcanic_soufflerie_braises": ["Turbine de ventilation lourde", "Souffle pneumatique haute pression repoussant violemment les mechas.", "cyan"],
 	"volcanic_cheminee_fonderie": ["Tour d'assemblage mécatronique", "Structure verticale de guidage et de câblage industriel : obstacle infranchissable.", "orange"],
 	"volcanic_pont_roulant": ["Portique de levage lourd", "Poutre maîtresse et treuil robotique de manutention de châssis : couverture robuste.", "orange"],
+	"volcanic_fourneau_lourd": ["Haut-fourneau 2.5D", "Cuve de fonderie rivetée sous haute pression : blindage massif résistant aux obus de magma.", "orange"],
 	"volcanic_bordure_basalte": ["Paroi de hangar blindé", "Blindage modulaire d'usine et piliers en acier renforcé délimitant l'atelier.", "cyan"],
 	"volcanic_robot_constructeur": ["Station de montage automatisée", "RESTEZ à proximité : active un faisceau de nanoréparation (+4 PV/s) et repousse les assaillants.", "cyan"],
 	# ===== Bible des niveaux — Niveau 5 (swamp) =====
@@ -589,6 +618,7 @@ const INFO: Dictionary = {
 	"swamp_brouilleur_radio": ["Brouilleur radio", "Tour de brouillage : ralentit de 50 % tous les projectiles ennemis dans un rayon de 300 u.", "magenta"],
 	"swamp_gratte_ciel": ["Gratte-ciel effondré", "Vestige de tour de verre et de béton noyé dans l'eau trouble : obstacle massif.", "cyan"],
 	"swamp_pont_brise": ["Pont suspendu brisé", "Tablier de pont affaissé et câbles rompus : obstacle infranchissable.", "cyan"],
+	"swamp_arche_submergee": ["Arche de vanne 2.5D", "Piliers d'écluse et linteau de gratte-ciel immergé : franchissement tactique blindé.", "cyan"],
 	"swamp_bordure_facades": ["Façades noyées", "Ligne d'immeubles submergés et néons brisés marquant la limite de l'arène.", "cyan"],
 	"plaque_de_glace": ["Plaque de glace", "Vous fait glisser : votre mecha perd de l'adhérence tant que vous êtes dessus.", "cyan"],
 	"capsule_cryogenique": ["Capsule cryogénique", "Détruisez-la : un bonus… ou un ennemi en sort (1 chance sur 3).", "cyan"],
@@ -774,7 +804,7 @@ const ZONE_HINTS: bool = false
 ## 16/10 (patron : « stop le pivotement, laisse-les fixes ») : false = l image ne tourne plus. Les canons a TUBE
 ## (liste ci-dessous) tirent alors DROIT, dans l axe de leur tube, a cadence reguliere, sans viser le mecha.
 const HEAD_PIVOT: bool = false
-const TUBE_CANNONS: Array = ["g27", "tech_tourelle_soudeuse", "jungle_tourelle_mortier_plante", "volcanic_tourelle_mortier_scories",
+const TUBE_CANNONS: Array = ["g27", "tech_tourelle_soudeuse", "desert_tourelle_miroir_solaire", "jungle_tourelle_mortier_plante", "volcanic_tourelle_mortier_scories",
 	"swamp_tourelle_dca_toit", "cryo_tourelle_canon_azote", "reacteur_tourelle_canon_particules", "ruche_tourelle_organe_acide"]
 # 16/10 : pivot = un point SUR l AXE DU TUBE (cote culasse), muzzle = centre de la bouche ; mesures sur l image avec une
 # grille (l ancien pivot etait le centre du corps : axe faux de 10 a 25 degres, et FAUX SENS pour le mortier a scories).
@@ -883,7 +913,7 @@ static func _decor_cat(k: String) -> String:
 		return "machines_towers"
 	if k in ["convoyeur_sol", "console_convoyeur", "bras_presseur", "piston_hydraulique", "surchauffe_sol", "plaque_de_glace", "jet_de_cryo", "bassin_toxique", "poche_de_vent", "zone_alternante", "zone_depressurisation", "desert_fosse_aspiration", "desert_collecteur_solaire", "desert_projecteur_mirage", "desert_fumerolle_vapeur", "jungle_fleur_catapulte", "jungle_plante_lasso", "jungle_nuee_lucioles", "volcanic_bassin_trempe", "volcanic_electroaimant", "swamp_vanne_crue", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_barricade_vehicules", "cryo_teleporteur_paire", "cryo_mur_glace_regen", "reacteur_barre_controle", "reacteur_cellule_confinement", "ruche_veine_pulsatile", "citadelle_sas_pressurise", "citadelle_dome_bouclier", "citadelle_grappin_magnetique", "abyss_inter_dome_oxygene", "abyss_inter_mine_ancree", "ether_inter_pollen_regen", "ether_inter_champignon_rebond", "titans_inter_electroaimant_epave", "titans_inter_mine_antichar", "orbit_inter_borne_antigravite", "orbit_inter_piege_emp", "quantum_inter_dalle_transfert", "quantum_inter_cube_glitch", "ozone_inter_condensateur_surcharge", "ozone_inter_cristal_piezo", "prism_inter_miroir_deflexion", "prism_inter_stalagmite_fragile", "steampunk_inter_vanne_surchauffe", "steampunk_inter_chaudiere_instable", "colosseum_inter_pod_overdrive", "colosseum_inter_mine_exercice"]:
 		return "interactive_hazards"
-	if k in ["rocher", "cristaux", "arbre", "plante", "glace", "arche", "lave", "racines", "pilier_energie", "tech_cuve_vapeur", "tech_chariot_robot", "desert_char_enfoui", "desert_arche_verre", "jungle_colonne_racines", "jungle_statue_mecha", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "swamp_gratte_ciel", "swamp_pont_brise", "cryo_cuve_stase", "cryo_serveur_givre", "reacteur_turbine_hs", "reacteur_cuve_plomb", "ruche_colonne_os", "ruche_champignon_geant", "citadelle_panneau_solaire", "citadelle_reacteur_orbital", "abyss_terrain_colonne_recif", "ether_terrain_fongus_arbre", "titans_terrain_main_colosse", "orbit_terrain_panneau_solaire_brise", "quantum_terrain_monolithe_flottant", "ozone_terrain_fleche_fulgurite", "prism_terrain_grappe_cristaux", "steampunk_terrain_engrenage_monumental", "colosseum_terrain_pilier_holomur"]:
+	if k in ["rocher", "cristaux", "arbre", "plante", "glace", "arche", "lave", "racines", "pilier_energie", "tech_cuve_vapeur", "tech_chariot_robot", "desert_char_enfoui", "desert_arche_verre", "desert_obelisque_solaire", "jungle_colonne_racines", "jungle_statue_mecha", "jungle_pilier_racines", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "volcanic_fourneau_lourd", "swamp_gratte_ciel", "swamp_pont_brise", "swamp_arche_submergee", "cryo_cuve_stase", "cryo_serveur_givre", "reacteur_turbine_hs", "reacteur_cuve_plomb", "ruche_colonne_os", "ruche_champignon_geant", "citadelle_panneau_solaire", "citadelle_reacteur_orbital", "abyss_terrain_colonne_recif", "ether_terrain_fongus_arbre", "titans_terrain_main_colosse", "orbit_terrain_panneau_solaire_brise", "quantum_terrain_monolithe_flottant", "ozone_terrain_fleche_fulgurite", "prism_terrain_grappe_cristaux", "steampunk_terrain_engrenage_monumental", "colosseum_terrain_pilier_holomur"]:
 		return "nature_minerals"
 	return "borders"
 
@@ -914,15 +944,15 @@ const BIOME_DECOR: Dictionary = {
 	"desert":    ["desert_miroir_solaire", "desert_generateur_tempete", "desert_malle_survie", "desert_fosse_aspiration",
 	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "desert_collecteur_solaire", "desert_projecteur_mirage", "desert_ver_foreur", "desert_fumerolle_vapeur",
-	              "desert_char_enfoui", "desert_arche_verre"],
+	              "desert_char_enfoui", "desert_arche_verre", "desert_obelisque_solaire"],
 	"jungle":    ["jungle_mortier_plante", "jungle_liane_fouet", "jungle_cosse_geante",
 	              "jungle_fleur_catapulte", "jungle_plante_lasso", "jungle_nuee_lucioles",
-	              "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_colonne_racines", "jungle_statue_mecha"],
+	              "jungle_arbre_ruche", "jungle_fruit_grenade", "jungle_colonne_racines", "jungle_statue_mecha", "jungle_pilier_racines"],
 	"volcanic":  ["volcanic_mortier_scories", "volcanic_event_magma", "volcanic_lingotiere",
 	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "volcanic_marteau_pilon", "volcanic_creuset_basculant", "volcanic_bassin_trempe",
-	              "volcanic_electroaimant", "volcanic_soufflerie_braises", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "volcanic_robot_constructeur"],
-	"swamp":     ["swamp_tourelle_dca", "swamp_vanne_crue", "swamp_coffre_banque", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_lampadaire_phare", "swamp_barricade_vehicules", "swamp_brouilleur_radio", "swamp_gratte_ciel", "swamp_pont_brise"],
+	              "volcanic_electroaimant", "volcanic_soufflerie_braises", "volcanic_cheminee_fonderie", "volcanic_pont_roulant", "volcanic_robot_constructeur", "volcanic_fourneau_lourd"],
+	"swamp":     ["swamp_tourelle_dca", "swamp_vanne_crue", "swamp_coffre_banque", "swamp_vanne_barrage", "swamp_bouee_mine", "swamp_lampadaire_phare", "swamp_barricade_vehicules", "swamp_brouilleur_radio", "swamp_gratte_ciel", "swamp_pont_brise", "swamp_arche_submergee"],
 	"cryo":      ["cryo_canon_azote", "cryo_condenseur_givre", "cryo_caisson_echantillons", "cryo_teleporteur_paire", "cryo_mur_glace_regen", "cryo_cuve_stase", "cryo_serveur_givre",
 	              "cuve_promethee", "generateur_scrap", "barricade_blindee",
 	              "plaque_de_glace", "capsule_cryogenique", "jet_de_cryo", "brouillard_froid", "radiateur", "pic_de_glace", "borne_thermique", "glace_fragile"],
@@ -1314,7 +1344,7 @@ func _load_chunk(c: Vector2i) -> void:
 	var placed: Array = []               # [{pos, gap}] — gap scales with prop size
 
 	# v12.21 : Generation par gabarits de circuits (anneaux de kiting, chicanes, goulets, tranchees)
-	var layout_items: Array = CircuitPatterns.generate_layout(c, kinds, rng, ppos, CLEAR_R)
+	var layout_items: Array = CircuitPatterns.generate_layout(c, kinds, rng, ppos, CLEAR_R, biome)
 	for item in layout_items:
 		var kind: String = String(item.get("kind", ""))
 		if kind == "" or not DECOR.has(kind):
@@ -1333,10 +1363,11 @@ func _load_chunk(c: Vector2i) -> void:
 		var rs: float = float(item.get("rand_scale", 1.0))
 		var sr: float = float(item.get("skill_roll", 0.5))
 		var fl: bool = bool(item.get("flip", false))
+		var aim_ang: float = float(item.get("aim", -999.0))
 
 		if _destroyed.has(Vector2i(pos.round())):
 			continue                     # smashed earlier this run — the spot stays empty
-		made.append(_place(kind, pos, rs, sr, fl))
+		made.append(_place(kind, pos, rs, sr, fl, aim_ang))
 
 		# 14/10 : consoles/vannes avec cible companion a portee
 		if COMPANION.has(kind):
@@ -1380,7 +1411,7 @@ func _unload_chunk(c: Vector2i) -> void:
 
 ## Variation values are drawn by the caller so a skipped (already-destroyed) prop cannot desync
 ## the chunk's RNG stream.
-func _place(kind: String, pos: Vector2, rand_scale: float, skill_roll: float, flip: bool) -> Prop:
+func _place(kind: String, pos: Vector2, rand_scale: float, skill_roll: float, flip: bool, aim_ang: float = -999.0) -> Prop:
 	var prop: Prop = Prop.new()
 	prop.game = game
 	prop.kind = kind
@@ -1389,6 +1420,8 @@ func _place(kind: String, pos: Vector2, rand_scale: float, skill_roll: float, fl
 	prop.rand_scale = rand_scale
 	prop.skill_roll = skill_roll
 	prop.flip = flip                   # mirrored turrets cover the opposite arc (seeded -> stable)
+	if aim_ang > -900.0:
+		prop.custom_aim = aim_ang
 	add_child(prop)
 	return prop
 
@@ -1400,6 +1433,7 @@ class Prop extends StaticBody2D:
 	var block_r: float = 40.0        # radius enemies steer around (read by Enemy)
 	var rand_scale: float = 1.0      # from the chunk's seeded RNG (stable across reloads)
 	var skill_roll: float = 1.0      # ditto
+	var custom_aim: float = -999.0
 	var _sprite: Sprite2D
 	var _skill: bool = false
 	var _awaken: String = ""         # non-empty on a robot carcass: the foe it frees on approach
@@ -2807,6 +2841,12 @@ class Prop extends StaticBody2D:
 		add_child(_sprite)
 		if HEAD_ROTATE and HEADS.has(String(def.get("f", ""))):
 			_build_head(HEADS[String(def.get("f", ""))], tex)
+		if custom_aim > -900.0:
+			if _head != null:
+				var rad: float = deg_to_rad(custom_aim)
+				_head.rotation = rad - _head_axis
+			else:
+				_sprite.rotation = deg_to_rad(custom_aim)
 
 		# Fixed emplacement gun: derive the FIRING AXIS from the art itself so the bolt always
 		# leaves the barrel we drew, never the opposite side. Mirroring the sprite mirrors both
@@ -2819,7 +2859,8 @@ class Prop extends StaticBody2D:
 			set_process(true)
 			if _head == null:
 				_sprite.flip_h = flip
-			var a: float = deg_to_rad(float(def.get("aim", 135.0 if (_welder or _solar_mirror) else 140.0)))
+			var aim_base: float = custom_aim if custom_aim > -900.0 else float(def.get("aim", 135.0 if (_welder or _solar_mirror) else 140.0))
+			var a: float = deg_to_rad(aim_base)
 			_cannon = Vector2.RIGHT.rotated(a)
 			# 15/10 : les images des tourelles ont ete REDUITES (1700-1800 px -> 640 px) pour passer sous la limite
 			# de 200 Mo d'itch.io. Les bouches par defaut du miroir solaire / de la soudeuse etaient en
@@ -2831,7 +2872,12 @@ class Prop extends StaticBody2D:
 				_cannon.x = -_cannon.x
 				_muzzle.x = -_muzzle.x
 			_cannon_beam = true
-			if _welder or _solar_mirror:
+			if def.has("shot_style"):
+				_cannon_beam = false
+				_shot_style = String(def["shot_style"])
+				_shot_cd = float(def.get("shoot_cd", 3.2))
+				_shot_t = randf_range(0.8, 1.8)
+			elif _welder or _solar_mirror:
 				# 15/10 : ces deux tourelles n'utilisent plus le moteur a faisceau COMMUN (ligne fine puis
 				# faisceau epais, juste recolore) : balayage d'arc de soudure / aiguille solaire a cone
 				# convergent, voir TurretShots.gd.
@@ -2953,6 +2999,12 @@ class Prop extends StaticBody2D:
 		if _head_hold_t > 0.0:
 			_head_hold_t -= delta
 			d = _head_override
+		elif _hacked:
+			var ne: Node2D = _find_nearest_enemy(1400.0)
+			if ne != null:
+				d = (ne.global_position - pivot_world()).normalized()
+			else:
+				return
 		elif _plr != null and dist < 1500.0:
 			d = (_plr.global_position - pivot_world()).normalized()
 		else:
@@ -3045,6 +3097,17 @@ class Prop extends StaticBody2D:
 			_enemy_cache = get_tree().get_nodes_in_group("enemies")
 		return _enemy_cache
 
+	func _find_nearest_enemy(max_dist: float = 1200.0) -> Node2D:
+		var best: Node2D = null
+		var best_d2: float = max_dist * max_dist
+		for e in _enemies():
+			if e is Node2D and is_instance_valid(e) and ("alive" not in e or e.alive):
+				var d2: float = global_position.distance_squared_to((e as Node2D).global_position)
+				if d2 < best_d2:
+					best_d2 = d2
+					best = e as Node2D
+		return best
+
 	var _zone_vis: Array = []
 	func _add_zone_vis(r: float, col: Color, a: float, mode: String = "ring") -> void:
 		if mode == "ring" and not ZONE_HINTS:
@@ -3106,12 +3169,22 @@ class Prop extends StaticBody2D:
 		if _cannon_beam and (dist < 2200.0 or _cannon_beam_state != 0):
 			_tick_cannon_beam(delta)
 
-		# --- soudeuse (niveau 1) / miroir solaire (niveau 2) : tirs propres a leur niveau ---
-		if _shot_style != "" and dist < 1300.0:
+		# --- tirs balistiques haute fidelite (soudeuse, miroir solaire, flak, etc.) ---
+		if _shot_style != "" and dist < 1400.0:
 			_shot_t -= delta
 			if _shot_t <= 0.0:
 				_shot_t = _shot_cd
-				TurretShot.fire(_shot_style, self, game, _plr, _welder_dmg if _welder else _solar_dmg, kind)
+				var target_node: Node2D = _plr
+				var dmg: float = _welder_dmg if _welder else (_solar_dmg if _solar_mirror else float(def.get("shoot_dmg", 22.0)))
+				if _hacked:
+					var nearest_enemy: Node2D = _find_nearest_enemy(1400.0)
+					if nearest_enemy != null:
+						target_node = nearest_enemy
+						dmg *= 1.8
+					else:
+						target_node = null
+				if target_node != null and is_instance_valid(target_node):
+					TurretShot.fire(_shot_style, self, game, target_node, dmg, kind)
 
 		# --- beacon: emit an enemy on a fixed cadence while the player is in range ---
 		if _beacon:
@@ -4567,6 +4640,12 @@ class Prop extends StaticBody2D:
 			var progress: float = 1.0 - clampf(_cannon_beam_t / maxf(dur, 0.001), 0.0, 1.0)
 			var cur_angle: float = lerpf(-_sweep_half, _sweep_half, progress)
 			cur_cannon = _cannon.rotated(cur_angle)
+		if not _welder and _cannon_beam_state == 2:
+			# Balayage d'interdiction en éventail (tir de barrage) couvrant l'avenue
+			var dur: float = fire_time
+			var progress: float = 1.0 - clampf(_cannon_beam_t / maxf(dur, 0.001), 0.0, 1.0)
+			var cur_angle: float = sin(progress * TAU) * deg_to_rad(18.0)
+			cur_cannon = _cannon.rotated(cur_angle)
 		var a: Vector2 = global_position + _muzzle
 		if _head != null:
 			# tourelle a tete pivotante : le faisceau part de la bouche et suit le canon (verrouille pendant le tir)
@@ -4577,6 +4656,18 @@ class Prop extends StaticBody2D:
 			if _cannon_beam_state == 2:
 				head_override(_head_lock, 0.2)
 		var b: Vector2 = a + cur_cannon * CANNON_LEN
+		# Raycast anti-mur : stoppe proprement le rayon à la surface des obstacles (layer 8)
+		if is_inside_tree():
+			var space = get_world_2d().direct_space_state
+			if space != null:
+				var q = PhysicsRayQueryParameters2D.create(a + cur_cannon * 12.0, b, 8)
+				q.exclude = [self]
+				var hit = space.intersect_ray(q)
+				if not hit.is_empty():
+					b = hit.position
+					if _cannon_beam_state == 2 and game != null and game.has_method("impact_fx"):
+						var icol: Color = Color(0.3, 0.9, 1.0) if (_hacked or _welder) else Color(1.0, 0.6, 0.2)
+						game.impact_fx(b, icol, "sparks", -cur_cannon, 0.7)
 		var pts: PackedVector2Array = PackedVector2Array([a, b])
 		var base_col: Color = Color(1.0, 0.9, 0.4) if _solar_mirror else (Color(0.2, 0.85, 1.0) if (_hacked or _welder) else Color(1.0, 0.35, 0.1))
 
@@ -4614,11 +4705,13 @@ class Prop extends StaticBody2D:
 					_cannon_hit_set.clear()
 					if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
 						_cannon_beam_flash.position = a
+						_cannon_beam_flash.rotation = cur_cannon.angle()
+						_cannon_beam_flash.scale = Vector2(0.65, 0.38)
 						_cannon_beam_flash.visible = true
 					_fire_cannon_beam(a, b, base_col, cur_cannon)
 					Audio.sfx("w_plasma", 0.06)
 			2:
-				# Decharge de rayon laser : faisceau epais incandescent avec micro-flicker
+				# Decharge de tir de barrage : faisceau energetique intense balayant la zone
 				var f: float = clampf(_cannon_beam_t / maxf(fire_time, 0.001), 0.0, 1.0)
 				var flick: float = 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.1)
 				for ln in [_cannon_beam_glow, _cannon_beam_line, _cannon_beam_core]:
@@ -4635,8 +4728,9 @@ class Prop extends StaticBody2D:
 					_cannon_beam_glow.default_color = Color(base_col.r, base_col.g, base_col.b, f * 0.5)
 				if _cannon_beam_flash != null and is_instance_valid(_cannon_beam_flash):
 					_cannon_beam_flash.position = a
-					_cannon_beam_flash.scale = Vector2.ONE * (CANNON_HALF_W * 4.5 / 128.0) * (0.8 + 0.4 * flick)
-					_cannon_beam_flash.modulate = Color(base_col.r, base_col.g, base_col.b, f)
+					_cannon_beam_flash.rotation = cur_cannon.angle()
+					_cannon_beam_flash.scale = Vector2(0.75, 0.42) * (0.85 + 0.3 * flick)
+					_cannon_beam_flash.modulate = Color(base_col.r, base_col.g, base_col.b, f * 0.95)
 				_check_cannon_beam_hits(a, b, cur_cannon)
 				if _cannon_beam_t <= 0.0:
 					_cannon_beam_state = 0

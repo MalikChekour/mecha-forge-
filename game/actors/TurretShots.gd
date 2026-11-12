@@ -38,8 +38,8 @@ var _d: Dictionary = {}
 
 const FRAG_N: int = 16
 ## portee du tir droit (canons a tube fixes) selon le style
-const STRAIGHT_RANGE: Dictionary = {"weld_sweep": 450.0, "lob_pod": 430.0, "lob_slag": 400.0, "flak": 470.0,
-	"orb_frost": 450.0, "plasma": 440.0, "acid_burst": 340.0}
+const STRAIGHT_RANGE: Dictionary = {"weld_sweep": 450.0, "solar_needle": 550.0, "lob_pod": 430.0, "lob_slag": 400.0, "flak": 470.0,
+	"orb_frost": 450.0, "plasma": 440.0, "acid_burst": 340.0, "missile_swarm": 500.0}
 
 const GRAMMAR: Dictionary = {
 	"weld_sweep":    ["balayage_continu", "masque_et_pointilles"],
@@ -77,23 +77,77 @@ static func fire(shot_style: String, prop: Node2D, g: Node, p: Node2D, damage: f
 			sh.life = 0.7 + 2.4
 			sh.dir = (to_p - s).normalized()
 		"solar_needle":
-			var sh2: TurretShot = _mk("solar_needle", g, p, damage, k, s, to_p, prop)
+			# Rayon solaire haute température avec détection d'obstacle (arrêt net sur parois)
+			var base_dir: Vector2 = fixed_dir if fixed_dir != Vector2.ZERO else (to_p - s).normalized()
+			var dist_tgt: float = s.distance_to(to_p)
+			var needle_tgt: Vector2 = s + base_dir * maxf(dist_tgt, 420.0)
+			if prop.is_inside_tree():
+				var space = prop.get_world_2d().direct_space_state
+				if space != null:
+					var q = PhysicsRayQueryParameters2D.create(s + base_dir * 12.0, needle_tgt, 8)
+					q.exclude = [prop]
+					var hit = space.intersect_ray(q)
+					if not hit.is_empty():
+						needle_tgt = hit.position - base_dir * 8.0
+			var sh2: TurretShot = _mk("solar_needle", g, p, damage, k, s, needle_tgt, prop)
 			sh2.life = 1.5 + 0.45
 		"lob_pod":
-			var sh3: TurretShot = _mk("lob_pod", g, p, damage, k, s, to_p + lead, prop)
-			sh3.life = clampf(s.distance_to(sh3.tgt) / 300.0, 0.9, 1.7)
+			# Barrage végétal d'angle : salve en éventail de 3 cosses explosives arrosant la route
+			var base_dir: Vector2 = fixed_dir if fixed_dir != Vector2.ZERO else (to_p - s).normalized()
+			var dist_tgt: float = s.distance_to(to_p)
+			for i in 3:
+				var spread_ang: float = deg_to_rad(-16.0 + float(i) * 16.0)
+				var pod_target: Vector2 = s + base_dir.rotated(spread_ang) * maxf(dist_tgt, 260.0) + lead * 0.4
+				if prop.is_inside_tree():
+					var space = prop.get_world_2d().direct_space_state
+					if space != null:
+						var q = PhysicsRayQueryParameters2D.create(s + base_dir * 12.0, pod_target, 8)
+						q.exclude = [prop]
+						var hit = space.intersect_ray(q)
+						if not hit.is_empty():
+							pod_target = hit.position - base_dir * 14.0
+				var sh3: TurretShot = _mk("lob_pod", g, p, damage * 0.55, k, s, pod_target, prop)
+				sh3.delay = float(i) * 0.12
+				sh3.life = clampf(s.distance_to(sh3.tgt) / 300.0, 0.9, 1.7)
 		"lob_slag":
-			var sh4: TurretShot = _mk("lob_slag", g, p, damage, k, s, to_p + lead * 0.6, prop)
-			sh4.life = clampf(s.distance_to(sh4.tgt) / 190.0, 1.5, 2.4)
-			sh4._d["dir2"] = (sh4.tgt - s).normalized()
+			# Barrage de scories : salve de 2 obus lourds balayant l'axe de coulée
+			var base_dir: Vector2 = fixed_dir if fixed_dir != Vector2.ZERO else (to_p - s).normalized()
+			var dist_tgt: float = s.distance_to(to_p)
+			for i in 2:
+				var spread_ang: float = 0.0 if i == 0 else deg_to_rad(14.0)
+				var slag_target: Vector2 = s + base_dir.rotated(spread_ang) * maxf(dist_tgt, 250.0) + lead * 0.35
+				if prop.is_inside_tree():
+					var space = prop.get_world_2d().direct_space_state
+					if space != null:
+						var q = PhysicsRayQueryParameters2D.create(s + base_dir * 12.0, slag_target, 8)
+						q.exclude = [prop]
+						var hit = space.intersect_ray(q)
+						if not hit.is_empty():
+							slag_target = hit.position - base_dir * 14.0
+				var sh4: TurretShot = _mk("lob_slag", g, p, damage * 0.65, k, s, slag_target, prop)
+				sh4.delay = float(i) * 0.15
+				sh4.life = clampf(s.distance_to(sh4.tgt) / 190.0, 1.5, 2.4)
+				sh4._d["dir2"] = (sh4.tgt - s).normalized()
 		"flak":
+			# Tir de barrage défensif : salve de 4 obus supersoniques balayant le secteur en éventail
+			var base_dir: Vector2 = fixed_dir if fixed_dir != Vector2.ZERO else (to_p - s).normalized()
+			var dist_tgt: float = s.distance_to(to_p)
 			for i in 4:
-				var off: Vector2 = Vector2.RIGHT.rotated(randf() * TAU) * randf_range(25.0, 75.0)
-				if fixed_dir != Vector2.ZERO:
-					off = fixed_dir * randf_range(-70.0, 70.0)   # tube fixe : les obus restent DANS l axe, seule la profondeur varie
-				var sh5: TurretShot = _mk("flak", g, p, damage * 0.45, k, s, to_p + lead + off, prop)
-				sh5.delay = float(i) * 0.12
-				sh5.life = clampf(s.distance_to(sh5.tgt) / 560.0, 0.45, 1.0)
+				# Éventail de barrage : balayage angulaire couvrant l'avenue (-15° à +15°)
+				var spread_angle: float = deg_to_rad(-15.0 + float(i) * 10.0)
+				var shot_target: Vector2 = s + base_dir.rotated(spread_angle) * maxf(dist_tgt, 260.0) + lead * 0.4
+				# Vérification obstacle / anti-mur : stoppe l'obus à la surface des murs (layer 8)
+				if prop.is_inside_tree():
+					var space = prop.get_world_2d().direct_space_state
+					if space != null:
+						var q = PhysicsRayQueryParameters2D.create(s + base_dir * 12.0, shot_target, 8)
+						q.exclude = [prop]
+						var hit = space.intersect_ray(q)
+						if not hit.is_empty():
+							shot_target = hit.position - base_dir * 12.0
+				var sh5: TurretShot = _mk("flak", g, p, damage * 0.45, k, s, shot_target, prop)
+				sh5.delay = float(i) * 0.10
+				sh5.life = clampf(s.distance_to(sh5.tgt) / 620.0, 0.35, 0.95)
 		"orb_frost":
 			var sh6: TurretShot = _mk("orb_frost", g, p, damage, k, s, to_p, prop)
 			sh6.life = 0.9 + 6.0
@@ -129,7 +183,7 @@ static func _muzzle_of(prop: Node2D) -> Vector2:
 		h = float(prop._sprite.texture.get_height()) * absf(prop._sprite.scale.y)
 	return prop.global_position + Vector2(0.0, -h * 0.28)
 
-static func _mk(st: String, g: Node, p: Node2D, damage: float, k: String, s: Vector2, target: Vector2, prop: Node2D) -> TurretShot:
+static func _mk(st: String, g: Node, p: Node2D, damage: float, k: String, s: Vector2, target: Vector2, prop = null) -> TurretShot:
 	var sh: TurretShot = TurretShot.new()
 	sh.style = st
 	sh.game = g
@@ -138,12 +192,13 @@ static func _mk(st: String, g: Node, p: Node2D, damage: float, k: String, s: Vec
 	sh.kind = k
 	sh.src = s
 	sh.tgt = target
-	sh.prop_ref = prop
+	var pref: Node2D = (prop as Node2D) if (prop != null and is_instance_valid(prop)) else null
+	sh.prop_ref = pref
 	sh.top_level = true
 	sh.z_index = 30
 	sh.global_position = s
 	sh._seed = randf() * 100.0
-	sh._d["straight"] = prop != null and prop.has_method("barrel_fixed") and prop.barrel_fixed()
+	sh._d["straight"] = pref != null and pref.has_method("barrel_fixed") and pref.barrel_fixed()
 	g.fx_layer.add_child(sh)
 	sh._glow = ShotGlow.new()
 	sh._glow.owner_shot = sh
@@ -342,6 +397,18 @@ func _step_solar(delta: float) -> void:
 		var lk: Vector2 = _d["lock"]
 		var dd: Vector2 = (lk - src).normalized()
 		var tip: Vector2 = src + dd * 560.0
+		# Arrêt net du rayon solaire à la surface des obstacles (layer 8)
+		if is_inside_tree():
+			var space = get_world_2d().direct_space_state
+			if space != null:
+				var q = PhysicsRayQueryParameters2D.create(src + dd * 10.0, tip, 8)
+				if prop_ref != null and is_instance_valid(prop_ref):
+					q.exclude = [prop_ref]
+				var hit = space.intersect_ray(q)
+				if not hit.is_empty():
+					tip = hit.position - dd * 6.0
+					if game != null and game.has_method("impact_fx"):
+						game.impact_fx(tip, Color(1.0, 0.88, 0.35), "solar", -dd, 1.3)
 		_d["tip"] = tip
 		_sfx("ts_solar_b", 0.02)
 		_shake(5.5)
@@ -369,8 +436,9 @@ func _step_pod(delta: float) -> void:
 		if plr != null and plr.global_position.distance_to(tgt) <= 65.0:
 			_hurt(dmg * 0.8, tgt)
 		# Eclate en 6 epines radiales
+		var pref_pod: Node2D = prop_ref if is_instance_valid(prop_ref) else null
 		for i in 6:
-			var th: TurretShot = _mk("thorn", game, plr, dmg * 0.18, kind, tgt, tgt, prop_ref)
+			var th: TurretShot = _mk("thorn", game, plr, dmg * 0.18, kind, tgt, tgt, pref_pod)
 			th.vel = Vector2.RIGHT.rotated(float(i) * TAU / 6.0 + 0.1) * 340.0
 			th.life = 0.42
 		# Spores toxiques
@@ -452,11 +520,21 @@ func _step_flak(delta: float) -> void:
 		# Anneau d'eclats supersonique
 		var r: float = 122.0 * (1.0 - pow(1.0 - clampf(t / 0.52, 0.0, 1.0), 2.2))
 		_d["r"] = r
-		if not _hit_done and plr != null:
-			var dp: float = plr.global_position.distance_to(tgt)
-			if absf(dp - r) <= 20.0 and t < 0.5:
-				_hit_done = true
-				_hurt(dmg, tgt)
+		if not _hit_done:
+			var is_hacked: bool = false
+			if prop_ref != null and is_instance_valid(prop_ref) and "_hacked" in prop_ref:
+				is_hacked = bool(prop_ref._hacked)
+			if not is_hacked and plr != null and is_instance_valid(plr):
+				var dp: float = plr.global_position.distance_to(tgt)
+				if absf(dp - r) <= 22.0 and t < 0.5:
+					_hit_done = true
+					_hurt(dmg, tgt)
+			if game != null and "enemy_layer" in game and is_instance_valid(game.enemy_layer):
+				for e in game.enemy_layer.get_children():
+					if e is Node2D and is_instance_valid(e) and e.has_method("take_damage"):
+						var de: float = (e as Node2D).global_position.distance_to(tgt)
+						if de <= r + 18.0 and t < 0.4:
+							e.take_damage(dmg * (2.2 if is_hacked else 1.2))
 		if t >= 0.6:
 			queue_free()
 
@@ -546,8 +624,9 @@ func _step_plasma(delta: float) -> void:
 			_sfx("ts_plasma_b", 0.04)
 			_shake(3.2)
 			# Se scinde en 3 eclairs
+			var pref_pl: Node2D = prop_ref if is_instance_valid(prop_ref) else null
 			for i in 3:
-				var b: TurretShot = _mk("bolt", game, plr, dmg * 0.55, kind, global_position, tgt, prop_ref)
+				var b: TurretShot = _mk("bolt", game, plr, dmg * 0.55, kind, global_position, tgt, pref_pl)
 				b.vel = dir.rotated(float(i - 1) * 0.4) * 580.0
 				b.life = 0.68
 			_burst("plasma", global_position, 0.8, Color(0.5, 1.0, 0.6))
@@ -873,26 +952,38 @@ func _draw_flak() -> void:
 	if phase == 0:
 		var tp: Vector2 = to_local(tgt)
 		var k: float = clampf(t / life, 0.0, 1.0)
-		_shadow(tp, 20.0 + 12.0 * k, 10.0 + 6.0 * k, 0.28 + 0.32 * k)
-	_smoke_trail(Color(0.5, 0.48, 0.46), 15.0, 38.0, 0.38)
+		_shadow(tp, 24.0 + 14.0 * k, 12.0 + 7.0 * k, 0.35 + 0.35 * k)
+	_smoke_trail(Color(0.46, 0.44, 0.42), 18.0, 44.0, 0.42)
 
 func _glow_flak(g: Node2D) -> void:
+	var is_cyan: bool = false
+	if prop_ref != null and is_instance_valid(prop_ref) and "_hacked" in prop_ref:
+		is_cyan = bool(prop_ref._hacked)
+	var col_head: Color = Color(0.4, 0.9, 1.0) if is_cyan else Color(1.0, 0.75, 0.35)
+	var col_trail: Color = Color(0.2, 0.8, 1.0) if is_cyan else Color(1.0, 0.5, 0.15)
 	if phase == 0:
 		var tp: Vector2 = to_local(tgt)
 		var k: float = clampf(t / life, 0.0, 1.0)
-		_spr(g, "ts_ring", tp, Vector2.ONE * 244.0, 0.0, Color(1.0, 0.8, 0.45, 0.18 + 0.4 * k))
+		# Réticule de barrage au sol : anneau dynamique net et lisible
+		_spr(g, "ts_ring", tp, Vector2.ONE * (130.0 + 40.0 * (1.0 - k)), 0.0, Color(col_head.r, col_head.g, col_head.b, 0.22 + 0.5 * k))
+		_spr(g, "ts_flare", tp, Vector2.ONE * (16.0 + 6.0 * sin(t * 24.0)), 0.0, Color(col_head.r, col_head.g, col_head.b, 0.75))
+		# Traînée supersonique étirée et tête d'obus incandescente
+		_line(g, "ts_streak", -dir * 38.0, Vector2.ZERO, 15.0, Color(col_trail.r, col_trail.g, col_trail.b, 0.9))
 		_spr(g, "ts_flak_head", Vector2.ZERO, Vector2(180, 180), dir.angle(), Color.WHITE)
-		_spr(g, "ts_flare", Vector2.ZERO, Vector2.ONE * 45.0, dir.angle(), Color(1.0, 0.9, 0.7, 0.9))
+		_spr(g, "ts_flare", Vector2.ZERO, Vector2.ONE * 52.0, dir.angle(), Color(col_head.r, col_head.g, col_head.b, 0.95))
+		_glow_trail(g, "ts_spark", col_trail, 20.0, 0.55)
 	else:
 		var r: float = float(_d.get("r", 0.0))
 		var f: float = clampf(1.0 - t / 0.6, 0.0, 1.0)
-		_spr(g, "ts_ring", Vector2.ZERO, Vector2.ONE * (r * 2.0 + 26.0), 0.0, Color(1.0, 0.85, 0.55, 0.88 * f))
+		# Anneau d'onde de choc de détonation
+		_spr(g, "ts_ring", Vector2.ZERO, Vector2.ONE * (r * 2.2 + 28.0), 0.0, Color(col_head.r, col_head.g, col_head.b, 0.92 * f))
 		for i in FRAG_N:
-			var a: float = TAU * float(i) / float(FRAG_N) + 0.2
+			var a: float = TAU * float(i) / float(FRAG_N) + 0.25
 			var d_v: Vector2 = Vector2.RIGHT.rotated(a)
-			_line(g, "ts_spark", d_v * maxf(0.0, r - 34.0), d_v * r, 10.0, Color(1.0, 0.88, 0.55, f))
-			_spr(g, "ts_flare", d_v * r, Vector2.ONE * 24.0, 0.0, Color(1.0, 0.96, 0.82, f))
-		_spr(g, "ts_flare", Vector2.ZERO, Vector2.ONE * (70.0 + 70.0 * f), 0.0, Color(1.0, 0.82, 0.48, 0.75 * f))
+			_line(g, "ts_spark", d_v * maxf(0.0, r - 36.0), d_v * r, 11.0, Color(col_head.r, col_head.g, col_head.b, f))
+			_spr(g, "ts_flare", d_v * r, Vector2.ONE * 26.0, 0.0, Color(1.0, 0.96, 0.88, f))
+		# Flash sphérique incandescent d'éclatement
+		_spr(g, "ts_flare", Vector2.ZERO, Vector2.ONE * ((80.0 + 70.0 * f) * 1.15), 0.0, Color(col_head.r, col_head.g, col_head.b, 0.82 * f))
 
 # ---------------------------------------------------------------- DESSIN 6 CRYO
 func _glow_orb(g: Node2D) -> void:

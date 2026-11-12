@@ -90,9 +90,9 @@ func target_center() -> Vector2:
 func target_radius() -> float:
 	return next_radius if next_shown else radius
 
-## La zone n'existe vraiment qu'a partir de la 1re annonce (avant : la carte entiere est sure).
+## La zone est toujours active et visible des le debut de la partie.
 func zone_live() -> bool:
-	return phase > 0 or _shrinking >= 0 or next_shown
+	return active
 
 func cur_dps_frac() -> float:
 	var z: int = phase + (1 if _shrinking >= 0 else 0)
@@ -396,7 +396,7 @@ class ZoneHud extends Control:
 		var t: float = GameState.run_time
 		var n: int = ArenaWall.PHASES.size()
 		if t < float(ArenaWall.PHASES[0][0]):
-			return ""                          # phase 0 : exploration libre, aucune pression
+			return "ZONE 1/%d  -  ATTENTE %s" % [n, _fmt(float(ArenaWall.PHASES[0][0]) - t)]
 		for i in ArenaWall.PHASES.size():
 			var ph: Array = ArenaWall.PHASES[i]
 			if t < float(ph[1]):

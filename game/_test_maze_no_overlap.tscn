@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://d2n8maze0overlap"]
+
+[ext_resource type="Script" path="res://_test_maze_no_overlap.gd" id="1_test"]
+
+[node name="TestMazeNoOverlap" type="Node"]
+script = ExtResource("1_test")

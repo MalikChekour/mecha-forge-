@@ -40,6 +40,8 @@ Write-Output "=== export Web + Android depuis la source actuelle ==="
 Push-Location $REPO
 & $GODOT --headless --path game --export-release "Web" ../web/index.html
 if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Error "export Web echoue" }
+# Clean stale Godot temp APK files to avoid Windows file locks
+Get-ChildItem "$env:LOCALAPPDATA\Godot\tmpexport*" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 & $GODOT --headless --path game --export-debug "Android" ../build/mecha-forge.apk
 if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Error "export Android echoue" }
 Pop-Location

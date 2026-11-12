@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://crosaces001test"]
+
+[ext_resource type="Script" path="res://_test_rosace_intersections.gd" id="1_test"]
+
+[node name="TestRosaceIntersections" type="Node"]
+script = ExtResource("1_test")

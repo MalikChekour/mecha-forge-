@@ -2831,20 +2831,22 @@ func _scatter_decor(biome_name: String) -> void:
 	cover_list.clear()
 	_map_phase_shown = -1   # 04/10 : nouveau biome -> jamais bannerer son tout premier etat de map
 
-	# TEST NIVEAU 1 ("tech" / L'Usine) :
-	# Suppression temporaire de tous les décors anciens et activation du labyrinthe léger modulaire Blender.
+	# NIVEAU 1 ("tech" / L'Usine) :
+	# Labyrinthe modulaire haute fidélité étendu jusqu'aux limites du cercle PUBG (MAP_R = 10 000 px).
+	# Le cercle reste toujours actif et la carte est totalement explorable sans restriction artificielle.
 	if biome_name == "tech":
 		var maze: Node2D = TechMazeScript.new()
 		maze.game = self
 		maze.z_index = -1
 		add_child(maze)
 		_tech_maze = maze
+		var map_r: float = ArenaWallScript.MAP_R
 		if player != null:
-			player.arena = Rect2(-1500.0, -1500.0, 3000.0, 3000.0)
+			player.arena = Rect2(-map_r, -map_r, map_r * 2.0, map_r * 2.0)
 		if spawner != null:
-			spawner.arena = Rect2(-1450.0, -1450.0, 2900.0, 2900.0)
+			spawner.arena = Rect2(-map_r, -map_r, map_r * 2.0, map_r * 2.0)
 		if cam != null:
-			cam.limit_left = -1650; cam.limit_right = 1650; cam.limit_top = -1650; cam.limit_bottom = 1650
+			cam.limit_left = -10000000; cam.limit_right = 10000000; cam.limit_top = -10000000; cam.limit_bottom = 10000000
 		return
 
 	var s: PropScatter = PropScatter.new()

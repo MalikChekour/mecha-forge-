@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sélecteur & Exporteur de Méchas — Choix des Images</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #090d16;
+    --card-bg: rgba(18, 24, 38, 0.9);
+    --border: rgba(255, 255, 255, 0.08);
+    --cyan: #06b6d4;
+    --green: #10b981;
+    --orange: #f97316;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg);
+    background-image: 
+      radial-gradient(circle at 10% 10%, rgba(6, 182, 212, 0.07) 0%, transparent 40%),
+      radial-gradient(circle at 90% 90%, rgba(249, 115, 22, 0.07) 0%, transparent 40%),
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    padding: 24px 20px 100px;
+  }
+  .container { max-width: 1440px; margin: 0 auto; }
+  
+  /* Sticky Action Bar */
+  .action-bar {
+    position: sticky;
+    top: 16px;
+    z-index: 900;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(6, 182, 212, 0.35);
+    border-radius: 14px;
+    padding: 16px 24px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(6, 182, 212, 0.15);
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .stats-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .badge-count {
+    background: var(--cyan);
+    color: #000;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+  }
+  .action-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .btn-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'Chakra Petch', sans-serif;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13.5px;
+    transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.12); }
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+    border-color: var(--green);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+  }
+  .btn-primary:hover {
+    background: #059669;
+    color: #fff;
+  }
+  .btn-accent {
+    background: var(--cyan);
+    color: #000;
+    border-color: var(--cyan);
+  }
+  .btn-accent:hover {
+    background: #0891b2;
+    color: #fff;
+  }
+  
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  h1 {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff 0%, #cbd5e1 50%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  p.subtitle {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  /* Filter Pills */
+  .filter-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .pill-filter {
+    font-family: 'Chakra Petch', sans-serif;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .pill-filter.active, .pill-filter:hover {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--cyan);
+    border-color: var(--cyan);
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 22px;
+  }
+  .mecha-item {
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.22s ease;
+    backdrop-filter: blur(8px);
+  }
+  .mecha-item:hover {
+    transform: translateY(-4px);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  }
+  .mecha-item.selected {
+    border-color: var(--green);
+    background: rgba(16, 185, 129, 0.06);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+  }
+  .item-thumb-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #060911;
+  }
+  .item-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  .mecha-item:hover .item-img {
+    transform: scale(1.03);
+  }
+  .check-overlay {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #fff;
+    transition: all 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  .mecha-item.selected .check-overlay {
+    background: var(--green);
+    border-color: var(--green);
+    color: #000;
+    font-weight: 900;
+  }
+  .cat-tag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--cyan);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+  }
+  .cat-tag.tag-v2 {
+    color: var(--green);
+    border-color: rgba(16, 185, 129, 0.5);
+  }
+  .cat-tag.tag-v1 {
+    color: var(--orange);
+    border-color: rgba(249, 115, 22, 0.5);
+  }
+  .item-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  .item-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .item-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  
+  /* Modal zoom */
+  .modal {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    display: none; align-items: center; justify-content: center;
+    z-index: 2000; padding: 20px;
+  }
+  .modal.active { display: flex; }
+  .modal-img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 8px; }
+  .modal-close {
+    position: absolute; top: 20px; right: 24px;
+    background: rgba(255, 255, 255, 0.15); border: none; color: #fff;
+    font-size: 26px; width: 44px; height: 44px; border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* Export Dialog / Success Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #10b981; color: #000;
+    padding: 14px 22px; border-radius: 8px;
+    font-weight: 700; font-family: 'Chakra Petch', sans-serif;
+    font-size: 15px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    display: none; z-index: 3000;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sélecteur Visuel & Exporteur de Méchas</h1>
+      <p class="subtitle">
+        Coche les méchas que tu souhaites conserver. Tu pourras ensuite exporter automatiquement ta sélection dans un dossier propre.
+      </p>
+    </header>
+
+    <div class="action-bar">
+      <div class="stats-wrap">
+        <span class="badge-count" id="countBadge">0 sélectionné(s)</span>
+        <span class="action-title">Ta Sélection</span>
+      </div>
+      <div class="btn-group">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace;">Dossier :</label>
+          <input type="text" id="destFolderInput" value="mechas_generes_aujourdhui" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(6,182,212,0.4); color: #06b6d4; padding: 7px 12px; border-radius: 6px; font-family:'JetBrains Mono', monospace; font-size: 13px; width: 230px;" placeholder="mechas_generes_aujourdhui">
+        </div>
+        <button class="btn btn-accent" onclick="selectPreset('today')">🔥 Ceux d'Aujourd'hui (13)</button>
+        <button class="btn" onclick="selectPreset('recommended')">⭐ Recommandé (18 Finaux)</button>
+        <button class="btn" onclick="selectPreset('all')">Tout cocher</button>
+        <button class="btn" onclick="selectPreset('none')">Tout décocher</button>
+        <button class="btn btn-primary" onclick="exportSelection()">💾 Sauvegarder dans ce Dossier</button>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <span class="pill-filter" onclick="filterItems('all', event)">Tous les 22 modèles</span>
+      <span class="pill-filter active" onclick="filterItems('today', event)">🔥 Uniquement ceux d'Aujourd'hui (13 Gundams)</span>
+      <span class="pill-filter" onclick="filterItems('gundam_v2', event)">🌟 V2 Récentes (Ch. 2, 3, 5, 7)</span>
+      <span class="pill-filter" onclick="filterItems('gundam_v1', event)">🛡️ V1 (Ch. 1 à 9)</span>
+      <span class="pill-filter" onclick="filterItems('walkers', event)">⚙️ Walkers Industriels (Ch. 10 à 18)</span>
+    </div>
+
+    <div class="grid" id="mechaGrid"></div>
+  </div>
+
+  <div class="modal" id="zoomModal" onclick="closeZoom()">
+    <button class="modal-close" onclick="closeZoom()">&times;</button>
+    <img src="" alt="" class="modal-img" id="zoomImg" onclick="event.stopPropagation()">
+  </div>
+
+  <div class="toast" id="toastBox">✓ Sélection enregistrée avec succès !</div>
+
+<script>
+const MECHAS = [
+  // V2 Recentes (Canon + Bras Articule Gundam)
+  { id: 'ch02_v2', cat: 'gundam_v2', ch: 2, name: 'Ch. 2 : Desert (MA-02 Dune-Zeal V2)', desc: 'Gundam Solo Hero avec canon lineaire 180mm et deux jambes Gundam', file: 'ch02_gundam_desert_v2_1792504770410.jpg', recommended: true },
+  { id: 'ch03_v2', cat: 'gundam_v2', ch: 3, name: 'Ch. 3 : Jungle (MA-03 Jungle-Goliath V2)', desc: 'Gundam Solo Hero avec mega-canon beam et bras articule', file: 'ch03_gundam_jungle_v2_1792504713155.jpg', recommended: true },
+  { id: 'ch05_v2', cat: 'gundam_v2', ch: 5, name: 'Ch. 5 : Marais (MA-05 Sludge-Amphibian V2)', desc: 'Gundam Solo Hero submersible avec canon torpille et deux jambes Gundam', file: 'ch05_gundam_swamp_v2_1792504737086.jpg', recommended: true },
+  { id: 'ch07_v2', cat: 'gundam_v2', ch: 7, name: 'Ch. 7 : Reacteur (MA-07 Cherenkov-Core V2)', desc: 'Gundam Solo Hero avec accelerateur gamma et coeur Cherenkov cyan', file: 'ch07_gundam_reacteur_v2_1792504808484.jpg', recommended: true },
+  
+  // V1 Gundam (Chapitres 1 a 9)
+  { id: 'ch01_v1', cat: 'gundam_v1', ch: 1, name: 'Ch. 1 : Usine (MA-01 Valiant-Worker)', desc: 'Gundam de fonderie jaune/blanc avec Gatling lourde', file: 'ch01_gundam_mecha_1792503626618.jpg', recommended: true },
+  { id: 'ch02_v1', cat: 'gundam_v1', ch: 2, name: 'Ch. 2 : Desert (MA-02 Dune-Zeal V1 Multi-vues)', desc: 'Planche multi-vues avec annotations et isolation des membres', file: 'ch02_gundam_desert_1792503752210.jpg', recommended: false },
+  { id: 'ch03_v1', cat: 'gundam_v1', ch: 3, name: 'Ch. 3 : Jungle (MA-03 Jungle-Goliath V1 Pare-buffle)', desc: 'Version avec lame pare-buffle biseautee et doubles scies', file: 'ch03_gundam_jungle_1792503785319.jpg', recommended: false },
+  { id: 'ch04_v1', cat: 'gundam_v1', ch: 4, name: 'Ch. 4 : Volcanique (MA-04 Magma-Dom)', desc: 'Gundam Dom avec fourneau incandescent et canon plasma', file: 'ch04_gundam_volcanic_1792503824716.jpg', recommended: true },
+  { id: 'ch05_v1', cat: 'gundam_v1', ch: 5, name: 'Ch. 5 : Marais (MA-05 Sludge-Amphibian V1 Sous-marin)', desc: 'Version sous-marine arrondie avec hydrojets et periscope', file: 'ch05_gundam_swamp_1792503857868.jpg', recommended: false },
+  { id: 'ch06_v1', cat: 'gundam_v1', ch: 6, name: 'Ch. 6 : Cryo (MA-06 Polar-Blizzard)', desc: 'Gundam arctique blanc/bleu avec 3 bonbonnes N2 et foreuse', file: 'ch06_gundam_cryo_1792503890181.jpg', recommended: true },
+  { id: 'ch07_v1', cat: 'gundam_v1', ch: 7, name: 'Ch. 7 : Reacteur (MA-07 Cherenkov-Core V1 Diagramme)', desc: 'Version diagramme 3 vues avec annotations textuelles', file: 'ch07_gundam_reacteur_1792503927457.jpg', recommended: false },
+  { id: 'ch08_v1', cat: 'gundam_v1', ch: 8, name: 'Ch. 8 : Ruche (MA-08 Exterminator-Unit)', desc: 'Gundam anti-acide noir/jaune avec double lance-flammes napalm', file: 'ch08_gundam_ruche_1792503962696.jpg', recommended: true },
+  { id: 'ch09_v1', cat: 'gundam_v1', ch: 9, name: 'Ch. 9 : Citadelle (MA-09 Citadel-Bastion)', desc: 'Forteresse Mobile Armor avec railgun jumeau et multi-vues', file: 'ch09_gundam_citadelle_1792503998405.jpg', recommended: true },
+  
+  // Chapitres 10 a 18 (Walkers Industriels)
+  { id: 'ch10', cat: 'walkers', ch: 10, name: 'Ch. 10 : Abysses (Nautilus-01)', desc: 'Bathyscaphe submersible lourd avec canon-torpille et pince', file: 'abyss_walker_mecha_1792436404452.jpg', recommended: true },
+  { id: 'ch11', cat: 'walkers', ch: 11, name: 'Ch. 11 : Ether (Spore-Strider)', desc: 'Caisson mycelien avec mortier rotatif a capsules', file: 'ether_walker_mecha_1792436439299.jpg', recommended: true },
+  { id: 'ch12', cat: 'walkers', ch: 12, name: 'Ch. 12 : Titans (Goliath-Relic)', desc: 'Bunker antique en fonte avec cheminees et double canon', file: 'titans_walker_mecha_1792436476294.jpg', recommended: true },
+  { id: 'ch13', cat: 'walkers', ch: 13, name: 'Ch. 13 : Orbite (Astro-Vecteur)', desc: 'Dome dore zero-g avec tuyeres RCS et railgun', file: 'orbit_walker_mecha_1792436506588.jpg', recommended: true },
+  { id: 'ch14', cat: 'walkers', ch: 14, name: 'Ch. 14 : Quantique (Cipher-Byte)', desc: 'Matrice obsidian et cyan avec coeur hypercube', file: 'quantum_walker_mecha_1792436546606.jpg', recommended: true },
+  { id: 'ch15', cat: 'walkers', ch: 15, name: 'Ch. 15 : Ozone (Volt-Jumper)', desc: 'Sphere Tesla centrale avec lanceur d arcs electriques', file: 'ozone_walker_mecha_1792436577107.jpg', recommended: true },
+  { id: 'ch16', cat: 'walkers', ch: 16, name: 'Ch. 16 : Prisme (Spectra-Mech)', desc: 'Chassis geodesique quartz et chrome a diffraction laser', file: 'prism_walker_mecha_1792436607198.jpg', recommended: true },
+  { id: 'ch17', cat: 'walkers', ch: 17, name: 'Ch. 17 : Steampunk (Steam-Dread)', desc: 'Chaudiere cuivre et bronze rivete avec Gatling laiton', file: 'steampunk_walker_mecha_1792436648178.jpg', recommended: true },
+  { id: 'ch18', cat: 'walkers', ch: 18, name: 'Ch. 18 : Colisee (Colosseum-Gladiator)', desc: 'Champion cyber-gladiateur ceramique rouge et titane', file: 'colosseum_walker_mecha_1792436834734.jpg', recommended: true }
+];
+
+let selectedIds = new Set(MECHAS.filter(m => m.cat === 'gundam_v1' || m.cat === 'gundam_v2').map(m => m.id));
+
+function renderGrid(filter = 'today') {
+  const container = document.getElementById('mechaGrid');
+  container.innerHTML = '';
+  
+  MECHAS.forEach(m => {
+    if (filter === 'today') {
+      if (m.cat !== 'gundam_v1' && m.cat !== 'gundam_v2') return;
+    } else if (filter !== 'all' && m.cat !== filter) {
+      return;
+    }
+    
+    const isSelected = selectedIds.has(m.id);
+    const card = document.createElement('div');
+    card.className = 'mecha-item ' + (isSelected ? 'selected' : '');
+    card.setAttribute('data-id', m.id);
+    
+    let tagClass = 'tag-walker';
+    let tagText = 'Ch. ' + m.ch;
+    if (m.cat === 'gundam_v2') { tagClass = 'tag-v2'; tagText = 'NOUVEAU V2'; }
+    else if (m.cat === 'gundam_v1') { tagClass = 'tag-v1'; tagText = 'GUNDAM V1'; }
+    
+    card.innerHTML = `
+      <div class="item-thumb-wrap">
+        <img src="selector_assets/${m.file}" alt="${m.name}" class="item-img" loading="lazy" onclick="zoomImage('selector_assets/${m.file}', event)">
+        <span class="cat-tag ${tagClass}">${tagText}</span>
+        <div class="check-overlay">${isSelected ? '✓' : ''}</div>
+      </div>
+      <div class="item-body" onclick="toggleSelect('${m.id}')">
+        <div class="item-title">${m.name}</div>
+        <div class="item-desc">${m.desc}</div>
+      </div>
+    `;
+    
+    container.appendChild(card);
+  });
+  
+  updateBadge();
+}
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+  } else {
+    selectedIds.add(id);
+  }
+  const el = document.querySelector(`.mecha-item[data-id="${id}"]`);
+  if (el) {
+    el.classList.toggle('selected', selectedIds.has(id));
+    el.querySelector('.check-overlay').textContent = selectedIds.has(id) ? '✓' : '';
+  }
+  updateBadge();
+}
+
+function updateBadge() {
+  document.getElementById('countBadge').textContent = `${selectedIds.size} sélectionné(s)`;
+}
+
+function selectPreset(type) {
+  if (type === 'all') {
+    selectedIds = new Set(MECHAS.map(m => m.id));
+  } else if (type === 'none') {
+    selectedIds.clear();
+  } else if (type === 'today') {
+    selectedIds = new Set(MECHAS.filter(m => m.cat === 'gundam_v1' || m.cat === 'gundam_v2').map(m => m.id));
+  } else if (type === 'recommended') {
+    selectedIds = new Set(MECHAS.filter(m => m.recommended).map(m => m.id));
+  }
+  const activeFilter = document.querySelector('.pill-filter.active')?.getAttribute('data-filter') || 'today';
+  renderGrid(activeFilter);
+}
+
+function filterItems(filter, e) {
+  document.querySelectorAll('.pill-filter').forEach(p => p.classList.remove('active'));
+  e.target.classList.add('active');
+  e.target.setAttribute('data-filter', filter);
+  renderGrid(filter);
+}
+
+function zoomImage(src, e) {
+  e.stopPropagation();
+  document.getElementById('zoomImg').src = src;
+  document.getElementById('zoomModal').classList.add('active');
+}
+
+function closeZoom() {
+  document.getElementById('zoomModal').classList.remove('active');
+}
+
+async function exportSelection() {
+  if (selectedIds.size === 0) {
+    alert('Veuillez sélectionner au moins un mécha avant d\'exporter.');
+    return;
+  }
+  
+  const chosenList = MECHAS.filter(m => selectedIds.has(m.id));
+  const folderInput = document.getElementById('destFolderInput');
+  const targetFolder = (folderInput && folderInput.value.trim()) ? folderInput.value.trim() : 'ma_selection_mechas';
+  
+  // Try calling the local server API first
+  let savedViaApi = false;
+  try {
+    const res = await fetch('/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selected: Array.from(selectedIds),
+        folderName: targetFolder
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'success') {
+        savedViaApi = true;
+        const toast = document.getElementById('toastBox');
+        toast.textContent = `✓ SUCCÈS DIRECT ! ${data.count} méchas enregistrés dans "${targetFolder}" et le dossier a été ouvert !`;
+        toast.style.background = '#10b981';
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 5000);
+      }
+    }
+  } catch (err) {
+    console.log('API non joignable, fallback sur script .bat:', err);
+  }
+  
+  if (!savedViaApi) {
+    // Fallback: create .bat file
+    let batContent = "@echo off\r\n";
+    batContent += `set DEST=C:\\Users\\Administrator\\mecha-forge\\${targetFolder}\r\n`;
+    batContent += "if not exist \"%DEST%\" mkdir \"%DEST%\"\r\n";
+    batContent += "echo Copie de " + chosenList.length + " mechas selectionnes vers %DEST%...\r\n";
+    
+    chosenList.forEach(m => {
+      batContent += `copy /Y "C:\\Users\\Administrator\\mecha-forge\\selector_assets\\${m.file}" "%DEST%\\${m.file}"\r\n`;
+    });
+    
+    batContent += "echo.\r\necho SUCCES ! Tous les mechas selectionnes ont ete copies dans %DEST% !\r\n";
+    batContent += "start explorer \"%DEST%\"\r\n";
+    batContent += "pause\r\n";
+
+    const blob = new Blob([batContent], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `sauvegarder_dans_${targetFolder}.bat`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    const toast = document.getElementById('toastBox');
+    toast.textContent = `✓ ${chosenList.length} méchas exportés ! Fichier sauvegarder_dans_${targetFolder}.bat téléchargé !`;
+    toast.style.background = '#06b6d4';
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeZoom();
+});
+
+// Initial render sur les modeles d'aujourd'hui
+renderGrid('today');
+</script>
+</body>
+</html>

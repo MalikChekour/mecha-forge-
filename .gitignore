@@ -40,3 +40,27 @@ meshy_in/
 **/_tmp/
 # temp backup of the old blurred ground textures (superseded by clean Gemini re-encode)
 .ground_blurred_backup/
+
+# --- Bruit de travail local (ajoute 12/11/2026 avant migration cloud) ---
+_push_*.log
+_push_*.err
+*.log
+*.err
+*.bak_*
+*.bak
+*.patch
+_backup*/
+_qa_*/
+_qa_*.zip
+qa_*/
+web_dbg/
+mechas_generes_aujourdhui/
+pack_mechas_aujourdhui/
+pack_mechas_aujourdhui.zip
+/test_*.jpg
+/crop_*.jpg
+/ch03_*.jpg
+/test_blueprint.png
+/_p23_src.tar.gz
+# archives sources (deja extraites dans le depot)
+assets_src/**/*.zip
